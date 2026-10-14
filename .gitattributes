@@ -1,0 +1,32 @@
+# ============================================================
+# 换行符统一策略：仓库内文本一律 LF
+#
+# 背景：Windows 本地 core.autocrlf=true 会把检出文件写成 CRLF，而 Linux
+#       服务器上是 LF。两边内容相同、字节数不同（例如 index.html
+#       65425B vs 64552B），会让 diff、备份比对、以及
+#       docs/人生之书/tools/check-generated.cjs 误判成"本地不是最新"。
+# 生效：本文件提交后重新检出（git rm -r --cached . && git reset --hard）
+#       或重新 clone 即按 LF 写出；已提交的历史内容不受影响。
+# ============================================================
+* text=auto eol=lf
+
+# Windows 批处理脚本保留 CRLF（LF 会影响 cmd 的 goto/label 解析）
+# 注意：.ps1 不在例外之列——PowerShell 完全兼容 LF，保持 LF 才能与服务器字节一致
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制资源不做换行符转换
+*.wasm  binary
+*.onnx  binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.woff  binary
+*.woff2 binary
+*.zip   binary
+*.pdf   binary
+*.docx  binary
+*.xlsx  binary

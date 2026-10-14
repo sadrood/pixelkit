@@ -1,0 +1,40 @@
+# 依赖与构建产物（服务器可重建，不进仓库）
+node_modules/
+dist/
+
+# 环境变量与日志（含所有备份变体：.env.bak-* 里同样有真实密钥，绝不能进仓库）
+.env
+.env.*
+.env.bak*
+*.log
+
+# 运行时数据（排行榜/访客统计/用户文件），必须保护，绝不进仓库
+data/
+
+# AI 训练产物（与站点无关，体积大，不进仓库）
+quoridor-ai/
+quoridor-ai.zip
+__pycache__/
+*.pyc
+
+# ONNX Runtime WASM 运行时（从 node_modules 自动复制，不进仓库）
+public/wasm/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 测试与临时产物（不进仓库）
+.playwright-cli/
+*.onnx
+*.onnx.data
+
+# 浏览器调试产物（playwright-cli 的 --filename 会落到项目根目录，容易误提交）
+/snap*.yaml
+/home.png
+/page-*.png
+/page-*.yml
+/console-*.log
+
+# 本地设计评审截图（scripts/ui-shot.mjs 生成）
+.shots*/

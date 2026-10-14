@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>轻量PPT</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --sidebar-w: 200px;
+  --toolbar-h: 44px;
+  --bg: #faf8f4;
+  --bg-panel: #f7f4ef;
+  --bg-surface: #ffffff;
+  --text: #1c1b1a;
+  --text-secondary: #6e6862;
+  --border: #e2ded6;
+  --accent: #ff6b4a;
+  --accent-hover: #f25c39;
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --slide-bg: #fff;
+  --shadow: 0 1px 3px rgba(0,0,0,0.12);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.15);
+  --thumb-bg: #ede9e2;
+  --editor-bg: #e8e4dd;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+}
+
+body.dark {
+  --bg: #1e1e1e;
+  --bg-panel: #252525;
+  --bg-surface: #2d2d2d;
+  --text: #e0e0e0;
+  --text-secondary: #999;
+  --border: #3a3a3a;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.4);
+  --thumb-bg: #333;
+  --editor-bg: #111;
+}
+
+body { display: flex; height: 100vh; overflow: hidden; background: var(--bg); }
+
+/* ---- sidebar ---- */
+#sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  user-select: none;
+}
+#sidebar-header {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 6px;
+}
+#sidebar-header span { font-weight: 600; font-size: 12px; color: var(--text-secondary); letter-spacing: 0.5px; }
+#slide-list {
+  flex: 1; overflow-y: auto; padding: 6px;
+}
+#slide-list::-webkit-scrollbar { width: 5px; }
+#slide-list::-webkit-scrollbar-thumb { background: #bbb; border-radius: 3px; }
+
+.slide-thumb {
+  border: 2px solid transparent;
+  border-radius: 4px;
+  margin-bottom: 6px; cursor: pointer;
+  position: relative;
+  background: var(--thumb-bg);
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.slide-thumb:hover { border-color: var(--accent); }
+.slide-thumb.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.slide-thumb .thumb-num {
+  position: absolute; top: 2px; left: 4px;
+  font-size: 10px; color: #fff; background: rgba(0,0,0,0.5);
+  padding: 0 4px; border-radius: 2px; z-index: 2;
+}
+.slide-thumb .thumb-del {
+  position: absolute; top: 2px; right: 2px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--danger); color: #fff; border: none;
+  font-size: 12px; line-height: 18px; cursor: pointer;
+  display: none; z-index: 3; text-align: center; padding: 0;
+}
+.slide-thumb:hover .thumb-del { display: block; }
+.slide-thumb .thumb-preview {
+  width: 100%; height: 100%;
+  transform-origin: top left;
+  pointer-events: none;
+}
+.slide-thumb .thumb-preview .tp-bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+}
+.slide-thumb .thumb-preview .tp-el {
+  position: absolute; overflow: hidden;
+}
+.slide-thumb .thumb-preview .tp-title {
+  position: absolute; left: 0; right: 0; top: 4%;
+  font-size: 10px; font-weight: 600; text-align: center;
+  color: #333; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; padding: 0 8px;
+}
+
+#add-slide-btn {
+  margin: 6px; padding: 6px;
+  background: var(--bg-surface); border: 1px dashed var(--border);
+  border-radius: 4px; cursor: pointer; color: var(--text-secondary);
+  font-size: 12px; text-align: center; transition: 0.15s;
+}
+#add-slide-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---- main area ---- */
+#main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+/* toolbar */
+#toolbar {
+  height: var(--toolbar-h); min-height: var(--toolbar-h);
+  background: var(--bg-panel); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 10px; gap: 6px;
+  overflow-x: auto; white-space: nowrap;
+}
+#toolbar::-webkit-scrollbar { height: 4px; }
+#toolbar .tb-group {
+  display: flex; align-items: center; gap: 3px;
+  padding: 0 6px; border-right: 1px solid var(--border);
+  height: 28px;
+}
+#toolbar .tb-group:last-child { border-right: none; }
+#toolbar button {
+  height: 28px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--bg-surface); color: var(--text);
+  cursor: pointer; font-size: 12px; white-space: nowrap;
+  display: flex; align-items: center; gap: 4px;
+  transition: 0.15s;
+}
+#toolbar button:hover { background: var(--bg); border-color: #999; }
+#toolbar button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+#toolbar button.primary:hover { background: var(--accent-hover); }
+#toolbar button.danger { color: var(--danger); }
+#toolbar button.danger:hover { background: #fef2f2; border-color: var(--danger); }
+#toolbar button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+#toolbar select {
+  height: 28px; padding: 0 4px; border: 1px solid var(--border);
+  border-radius: 4px; background: var(--bg-surface); color: var(--text);
+  font-size: 12px; cursor: pointer;
+}
+#toolbar input[type="color"] {
+  width: 28px; height: 28px; border: 1px solid var(--border);
+  border-radius: 4px; cursor: pointer; padding: 2px; background: var(--bg-surface);
+}
+#toolbar input[type="number"] {
+  width: 50px; height: 28px; border: 1px solid var(--border);
+  border-radius: 4px; padding: 0 4px; font-size: 12px;
+  background: var(--bg-surface); color: var(--text); text-align: center;
+}
+#toolbar label { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+#toolbar .tb-sep { width: 8px; flex-shrink: 0; }
+#toolbar .tb-spacer { flex: 1; }
+
+/* editor */
+#editor-wrapper {
+  flex: 1; overflow: hidden; display: flex;
+  align-items: center; justify-content: center;
+  background: var(--editor-bg);
+  position: relative;
+}
+#slide-canvas {
+  width: 960px; height: 540px;
+  position: absolute;
+  transform-origin: 0 0;
+  background: var(--slide-bg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+#slide-canvas .bg-layer {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  background-repeat: no-repeat;
+}
+#slide-canvas .bg-layer.empty::after {
+  content: '点击工具栏"设背景"选择图片';
+  position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center;
+  color: #ccc; font-size: 18px;
+}
+#slide-canvas .slide-title {
+  position: absolute; left: 40px; right: 40px; top: 20px;
+  font-size: 28px; font-weight: 700; color: #333;
+  text-align: center; cursor: text; z-index: 1;
+  outline: none; border: none; background: transparent;
+  min-height: 40px; padding: 4px 8px; border-radius: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#slide-canvas .slide-title:focus { background: rgba(0,0,0,0.04); }
+#slide-canvas .slide-title[data-align="left"] { text-align: left; }
+#slide-canvas .slide-title[data-align="right"] { text-align: right; }
+
+#slide-canvas .el {
+  position: absolute; cursor: move; z-index: 2;
+  min-width: 20px; min-height: 20px;
+}
+#slide-canvas .el.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+#slide-canvas .el.dragging { opacity: 0.85; z-index: 10; }
+
+/* text elements */
+#slide-canvas .el-text-block, #slide-canvas .el-text-line {
+  font-size: 16px; color: #333; padding: 8px;
+  outline: none; border: none;
+  overflow: hidden; word-wrap: break-word;
+  cursor: move;
+}
+#slide-canvas .el-text-block:focus,
+#slide-canvas .el-text-line:focus {
+  cursor: text; outline: 1px dashed #aaa;
+}
+#slide-canvas .el-text-block.has-bg,
+#slide-canvas .el-text-line.has-bg {
+  border-radius: 4px;
+}
+
+/* color block */
+#slide-canvas .el-color-block { cursor: move; }
+
+/* resize handles — color-block only */
+.el-color-block .resize-handle {
+  position: absolute; width: 14px; height: 14px;
+  background: #fff; border: 2px solid var(--accent);
+  border-radius: 3px;
+  z-index: 5; display: none;
+}
+.el-color-block.selected .resize-handle { display: block; }
+.el-color-block .resize-handle.nw { top: -7px; left: -7px; cursor: nw-resize; }
+.el-color-block .resize-handle.ne { top: -7px; right: -7px; cursor: ne-resize; }
+.el-color-block .resize-handle.sw { bottom: -7px; left: -7px; cursor: sw-resize; }
+.el-color-block .resize-handle.se { bottom: -7px; right: -7px; cursor: se-resize; }
+
+/* element delete btn — color-block only */
+.el-color-block .el-delete-btn {
+  position: absolute; top: -22px; right: 0;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--danger); color: #fff; border: none;
+  font-size: 14px; line-height: 20px; text-align: center;
+  cursor: pointer; display: none; z-index: 6; padding: 0;
+}
+.el-color-block.selected .el-delete-btn { display: block; }
+
+/* text-block resize handle — single se corner, hides when editing */
+.el-text-block .resize-handle {
+  position: absolute; width: 14px; height: 14px;
+  background: #fff; border: 2px solid var(--accent);
+  border-radius: 3px; z-index: 5; display: none;
+}
+.el-text-block .resize-handle.se { bottom: -7px; right: -7px; cursor: se-resize; }
+.el-text-block.selected .resize-handle { display: block; }
+.el-text-block.selected:focus-within .resize-handle { display: none; }
+
+/* text-line resize handle — same as text-block */
+.el-text-line .resize-handle {
+  position: absolute; width: 14px; height: 14px;
+  background: #fff; border: 2px solid var(--accent);
+  border-radius: 3px; z-index: 5; display: none;
+}
+.el-text-line .resize-handle.se { bottom: -7px; right: -7px; cursor: se-resize; }
+.el-text-line.selected .resize-handle { display: block; }
+.el-text-line.selected:focus-within .resize-handle { display: none; }
+
+/* Allow resize handles to extend beyond element bounds when selected */
+.el-color-block.selected, .el-text-block.selected, .el-text-line.selected { overflow: visible; }
+
+/* preview overlay */
+#preview-overlay {
+  position: fixed; inset: 0; z-index: 1000; background: #d4d4d4;
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+#preview-overlay.show { display: flex; }
+#preview-overlay .pv-slide {
+  width: 94vw; max-width: calc(94vh * 16 / 9);
+  aspect-ratio: 16 / 9;
+  background: #fff; position: relative;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  overflow: hidden;
+}
+#preview-overlay .pv-slide .pv-bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+}
+#preview-overlay .pv-slide .pv-title {
+  position: absolute; left: 4.17%; right: 4.17%; top: 3.7%;
+  font-size: max(28px, min(3vw, 48px));
+  font-weight: 700; color: #333;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  padding: 4px 8px;
+}
+#preview-overlay .pv-slide .pv-el {
+  position: absolute; overflow: hidden;
+}
+#preview-overlay .pv-nav {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 12px; z-index: 1001;
+}
+#preview-overlay .pv-nav button {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 1.5px solid rgba(0,0,0,0.18);
+  background: rgba(255,255,255,0.85); color: #555;
+  font-size: 18px; cursor: pointer;
+  transition: 0.2s;
+}
+#preview-overlay .pv-nav button:hover { background: #fff; border-color: rgba(0,0,0,0.35); }
+#preview-overlay .pv-page-num {
+  position: fixed; bottom: 20px; right: 28px;
+  color: rgba(0,0,0,0.45); font-size: 13px; z-index: 1001;
+}
+#preview-overlay .pv-exit {
+  position: fixed; top: 12px; right: 12px;
+  padding: 5px 12px; border-radius: 5px;
+  border: 1px solid rgba(0,0,0,0.15);
+  background: rgba(255,255,255,0.9); color: #555;
+  cursor: pointer; font-size: 12px; z-index: 1001;
+}
+#preview-overlay .pv-exit:hover { background: #fff; border-color: rgba(0,0,0,0.35); }
+
+/* context menu */
+#ctx-menu {
+  position: fixed; z-index: 2000;
+  background: var(--bg-surface); border: 1px solid var(--border);
+  border-radius: 6px; box-shadow: var(--shadow-lg);
+  padding: 4px 0; min-width: 140px; display: none;
+}
+#ctx-menu .ctx-item {
+  padding: 6px 14px; cursor: pointer; font-size: 12px; color: var(--text);
+}
+#ctx-menu .ctx-item:hover { background: var(--accent); color: #fff; }
+
+/* border-radius slider */
+.br-slider-group { display: flex; align-items: center; gap: 4px; }
+.br-slider-group input[type="range"] { width: 70px; }
+
+/* toast */
+#toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: #333; color: #fff; padding: 8px 20px; border-radius: 6px;
+  font-size: 13px; z-index: 3000; opacity: 0; transition: opacity 0.25s;
+  pointer-events: none;
+}
+#toast.show { opacity: 1; }
+
+/* RGB inputs */
+.rgb-inputs { display: flex; gap: 2px; align-items: center; }
+.rgb-inputs input { width: 36px !important; font-size: 11px !important; }
+.rgb-inputs span { font-size: 10px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <div id="sidebar-header"><span>幻灯片</span></div>
+  <div id="slide-list"></div>
+  <button id="add-slide-btn">+ 添加幻灯片</button>
+</div>
+
+<!-- Main -->
+<div id="main">
+  <div id="toolbar"></div>
+  <div id="editor-wrapper">
+    <div id="slide-canvas"></div>
+  </div>
+</div>
+
+<!-- Preview -->
+<div id="preview-overlay">
+  <div class="pv-slide" id="pv-slide"></div>
+  <div class="pv-nav">
+    <button id="pv-prev" title="上一页">&#9664;</button>
+    <button id="pv-next" title="下一页">&#9654;</button>
+  </div>
+  <span class="pv-page-num" id="pv-page-num"></span>
+  <button class="pv-exit" id="pv-exit">退出预览</button>
+</div>
+
+<!-- Context Menu -->
+<div id="ctx-menu"></div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ============ DATA MODEL ============
+const SLIDE_W = 960;
+const SLIDE_H = 540;
+
+let uidCounter = 0;
+function uid() { return 'el_' + (++uidCounter); }
+
+function createDefaultSlide(title) {
+  return {
+    id: uid(),
+    background: null,
+    title: { text: title || '幻灯片标题', align: 'center', visible: true },
+    elements: []
+  };
+}
+
+function defaultElement(type) {
+  const id = uid();
+  switch (type) {
+    case 'text-block':
+      return { id, type, x: 60, y: 120, w: 840, h: 200, text: '在此输入文本...', fontSize: 18, fontColor: '#333333', bgColor: null, bold: false, borderRadius: 0 };
+    case 'text-line':
+      return { id, type, x: 60, y: 100, w: 500, h: 40, text: '单行文本', fontSize: 24, fontColor: '#333333', bgColor: null, bold: false };
+    case 'color-block':
+      return { id, type, x: 100, y: 100, w: 200, h: 150, fillColor: '#ff6b4a', borderRadius: 0 };
+  }
+}
+
+// ============ STATE ============
+const state = {
+  slides: [],
+  currentSlideIndex: 0,
+  selectedElementId: null,
+  previewMode: false,
+  darkMode: false,
+  fileName: null,
+  fileHandle: null,
+  dirty: false
+};
+
+// Init with one slide
+state.slides.push(createDefaultSlide('欢迎使用 轻量PPT'));
+
+// ============ DOM REFS ============
+const $sidebar = document.getElementById('sidebar');
+const $slideList = document.getElementById('slide-list');
+const $addSlideBtn = document.getElementById('add-slide-btn');
+const $toolbar = document.getElementById('toolbar');
+const $editorWrapper = document.getElementById('editor-wrapper');
+const $slideCanvas = document.getElementById('slide-canvas');
+const $previewOverlay = document.getElementById('preview-overlay');
+const $pvSlide = document.getElementById('pv-slide');
+const $pvPageNum = document.getElementById('pv-page-num');
+const $ctxMenu = document.getElementById('ctx-menu');
+const $toast = document.getElementById('toast');
+
+// ============ HELPERS ============
+function toast(msg) {
+  $toast.textContent = msg;
+  $toast.classList.add('show');
+  clearTimeout($toast._t);
+  $toast._t = setTimeout(() => $toast.classList.remove('show'), 1500);
+}
+
+function getCurrentSlide() { return state.slides[state.currentSlideIndex]; }
+
+function rgbToHex(r, g, b) {
+  return '#' + [r, g, b].map(x => {
+    const h = Math.max(0, Math.min(255, Math.round(x))).toString(16);
+    return h.length === 1 ? '0' + h : h;
+  }).join('');
+}
+
+function hexToRgb(hex) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : { r: 0, g: 0, b: 0 };
+}
+
+function getEditorScale() {
+  const cw = $editorWrapper.clientWidth;
+  const ch = $editorWrapper.clientHeight;
+  return Math.min(cw / SLIDE_W, ch / SLIDE_H) * 0.88;
+}
+
+function canvasPos(e) {
+  const rect = $slideCanvas.getBoundingClientRect();
+  const s = getEditorScale();
+  return {
+    x: (e.clientX - rect.left) / s,
+    y: (e.clientY - rect.top) / s
+  };
+}
+
+// ============ RENDER: SLIDE LIST ============
+function renderSlideList() {
+  $slideList.innerHTML = '';
+  state.slides.forEach((slide, i) => {
+    const div = document.createElement('div');
+    div.className = 'slide-thumb' + (i === state.currentSlideIndex ? ' active' : '');
+    div.innerHTML = `
+      <span class="thumb-num">${i + 1}</span>
+      <button class="thumb-del" data-index="${i}">&times;</button>
+      <div class="thumb-preview" data-index="${i}"></div>`;
+    $slideList.appendChild(div);
+
+    // Render thumbnail preview
+    requestAnimationFrame(() => renderThumbPreview(div.querySelector('.thumb-preview'), slide));
+  });
+}
+
+function renderThumbPreview(container, slide) {
+  const scale = container.clientWidth / SLIDE_W;
+  container.style.transform = `scale(${scale})`;
+  container.style.width = SLIDE_W + 'px';
+  container.style.height = SLIDE_H + 'px';
+  container.style.position = 'relative';
+
+  let html = '';
+  if (slide.background) {
+    html += `<div class="tp-bg" style="background-image:url(${slide.background})"></div>`;
+  }
+  if (slide.title.visible && slide.title.text) {
+    html += `<div class="tp-title" style="font-size:${28 * scale}px;text-align:${slide.title.align};color:${slide.background ? '#fff' : '#333'}">${escapeHtml(slide.title.text)}</div>`;
+  }
+  slide.elements.forEach(el => {
+    let style = `left:${el.x * scale}px;top:${el.y * scale}px;width:${el.w * scale}px;height:${el.h * scale}px;`;
+    if (el.type === 'color-block') {
+      style += `background:${el.fillColor};border-radius:${el.borderRadius * scale}px;`;
+    } else if (el.bgColor) {
+      style += `background:${el.bgColor};border-radius:${4 * scale}px;`;
+    }
+    html += `<div class="tp-el" style="${style}"></div>`;
+  });
+  container.innerHTML = html;
+}
+
+// ============ RENDER: SLIDE CANVAS ============
+function renderSlideCanvas() {
+  const slide = getCurrentSlide();
+  if (!slide) return;
+
+  let html = '';
+
+  // Background
+  if (slide.background) {
+    html += `<div class="bg-layer" style="background-image:url(${slide.background})"></div>`;
+  } else {
+    html += `<div class="bg-layer empty"></div>`;
+  }
+
+  // Title
+  if (slide.title.visible) {
+    html += `<div class="slide-title" contenteditable="true" data-align="${slide.title.align}"
+      style="text-align:${slide.title.align}">${escapeHtml(slide.title.text)}</div>`;
+  }
+
+  // Elements
+  slide.elements.forEach(el => {
+    if (el.type === 'color-block') {
+      html += `<div class="el el-color-block" data-id="${el.id}"
+        style="left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px;
+        background:${el.fillColor};border-radius:${el.borderRadius}%">
+        <div class="resize-handle nw"></div><div class="resize-handle ne"></div>
+        <div class="resize-handle sw"></div><div class="resize-handle se"></div>
+        <button class="el-delete-btn">&times;</button>
+      </div>`;
+    } else if (el.type === 'text-block') {
+      const br = el.borderRadius || 0;
+      const pad = br > 10 ? br / 2 : 8;
+      html += `<div class="el el-text-block${el.bgColor ? ' has-bg' : ''}" data-id="${el.id}"
+        contenteditable="true"
+        style="left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px;
+        font-size:${el.fontSize}px;color:${el.fontColor};${el.bold ? 'font-weight:bold;' : ''}
+        ${el.bgColor ? 'background:' + el.bgColor + ';border-radius:' + br + '%;padding:' + pad + 'px;' : ''}">
+        ${escapeHtml(el.text)}
+        <div class="resize-handle se"></div>
+      </div>`;
+    } else if (el.type === 'text-line') {
+      html += `<div class="el el-text-line${el.bgColor ? ' has-bg' : ''}" data-id="${el.id}"
+        contenteditable="true"
+        style="left:${el.x}px;top:${el.y}px;width:${el.w}px;height:${el.h}px;
+        font-size:${el.fontSize}px;color:${el.fontColor};${el.bold ? 'font-weight:bold;' : ''}
+        ${el.bgColor ? 'background:' + el.bgColor + ';' : ''};white-space:nowrap;">
+        ${escapeHtml(el.text)}
+        <div class="resize-handle se"></div>
+      </div>`;
+    }
+  });
+
+  $slideCanvas.innerHTML = html;
+
+  // Scale
+  const s = getEditorScale();
+  $slideCanvas.style.transform = `scale(${s})`;
+  $slideCanvas.style.left = (($editorWrapper.clientWidth - SLIDE_W * s) / 2) + 'px';
+  $slideCanvas.style.top = (($editorWrapper.clientHeight - SLIDE_H * s) / 2) + 'px';
+
+  // Restore selection
+  if (state.selectedElementId) {
+    const selEl = $slideCanvas.querySelector(`[data-id="${state.selectedElementId}"]`);
+    if (selEl) selEl.classList.add('selected');
+  }
+
+  bindElementEvents();
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ============ TOOLBAR RENDER ============
+function renderToolbar() {
+  const slide = getCurrentSlide();
+  const selEl = slide && state.selectedElementId ? slide.elements.find(e => e.id === state.selectedElementId) : null;
+
+  let html = '';
+
+  // File ops
+  html += `<div class="tb-group">
+    <button class="primary" id="tb-new">新建</button>
+    <button id="tb-open">打开</button>
+    <button id="tb-save">保存HTML</button>
+    <button id="tb-export-json" title="导出JSON源文件（用于以后继续编辑）">导出JSON</button>
+  </div>`;
+
+  // Slide ops
+  html += `<div class="tb-group">
+    <button id="tb-set-bg">🖼 设背景</button>
+    <button id="tb-clear-bg" class="danger">清除背景</button>
+  </div>`;
+
+  // Title controls
+  html += `<div class="tb-group">
+    <label>标题:</label>
+    <select id="tb-title-align">
+      <option value="left" ${slide.title.align === 'left' ? 'selected' : ''}>靠左</option>
+      <option value="center" ${slide.title.align === 'center' ? 'selected' : ''}>居中</option>
+      <option value="right" ${slide.title.align === 'right' ? 'selected' : ''}>靠右</option>
+    </select>
+    <button id="tb-title-toggle" class="${slide.title.visible ? 'active' : ''}">${slide.title.visible ? '●显示' : '○隐藏'}</button>
+  </div>`;
+
+  // Add elements
+  html += `<div class="tb-group">
+    <label>添加:</label>
+    <button id="tb-add-text-block">📝 文本块</button>
+    <button id="tb-add-text-line">📄 文本行</button>
+  </div>`;
+
+  // Element properties (visible when element selected)
+  html += `<div class="tb-group" id="tb-el-props" style="${selEl ? '' : 'opacity:0.4;pointer-events:none;'}">`;
+
+  if (selEl && (selEl.type === 'text-block' || selEl.type === 'text-line')) {
+    // Font size
+    html += `<label>字号</label><input type="number" id="tb-font-size" value="${selEl.fontSize}" min="8" max="200">`;
+    // Bold
+    html += `<button id="tb-bold" class="${selEl.bold ? 'active' : ''}"><b>B</b></button>`;
+    // Font color - RGB
+    const fc = hexToRgb(selEl.fontColor);
+    html += `<label>字色</label>`;
+    html += `<div class="rgb-inputs"><input type="number" id="tb-font-r" value="${fc.r}" min="0" max="255"><span>R</span><input type="number" id="tb-font-g" value="${fc.g}" min="0" max="255"><span>G</span><input type="number" id="tb-font-b" value="${fc.b}" min="0" max="255"><span>B</span></div>`;
+    html += `<input type="color" id="tb-font-color" value="${selEl.fontColor}" title="取色器">`;
+    // Bg color
+    html += `<label>背景</label>`;
+    if (selEl.bgColor) {
+      const bc = hexToRgb(selEl.bgColor);
+      html += `<div class="rgb-inputs"><input type="number" id="tb-bg-r" value="${bc.r}" min="0" max="255"><span>R</span><input type="number" id="tb-bg-g" value="${bc.g}" min="0" max="255"><span>G</span><input type="number" id="tb-bg-b" value="${bc.b}" min="0" max="255"><span>B</span></div>`;
+      html += `<input type="color" id="tb-bg-color" value="${selEl.bgColor}" title="取色器">`;
+    }
+    html += `<button id="tb-toggle-bg" class="${selEl.bgColor ? 'active' : ''}">${selEl.bgColor ? '有填充' : '无填充'}</button>`;
+
+    // Border-radius + square button for text-block with background
+    if (selEl.type === 'text-block' && selEl.bgColor) {
+      const br = selEl.borderRadius || 0;
+      html += `<label>圆角</label><div class="br-slider-group"><input type="range" id="tb-br" value="${br}" min="0" max="50" step="1"><span id="tb-br-val">${br}%</span></div>`;
+      html += `<button id="tb-square" title="取最短边变成正方形（方便造圆）">□ 正方</button>`;
+    }
+  }
+
+  if (selEl && selEl.type === 'color-block') {
+    const fc = hexToRgb(selEl.fillColor);
+    html += `<label>填充</label>`;
+    html += `<div class="rgb-inputs"><input type="number" id="tb-fill-r" value="${fc.r}" min="0" max="255"><span>R</span><input type="number" id="tb-fill-g" value="${fc.g}" min="0" max="255"><span>G</span><input type="number" id="tb-fill-b" value="${fc.b}" min="0" max="255"><span>B</span></div>`;
+    html += `<input type="color" id="tb-fill-color" value="${selEl.fillColor}" title="取色器">`;
+    html += `<label>圆角</label><div class="br-slider-group"><input type="range" id="tb-br" value="${selEl.borderRadius}" min="0" max="50" step="1"><span id="tb-br-val">${selEl.borderRadius}%</span></div>`;
+  }
+
+  html += `</div>`;
+
+  html += `<div class="tb-spacer"></div>`;
+
+  // Theme & Preview
+  html += `<div class="tb-group">
+    <button id="tb-dark-mode">${state.darkMode ? '☀ 亮色' : '🌙 暗色'}</button>
+    <button id="tb-preview" class="primary">▶ 预览</button>
+  </div>`;
+
+  $toolbar.innerHTML = html;
+  bindToolbarEvents();
+}
+
+// ============ BIND EVENTS ============
+function bindToolbarEvents() {
+  // File ops
+  document.getElementById('tb-new')?.addEventListener('click', newFile);
+  document.getElementById('tb-open')?.addEventListener('click', openFile);
+  document.getElementById('tb-save')?.addEventListener('click', saveFile);
+  document.getElementById('tb-export-json')?.addEventListener('click', saveAsJSON);
+
+  // Background
+  document.getElementById('tb-set-bg')?.addEventListener('click', setBackground);
+  document.getElementById('tb-clear-bg')?.addEventListener('click', clearBackground);
+
+  // Title
+  document.getElementById('tb-title-align')?.addEventListener('change', function() {
+    getCurrentSlide().title.align = this.value;
+    state.dirty = true;
+    refreshAll();
+  });
+  document.getElementById('tb-title-toggle')?.addEventListener('click', function() {
+    getCurrentSlide().title.visible = !getCurrentSlide().title.visible;
+    state.dirty = true;
+    refreshAll();
+  });
+
+  // Add elements
+  document.getElementById('tb-add-text-block')?.addEventListener('click', () => addElement('text-block'));
+  document.getElementById('tb-add-text-line')?.addEventListener('click', () => addElement('text-line'));
+
+  // Text element props
+  const selEl = state.selectedElementId ? getCurrentSlide().elements.find(e => e.id === state.selectedElementId) : null;
+
+  if (selEl && (selEl.type === 'text-block' || selEl.type === 'text-line')) {
+    document.getElementById('tb-font-size')?.addEventListener('change', function() {
+      selEl.fontSize = Math.max(8, Math.min(200, parseInt(this.value) || 16));
+      state.dirty = true;
+      refreshAll();
+    });
+    document.getElementById('tb-bold')?.addEventListener('click', function() {
+      selEl.bold = !selEl.bold;
+      state.dirty = true;
+      refreshAll();
+    });
+    // Font color RGB
+    ['tb-font-r', 'tb-font-g', 'tb-font-b'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', updateFontColorFromRgb);
+    });
+    document.getElementById('tb-font-color')?.addEventListener('input', function() {
+      selEl.fontColor = this.value;
+      state.dirty = true;
+      refreshAll();
+    });
+    // Bg color
+    ['tb-bg-r', 'tb-bg-g', 'tb-bg-b'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', updateBgColorFromRgb);
+    });
+    document.getElementById('tb-bg-color')?.addEventListener('input', function() {
+      selEl.bgColor = this.value;
+      state.dirty = true;
+      refreshAll();
+    });
+    document.getElementById('tb-toggle-bg')?.addEventListener('click', function() {
+      if (selEl.bgColor) {
+        selEl.bgColor = null;
+      } else {
+        selEl.bgColor = '#f0f0f0';
+        selEl.borderRadius = selEl.borderRadius || 0;
+      }
+      state.dirty = true;
+      refreshAll();
+    });
+    // Border-radius for text-block with bg
+    document.getElementById('tb-br')?.addEventListener('input', function() {
+      selEl.borderRadius = parseInt(this.value);
+      document.getElementById('tb-br-val').textContent = this.value + '%';
+      state.dirty = true;
+      renderSlideCanvas();
+    });
+    // Square button
+    document.getElementById('tb-square')?.addEventListener('click', function() {
+      const min = Math.min(selEl.w, selEl.h);
+      selEl.w = min;
+      selEl.h = min;
+      state.dirty = true;
+      refreshAll();
+    });
+  }
+
+  // Color block props
+  if (selEl && selEl.type === 'color-block') {
+    ['tb-fill-r', 'tb-fill-g', 'tb-fill-b'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', updateFillColorFromRgb);
+    });
+    document.getElementById('tb-fill-color')?.addEventListener('input', function() {
+      selEl.fillColor = this.value;
+      state.dirty = true;
+      refreshAll();
+    });
+    document.getElementById('tb-br')?.addEventListener('input', function() {
+      selEl.borderRadius = parseInt(this.value);
+      document.getElementById('tb-br-val').textContent = this.value + '%';
+      state.dirty = true;
+      renderSlideCanvas();
+    });
+  }
+
+  // Theme & Preview
+  document.getElementById('tb-dark-mode')?.addEventListener('click', toggleDarkMode);
+  document.getElementById('tb-preview')?.addEventListener('click', enterPreview);
+}
+
+function updateFontColorFromRgb() {
+  const selEl = state.selectedElementId ? getCurrentSlide().elements.find(e => e.id === state.selectedElementId) : null;
+  if (!selEl) return;
+  const r = parseInt(document.getElementById('tb-font-r')?.value) || 0;
+  const g = parseInt(document.getElementById('tb-font-g')?.value) || 0;
+  const b = parseInt(document.getElementById('tb-font-b')?.value) || 0;
+  selEl.fontColor = rgbToHex(r, g, b);
+  state.dirty = true;
+  refreshAll();
+}
+
+function updateBgColorFromRgb() {
+  const selEl = state.selectedElementId ? getCurrentSlide().elements.find(e => e.id === state.selectedElementId) : null;
+  if (!selEl) return;
+  const r = parseInt(document.getElementById('tb-bg-r')?.value) || 0;
+  const g = parseInt(document.getElementById('tb-bg-g')?.value) || 0;
+  const b = parseInt(document.getElementById('tb-bg-b')?.value) || 0;
+  selEl.bgColor = rgbToHex(r, g, b);
+  state.dirty = true;
+  refreshAll();
+}
+
+function updateFillColorFromRgb() {
+  const selEl = state.selectedElementId ? getCurrentSlide().elements.find(e => e.id === state.selectedElementId) : null;
+  if (!selEl) return;
+  const r = parseInt(document.getElementById('tb-fill-r')?.value) || 0;
+  const g = parseInt(document.getElementById('tb-fill-g')?.value) || 0;
+  const b = parseInt(document.getElementById('tb-fill-b')?.value) || 0;
+  selEl.fillColor = rgbToHex(r, g, b);
+  state.dirty = true;
+  refreshAll();
+}
+
+// ============ ELEMENT EVENTS ============
+let dragState = null;
+
+function bindElementEvents() {
+  $slideCanvas.querySelectorAll('.el').forEach(elDiv => {
+    elDiv.addEventListener('mousedown', onElementMouseDown);
+
+    // Double-click to edit text
+    if (elDiv.contentEditable === 'true') {
+      elDiv.addEventListener('dblclick', (e) => {
+        elDiv.focus();
+        const range = document.createRange();
+        range.selectNodeContents(elDiv);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      });
+    }
+
+    // Delete button
+    elDiv.querySelector('.el-delete-btn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteElement(elDiv.dataset.id);
+    });
+
+    // Text editing - save on blur
+    if (elDiv.contentEditable === 'true') {
+      elDiv.addEventListener('blur', () => saveTextElement(elDiv));
+      elDiv.addEventListener('input', () => { state.dirty = true; });
+      // Prevent Enter in text-line
+      if (elDiv.classList.contains('el-text-line')) {
+        elDiv.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); elDiv.blur(); }
+        });
+      }
+    }
+  });
+
+  // Title editing
+  const titleEl = $slideCanvas.querySelector('.slide-title');
+  if (titleEl) {
+    titleEl.addEventListener('blur', () => {
+      getCurrentSlide().title.text = titleEl.textContent.trim() || '幻灯片标题';
+      state.dirty = true;
+    });
+    titleEl.addEventListener('input', () => { state.dirty = true; });
+  }
+
+  // Canvas click to deselect
+  $slideCanvas.addEventListener('mousedown', (e) => {
+    const isEl = e.target.closest('.el');
+    const isTitle = e.target.closest('.slide-title');
+    if (!isEl && !isTitle) {
+      selectElement(null);
+    }
+  });
+}
+
+function onElementMouseDown(e) {
+  if (e.target.classList.contains('resize-handle') || e.target.classList.contains('el-delete-btn')) return;
+
+  const elDiv = e.currentTarget;
+  const id = elDiv.dataset.id;
+  const el = getCurrentSlide().elements.find(x => x.id === id);
+  if (!el) return;
+
+  // First click: select element (no drag, no focus — use double-click to edit)
+  if (state.selectedElementId !== id) {
+    selectElement(id);
+    e.preventDefault(); // prevent browser auto-focus on contenteditable
+    return;
+  }
+
+  // Already selected — set up pending drag (start actual drag after 3px move)
+  pendingDrag = {
+    el, elDiv,
+    startX: e.clientX, startY: e.clientY,
+    origX: el.x, origY: el.y,
+    scale: getEditorScale()
+  };
+  e.preventDefault();
+}
+
+// Resize handle events - delegated
+$slideCanvas.addEventListener('mousedown', (e) => {
+  if (!e.target.classList.contains('resize-handle')) return;
+  e.stopPropagation();
+  e.preventDefault();
+
+  const handle = e.target;
+  const elDiv = handle.closest('.el');
+  const id = elDiv.dataset.id;
+  const el = getCurrentSlide().elements.find(x => x.id === id);
+  if (!el) return;
+
+  const dir = handle.classList.contains('nw') ? 'nw' :
+              handle.classList.contains('ne') ? 'ne' :
+              handle.classList.contains('sw') ? 'sw' : 'se';
+
+  dragState = {
+    type: 'resize', dir, el, elDiv,
+    startX: e.clientX, startY: e.clientY,
+    origX: el.x, origY: el.y,
+    origW: el.w, origH: el.h,
+    scale: getEditorScale()
+  };
+});
+
+// Global mouse move and up
+document.addEventListener('mousemove', (e) => {
+  // Convert pending drag to real drag if moved > 3px
+  if (pendingDrag && !dragState) {
+    const dx = e.clientX - pendingDrag.startX;
+    const dy = e.clientY - pendingDrag.startY;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      dragState = {
+        type: 'move',
+        el: pendingDrag.el,
+        elDiv: pendingDrag.elDiv,
+        startX: pendingDrag.startX,
+        startY: pendingDrag.startY,
+        origX: pendingDrag.origX,
+        origY: pendingDrag.origY,
+        scale: pendingDrag.scale
+      };
+      dragState.elDiv.classList.add('dragging');
+      pendingDrag = null;
+    }
+  }
+  if (!dragState) return;
+
+  const s = dragState.scale;
+  const dx = (e.clientX - dragState.startX) / s;
+  const dy = (e.clientY - dragState.startY) / s;
+
+  if (dragState.type === 'move') {
+    let nx = Math.max(0, Math.min(SLIDE_W - dragState.el.w, dragState.origX + dx));
+    let ny = Math.max(0, Math.min(SLIDE_H - dragState.el.h, dragState.origY + dy));
+    dragState.el.x = Math.round(nx);
+    dragState.el.y = Math.round(ny);
+    dragState.elDiv.style.left = dragState.el.x + 'px';
+    dragState.elDiv.style.top = dragState.el.y + 'px';
+    state.dirty = true;
+  } else if (dragState.type === 'resize') {
+    let nx = dragState.origX, ny = dragState.origY, nw = dragState.origW, nh = dragState.origH;
+
+    if (dragState.dir.includes('e')) nw = Math.max(20, dragState.origW + dx);
+    if (dragState.dir.includes('w')) { nw = Math.max(20, dragState.origW - dx); nx = dragState.origX + dragState.origW - nw; }
+    if (dragState.dir.includes('s')) nh = Math.max(20, dragState.origH + dy);
+    if (dragState.dir.includes('n')) { nh = Math.max(20, dragState.origH - dy); ny = dragState.origY + dragState.origH - nh; }
+
+    dragState.el.x = Math.round(nx);
+    dragState.el.y = Math.round(ny);
+    dragState.el.w = Math.round(nw);
+    dragState.el.h = Math.round(nh);
+
+    dragState.elDiv.style.left = dragState.el.x + 'px';
+    dragState.elDiv.style.top = dragState.el.y + 'px';
+    dragState.elDiv.style.width = dragState.el.w + 'px';
+    dragState.elDiv.style.height = dragState.el.h + 'px';
+    state.dirty = true;
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  // If pending drag but no movement, it was a click on already-selected element → keep selected (handle stays)
+  if (pendingDrag && !dragState) {
+    pendingDrag = null;
+    return;
+  }
+  pendingDrag = null;
+  if (!dragState) return;
+  if (dragState.elDiv) dragState.elDiv.classList.remove('dragging');
+  dragState = null;
+  if (state.dirty) renderToolbar();
+});
+
+// Context menu on right click in editor
+$editorWrapper.addEventListener('contextmenu', (e) => {
+  if (state.previewMode) return;
+  const target = e.target.closest('.el');
+  if (target) {
+    e.preventDefault();
+    showContextMenu(e.clientX, e.clientY, target.dataset.id);
+  }
+});
+
+function showContextMenu(x, y, elId) {
+  $ctxMenu.innerHTML = `
+    <div class="ctx-item" data-action="delete" data-id="${elId}">删除元素</div>
+    <div class="ctx-item" data-action="bring-front" data-id="${elId}">置于顶层</div>
+    <div class="ctx-item" data-action="send-back" data-id="${elId}">置于底层</div>`;
+  $ctxMenu.style.display = 'block';
+  $ctxMenu.style.left = x + 'px';
+  $ctxMenu.style.top = y + 'px';
+
+  $ctxMenu.querySelectorAll('.ctx-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const action = item.dataset.action;
+      const id = item.dataset.id;
+      if (action === 'delete') deleteElement(id);
+      if (action === 'bring-front') bringToFront(id);
+      if (action === 'send-back') sendToBack(id);
+      $ctxMenu.style.display = 'none';
+    });
+  });
+}
+
+document.addEventListener('click', () => { $ctxMenu.style.display = 'none'; });
+
+// ============ ELEMENT OPERATIONS ============
+function addElement(type) {
+  const el = defaultElement(type);
+  getCurrentSlide().elements.push(el);
+  state.selectedElementId = el.id;
+  state.dirty = true;
+  refreshAll();
+}
+
+function selectElement(id) {
+  state.selectedElementId = id;
+  $slideCanvas.querySelectorAll('.el.selected').forEach(e => e.classList.remove('selected'));
+  if (id) {
+    const elDiv = $slideCanvas.querySelector(`[data-id="${id}"]`);
+    if (elDiv) elDiv.classList.add('selected');
+  }
+  renderToolbar();
+}
+
+function deleteElement(id) {
+  const slide = getCurrentSlide();
+  slide.elements = slide.elements.filter(e => e.id !== id);
+  if (state.selectedElementId === id) state.selectedElementId = null;
+  state.dirty = true;
+  refreshAll();
+}
+
+function bringToFront(id) {
+  const slide = getCurrentSlide();
+  const idx = slide.elements.findIndex(e => e.id === id);
+  if (idx < slide.elements.length - 1) {
+    const [el] = slide.elements.splice(idx, 1);
+    slide.elements.push(el);
+    state.dirty = true;
+    refreshAll();
+  }
+}
+
+function sendToBack(id) {
+  const slide = getCurrentSlide();
+  const idx = slide.elements.findIndex(e => e.id === id);
+  if (idx > 0) {
+    const [el] = slide.elements.splice(idx, 1);
+    slide.elements.unshift(el);
+    state.dirty = true;
+    refreshAll();
+  }
+}
+
+function saveTextElement(elDiv) {
+  const id = elDiv.dataset.id;
+  const el = getCurrentSlide().elements.find(e => e.id === id);
+  if (el) {
+    el.text = elDiv.textContent.trim() || (el.type === 'text-line' ? '单行文本' : '');
+    state.dirty = true;
+  }
+}
+
+// ============ BACKGROUND ============
+function setBackground() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      getCurrentSlide().background = reader.result;
+      state.dirty = true;
+      refreshAll();
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function clearBackground() {
+  getCurrentSlide().background = null;
+  state.dirty = true;
+  refreshAll();
+}
+
+// ============ SLIDE MANAGEMENT ============
+function addSlide() {
+  const newSlide = createDefaultSlide('新幻灯片');
+  state.slides.splice(state.currentSlideIndex + 1, 0, newSlide);
+  state.currentSlideIndex++;
+  state.selectedElementId = null;
+  state.dirty = true;
+  refreshAll();
+}
+
+function deleteSlide(index) {
+  if (state.slides.length <= 1) {
+    toast('至少保留一张幻灯片');
+    return;
+  }
+  state.slides.splice(index, 1);
+  if (state.currentSlideIndex >= state.slides.length) {
+    state.currentSlideIndex = state.slides.length - 1;
+  }
+  state.selectedElementId = null;
+  state.dirty = true;
+  refreshAll();
+}
+
+function switchSlide(index) {
+  if (index < 0 || index >= state.slides.length) return;
+  state.currentSlideIndex = index;
+  state.selectedElementId = null;
+  refreshAll();
+  // Scroll active thumbnail into view
+  const activeThumb = $slideList.querySelector('.slide-thumb.active');
+  if (activeThumb) activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ============ UNSAVED CHANGES ============
+window.addEventListener('beforeunload', (e) => {
+  if (state.dirty) {
+    e.preventDefault();
+    e.returnValue = '您有未保存的更改，确定要离开吗？';
+    return e.returnValue;
+  }
+});
+
+// ============ PREVIEW ============
+function enterPreview() {
+  state.previewMode = true;
+  state.previewIndex = state.currentSlideIndex;
+  $previewOverlay.classList.add('show');
+  document.body.style.overflow = 'hidden';
+  renderPreviewSlide();
+}
+
+function exitPreview() {
+  state.previewMode = false;
+  $previewOverlay.classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+function renderPreviewSlide() {
+  const slide = state.slides[state.previewIndex];
+
+  let html = '';
+  if (slide.background) {
+    html += `<div class="pv-bg" style="background-image:url(${slide.background})"></div>`;
+  }
+  if (slide.title.visible && slide.title.text) {
+    html += `<div class="pv-title" style="text-align:${slide.title.align}">${escapeHtml(slide.title.text)}</div>`;
+  }
+  slide.elements.forEach(el => {
+    let style = `left:${el.x / SLIDE_W * 100}%;top:${el.y / SLIDE_H * 100}%;width:${el.w / SLIDE_W * 100}%;height:${el.h / SLIDE_H * 100}%;`;
+    if (el.type === 'color-block') {
+      style += `background:${el.fillColor};border-radius:${el.borderRadius}%;`;
+      html += `<div class="pv-el" style="${style}"></div>`;
+    } else {
+      const br = (el.type === 'text-block' && el.borderRadius != null) ? el.borderRadius : (el.bgColor ? 4 : 0);
+      const pad = ((el.type === 'text-block' && br > 10) ? br / 2 : 8);
+      let textStyle = `font-size:${el.fontSize / SLIDE_W * 100}vw;color:${el.fontColor};${el.bold ? 'font-weight:bold;' : ''}${el.bgColor ? 'background:' + el.bgColor + ';border-radius:' + br + '%;padding:' + (pad/SLIDE_W*100) + 'vw;' : 'padding:0.4vw 0.8vw;'}`;
+      if (el.type === 'text-line') textStyle += 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:4px 8px;';
+      html += `<div class="pv-el" style="${style}"><div style="width:100%;height:100%;${textStyle}">${escapeHtml(el.text)}</div></div>`;
+    }
+  });
+  $pvSlide.innerHTML = html;
+
+  const total = state.slides.length;
+  $pvPageNum.textContent = `${state.previewIndex + 1} / ${total}`;
+}
+
+function previewPrev() {
+  if (state.previewIndex > 0) {
+    state.previewIndex--;
+    renderPreviewSlide();
+  }
+}
+
+function previewNext() {
+  if (state.previewIndex < state.slides.length - 1) {
+    state.previewIndex++;
+    renderPreviewSlide();
+  }
+}
+
+// ============ DARK MODE ============
+function toggleDarkMode() {
+  state.darkMode = !state.darkMode;
+  document.body.classList.toggle('dark', state.darkMode);
+  renderToolbar();
+}
+
+// ============ FILE I/O ============
+function newFile() {
+  state.slides = [createDefaultSlide('新演示文稿')];
+  state.currentSlideIndex = 0;
+  state.selectedElementId = null;
+  state.fileName = null;
+  state.fileHandle = null;
+  state.dirty = false;
+  uidCounter = 0;
+  refreshAll();
+  toast('已新建');
+}
+
+function generateStandaloneHTML() {
+  const data = {
+    version: 1,
+    slides: state.slides,
+    darkMode: state.darkMode,
+    uidCounter
+  };
+  const jsonData = JSON.stringify(data);
+
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(getCurrentSlide().title.text) || '演示文稿'}</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#d4d4d4;color:#333;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  width:100vw;height:100vh;overflow:hidden;display:flex;align-items:center;justify-content:center;user-select:none}
+#slide{width:94vw;max-width:calc(94vh * 16 / 9);aspect-ratio:16/9;background:#fff;color:#333;
+  position:relative;box-shadow:0 4px 24px rgba(0,0,0,.18);overflow:hidden}
+#slide .bg{position:absolute;inset:0;background-size:cover;background-position:center}
+#slide .title{position:absolute;left:4.17%;right:4.17%;top:3.7%;font-size:max(28px,min(3vw,48px));
+  font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:4px 8px}
+#slide .el{position:absolute;overflow:hidden;white-space:normal;word-wrap:break-word}
+#slide .el.text-line{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#nav{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:10}
+#nav button{width:44px;height:44px;border-radius:50%;border:1.5px solid rgba(0,0,0,.18);
+  background:rgba(255,255,255,.85);color:#555;font-size:18px;cursor:pointer;transition:.2s}
+#nav button:hover{background:#fff;border-color:rgba(0,0,0,.35)}
+#page-num{position:fixed;bottom:20px;right:28px;color:rgba(0,0,0,.45);font-size:13px;z-index:10}
+#hint{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);color:rgba(0,0,0,.3);
+  font-size:12px;z-index:10;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="slide"></div>
+<div id="nav">
+  <button id="prev" title="上一页">&#9664;</button>
+  <button id="next" title="下一页">&#9654;</button>
+</div>
+<span id="page-num"></span>
+<div id="hint">← → 或 PageUp / PageDown 翻页</div>
+<script id="slide-data" type="application/json">${jsonData}<\/script>
+<script>
+(function(){
+  var data=JSON.parse(document.getElementById('slide-data').textContent);
+  var slides=data.slides;
+  var idx=0,total=slides.length;
+  var $slide=document.getElementById('slide');
+  var $pageNum=document.getElementById('page-num');
+  var $hint=document.getElementById('hint');
+  function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML}
+  function render(){
+    var s=slides[idx],h='';
+    if(s.background)h+='<div class="bg" style="background-image:url('+s.background+')"></div>';
+    if(s.title&&s.title.visible&&s.title.text)h+='<div class="title" style="text-align:'+s.title.align+'">'+esc(s.title.text)+'</div>';
+    s.elements.forEach(function(el){
+      var st='left:'+(el.x/960*100)+'%;top:'+(el.y/540*100)+'%;width:'+(el.w/960*100)+'%;height:'+(el.h/540*100)+'%;';
+      if(el.type==='color-block'){
+        st+='background:'+el.fillColor+';border-radius:'+el.borderRadius+'%;';
+        h+='<div class="el" style="'+st+'"></div>';
+      }else{
+        var br=(el.type==='text-block' && el.borderRadius!=null)?el.borderRadius:(el.bgColor?4:0);
+        var pad=br>10?br/2:8;
+        var ts='font-size:'+(el.fontSize/960*100)+'vw;color:'+el.fontColor+';'+(el.bold?'font-weight:bold;':'')+(el.bgColor?'background:'+el.bgColor+';border-radius:'+br+'%;padding:'+(pad/960*100)+'%;':'padding:0.4% 0.8%');
+        ts+=';width:100%;height:100%';
+        var cls='el'+(el.type==='text-line'?' text-line':'');
+        h+='<div class="'+cls+'" style="'+st+'"><div style="'+ts+'">'+esc(el.text)+'</div></div>';
+      }
+    });
+    $slide.innerHTML=h;
+    $pageNum.textContent=(idx+1)+' / '+total;
+    if(total<=1){$hint.style.display='none'}else{$hint.style.display=''}
+  }
+  function prev(){if(idx>0){idx--;render()}}
+  function next(){if(idx<total-1){idx++;render()}}
+  document.getElementById('prev').onclick=prev;
+  document.getElementById('next').onclick=next;
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowLeft'||e.key==='ArrowUp'||e.key==='PageUp'){e.preventDefault();prev()}
+    if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key==='PageDown'){e.preventDefault();next()}
+  });
+  var touchX=0;
+  document.addEventListener('touchstart',function(e){touchX=e.touches[0].clientX});
+  document.addEventListener('touchend',function(e){var d=touchX-e.changedTouches[0].clientX;if(d>40)next();if(d<-40)prev()});
+  render();
+})();
+<\/script>
+</body>
+</html>`;
+}
+
+async function saveFile() {
+  const html = generateStandaloneHTML();
+  const baseName = (state.fileName || '演示文稿').replace(/\.[^.]+$/, '');
+
+  try {
+    // If current handle points to JSON, use new picker
+    if (!state.fileHandle || state.fileHandle.name.endsWith('.json') || state.fileHandle.name.endsWith('.lpppt.json')) {
+      state.fileHandle = null;
+    }
+    if (!state.fileHandle) {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: baseName + '.html',
+        types: [{ description: '轻量PPT放映稿', accept: { 'text/html': ['.html', '.htm'] } }]
+      });
+      state.fileHandle = handle;
+    }
+
+    const writable = await state.fileHandle.createWritable();
+    await writable.write(html);
+    await writable.close();
+    state.fileName = state.fileHandle.name;
+    state.dirty = false;
+    toast('保存成功: ' + state.fileName);
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    // Fallback: download
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = baseName + '.html';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('已下载(浏览器不支持File System Access API)');
+  }
+}
+
+async function saveAsJSON() {
+  const data = {
+    version: 1,
+    slides: state.slides,
+    darkMode: state.darkMode,
+    uidCounter
+  };
+  const json = JSON.stringify(data, null, 2);
+  const baseName = (state.fileName || '演示文稿').replace(/\.[^.]+$/, '');
+
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: baseName + '.lpppt.json',
+      types: [{ description: '轻量PPT源文件', accept: { 'application/json': ['.lpppt.json'] } }]
+    });
+    const writable = await handle.createWritable();
+    await writable.write(json);
+    await writable.close();
+    toast('JSON已导出: ' + handle.name);
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = baseName + '.lpppt.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('JSON已下载');
+  }
+}
+
+function parseSlideData(text) {
+  // Try JSON first
+  try {
+    const data = JSON.parse(text);
+    if (data.version && data.slides) return data;
+  } catch {}
+  // Try extracting from HTML
+  const m = text.match(/<script[^>]*id="slide-data"[^>]*type="application\/json"[^>]*>([\s\S]*?)<\/script>/i);
+  if (m) {
+    try {
+      const data = JSON.parse(m[1]);
+      if (data.version && data.slides) return data;
+    } catch {}
+  }
+  return null;
+}
+
+async function openFile() {
+  try {
+    const [handle] = await window.showOpenFilePicker({
+      types: [
+        { description: '轻量PPT文件', accept: { 'text/html': ['.html', '.htm'], 'application/json': ['.lpppt.json', '.json'] } }
+      ],
+      multiple: false
+    });
+    state.fileHandle = handle;
+    const file = await handle.getFile();
+    const text = await file.text();
+    const data = parseSlideData(text);
+
+    if (data) {
+      state.slides = data.slides;
+      state.darkMode = data.darkMode || false;
+      uidCounter = data.uidCounter || 0;
+      state.currentSlideIndex = 0;
+      state.selectedElementId = null;
+      state.fileName = handle.name;
+      state.dirty = false;
+      document.body.classList.toggle('dark', state.darkMode);
+      refreshAll();
+      toast('已打开: ' + handle.name);
+    } else {
+      toast('文件格式不正确');
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    // Fallback: file input
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.html,.htm,.json,.lpppt.json';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      const data = parseSlideData(text);
+      if (data) {
+        state.slides = data.slides;
+        state.darkMode = data.darkMode || false;
+        uidCounter = data.uidCounter || 0;
+        state.currentSlideIndex = 0;
+        state.selectedElementId = null;
+        state.fileName = file.name;
+        state.fileHandle = null;
+        state.dirty = false;
+        document.body.classList.toggle('dark', state.darkMode);
+        refreshAll();
+        toast('已打开: ' + file.name);
+      } else {
+        toast('文件格式不正确');
+      }
+    };
+    input.click();
+  }
+}
+
+// ============ REFRESH ============
+function refreshAll() {
+  renderSlideList();
+  renderSlideCanvas();
+  renderToolbar();
+  bindSlideListEvents();
+}
+
+// ============ SLIDE LIST EVENTS ============
+function bindSlideListEvents() {
+  // Thumbnail clicks
+  $slideList.querySelectorAll('.slide-thumb').forEach(thumb => {
+    const idx = parseInt(thumb.querySelector('.thumb-preview')?.dataset.index);
+    thumb.addEventListener('click', (e) => {
+      if (e.target.classList.contains('thumb-del')) return;
+      switchSlide(idx);
+    });
+  });
+
+  // Delete buttons
+  $slideList.querySelectorAll('.thumb-del').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteSlide(parseInt(btn.dataset.index));
+    });
+  });
+
+  // Add slide
+  $addSlideBtn.onclick = addSlide;
+}
+
+// ============ PREVIEW EVENTS ============
+document.getElementById('pv-prev').addEventListener('click', previewPrev);
+document.getElementById('pv-next').addEventListener('click', previewNext);
+document.getElementById('pv-exit').addEventListener('click', exitPreview);
+
+document.addEventListener('keydown', (e) => {
+  if (state.previewMode) {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp') {
+      e.preventDefault();
+      previewPrev();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === 'PageDown') {
+      e.preventDefault();
+      previewNext();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      exitPreview();
+    }
+    return;
+  }
+
+  // Delete selected element (only when not editing text)
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    const activeEl = document.activeElement;
+    const isEditing = activeEl && (activeEl.contentEditable === 'true' || activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+    if (state.selectedElementId && !isEditing) {
+      deleteElement(state.selectedElementId);
+    }
+  }
+
+  // Ctrl+S save
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    saveFile();
+  }
+
+  // Ctrl+O open
+  if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+    e.preventDefault();
+    openFile();
+  }
+});
+
+// ============ WINDOW RESIZE ============
+window.addEventListener('resize', () => { if (!state.previewMode) renderSlideCanvas(); });
+
+// ============ INIT ============
+function init() {
+  // Check for sessionStorage restore (from standalone HTML "编辑" button)
+  try {
+    var restore = sessionStorage.getItem('_lpppt_restore');
+    if (restore) {
+      var data = JSON.parse(restore);
+      sessionStorage.removeItem('_lpppt_restore');
+      if (data.version && data.slides) {
+        state.slides = data.slides;
+        state.darkMode = data.darkMode || false;
+        uidCounter = data.uidCounter || 0;
+        state.currentSlideIndex = 0;
+        state.selectedElementId = null;
+        state.fileName = null;
+        state.fileHandle = null;
+        state.dirty = true;
+        document.body.classList.toggle('dark', state.darkMode);
+        toast('已从放映稿导入，请保存');
+      }
+    }
+  } catch(e) {}
+  refreshAll();
+}
+
+init();
+console.log('轻量PPT 已就绪');
+</script>
+</body>
+</html>

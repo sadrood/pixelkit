@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PixelKit - 在线工具箱</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/src/styles/main.css" />
+  <link rel="stylesheet" href="/src/styles/tasks.css" />
+  <link rel="stylesheet" href="/src/styles/life.css" />
+  <link rel="stylesheet" href="/src/styles/life-book.css" />
+  <link rel="stylesheet" href="/src/styles/redesign.css" />
+    <link rel="stylesheet" href="/src/styles/agent.css" />
+</head>
+<body>
+  <div id="app">
+
+  <!-- ===== 图标素材（首页卡片与 UI 图标） ===== -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-compose" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2.5" fill="currentColor"/><rect x="13" y="3" width="8" height="8" rx="2.5" fill="currentColor" opacity=".5"/><rect x="3" y="13" width="8" height="8" rx="2.5" fill="currentColor" opacity=".5"/><rect x="13" y="13" width="8" height="8" rx="2.5" fill="currentColor"/></symbol>
+    <symbol id="i-convert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5h16M15.5 4.5l4 4-4 4"/><path d="M20.5 15.5h-16M8.5 19.5l-4-4 4-4"/></symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M8.5 15.5l2.5 2.5 4.5-5"/></symbol>
+    <symbol id="i-ppt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="11.5" rx="2"/><path d="M12 16v3.5M8.5 19.5h7"/><path d="M8 12.5v-2M12 12.5v-4M16 12.5v-1.5"/></symbol>
+    <symbol id="i-agent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M10 2.5l1.7 4.8 4.8 1.7-4.8 1.7L10 15.5 8.3 10.7 3.5 9l4.8-1.7z"/><path d="M17.5 13.5l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-docx" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 3h7l5 5v13a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14.5 3v5h5"/><path d="M9 13.5h7M9 17h4.5"/></symbol>
+    <symbol id="i-counter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><path d="M12 8v8M8 12h8"/></symbol>
+    <symbol id="i-speed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 17a9 9 0 1 1 17 0"/><path d="M12 17l4.5-6"/><circle cx="12" cy="17" r="1.6" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 10v3.5l2.5 1.8"/><path d="M9.5 2.5h5"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/><path d="M12 3v13M7.5 7.5L12 3l4.5 4.5"/></symbol>
+    <symbol id="i-qr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M14 14.5v2M17.5 14v6M14.5 18.5h1.5M19.5 17.5h1.5M14.5 21.5h2"/></symbol>
+    <symbol id="i-task" viewBox="0 0 24 24"><rect x="3" y="4" width="4.5" height="16" rx="2.2" fill="currentColor" opacity=".5"/><rect x="9.75" y="4" width="4.5" height="11" rx="2.2" fill="currentColor"/><rect x="16.5" y="4" width="4.5" height="7" rx="2.2" fill="currentColor" opacity=".5"/></symbol>
+    <symbol id="i-zhuzi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><path d="M12 4.5A7.5 7.5 0 0 1 19.5 12" stroke-width="2.8"/><path d="M4.5 12A7.5 7.5 0 0 1 12 4.5" stroke-width="2.8" opacity=".45"/></symbol>
+    <symbol id="i-life" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-9"/><path d="M12 13.5c0-3.6 2.7-6.5 6.5-6.5 0 3.6-2.7 6.5-6.5 6.5z"/><path d="M12 17c0-3-2.3-5.4-5.4-5.4 0 3 2.3 5.4 5.4 5.4z"/></symbol>
+    <symbol id="i-search-view" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="9" cy="9" r="5.6"/><path d="M13.4 13.4l3.6 3.6"/></symbol>
+    <symbol id="i-ok" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.6"/><path d="M5.2 8.2l2 2 3.6-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.4" stroke="currentColor" stroke-width="1.6"/><path d="M8 4.6V8l2.4 1.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </svg>
+    <!-- ==================== 主页 ==================== -->
+    <div id="page-home" class="page active">
+      <div class="home-container">
+
+        <!-- ---------- Hero ---------- -->
+        <header class="home-hero">
+          <div class="home-brand">
+            <span class="home-logo-icon"><span class="logo-pixels"></span></span>
+            <span class="home-logo">PixelKit</span>
+          </div>
+
+          <div class="home-hero-grid">
+            <div class="home-hero-copy">
+              <span class="home-badge"><i></i>13 个在线工具 · 全部免费 · 免注册</span>
+
+              <h1 class="home-headline">把琐碎的文件活<br>一次做完</h1>
+
+              <p class="home-lede">图片拼接、格式转换、文档转 PDF、二维码、计时计数……13 个工具全部在浏览器里运行，打开就能用，文件不送到第三方服务器。</p>
+
+              <ul class="home-trust">
+                <li><svg class="t-ok" width="16" height="16" aria-hidden="true"><use href="#i-ok"/></svg>浏览器本地处理</li>
+                <li><svg class="t-time" width="16" height="16" aria-hidden="true"><use href="#i-clock"/></svg>文件 24 小时后自动清理</li>
+              </ul>
+            </div>
+
+            <div class="home-hero-visual" aria-hidden="true">
+              <div class="home-blob"></div>
+
+              <div class="home-window">
+                <div class="home-window-bar">
+                  <span class="home-window-dots"><i></i><i></i><i></i></span>
+                  <span class="home-window-url">139.9.176.191:8081</span>
+                </div>
+                <div class="home-mini">
+                  <div class="home-mini-bar">
+                    <span>图片拼接</span>
+                    <span class="home-mini-badge">导出 PNG</span>
+                  </div>
+                  <div class="home-mini-body">
+                    <div class="home-mini-rail"><span></span><span></span><span></span></div>
+                    <div class="home-mini-canvas">
+                      <div class="home-mini-art"><i></i><i></i><i></i><i></i></div>
+                    </div>
+                    <div class="home-mini-layers">
+                      <span>底图</span><span class="is-active">照片 2</span><span>文字标注</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="home-chip home-chip--a">
+                <i style="background:#ff6b4a"><svg width="17" height="17"><use href="#i-compose"/></svg></i>图片拼接
+              </div>
+              <div class="home-chip home-chip--b">
+                <i style="background:#f2a93b"><svg width="17" height="17"><use href="#i-convert"/></svg></i>格式转换
+              </div>
+              <div class="home-chip home-chip--c">
+                <i style="background:#e85c7d"><svg width="17" height="17"><use href="#i-life"/></svg></i>人生之书
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <!-- ---------- 工具矩阵 ---------- -->
+        <section class="home-tools">
+          <div class="home-tools-head">
+            <span class="home-kicker">ALL TOOLS · 全部工具</span>
+            <h2>13 个工具，按你手头的活分组</h2>
+            <p>每个工具都独立可用、无需注册。图片与文档类工具全部在浏览器本地完成，不上传、不留存。</p>
+          </div>
+
+          <div class="home-toolbar">
+            <label class="home-search">
+              <svg width="20" height="20" aria-hidden="true"><use href="#i-search-view"/></svg>
+              <input type="search" id="home-search" placeholder="搜索工具，比如「格式转换」" aria-label="搜索工具">
+            </label>
+
+            <div class="home-tabs" id="home-tabs" role="tablist" aria-label="工具分组筛选">
+              <button class="home-tab" role="tab" aria-selected="true" data-filter="all">全部</button>
+              <button class="home-tab" role="tab" aria-selected="false" data-filter="image">图片影像</button>
+              <button class="home-tab" role="tab" aria-selected="false" data-filter="doc">文档办公</button>
+              <button class="home-tab" role="tab" aria-selected="false" data-filter="tool">效率工具</button>
+              <button class="home-tab" role="tab" aria-selected="false" data-filter="ai">AI 与实验</button>
+            </div>
+          </div>
+
+          <!--
+            注意：这里刻意不使用 .home-cards 类名。
+            main.js 的 _reverseCards() 会把 .home-cards 的子元素整体倒序，
+            而本页是按分组编排的，倒序会打乱分组顺序。
+            分组顺序在 HTML 中直接写死。
+          -->
+          <div class="home-groups" id="home-groups">
+
+            <!-- 图片影像 -->
+            <div class="tool-group" data-group="image" style="--accent:#ff6b4a">
+              <div class="tool-group-head">
+                <i></i>
+                <h3>图片影像</h3>
+                <span>2 个工具</span>
+              </div>
+              <div class="tool-cards">
+                <div class="home-card" data-page="compose" data-group="image" style="--accent:#ff6b4a">
+                  <div class="card-icon"><svg><use href="#i-compose"/></svg></div>
+                  <h2>图片拼接</h2>
+                  <p>上传多张图片，自由拖拽拼接，图层叠加、编组锁定，支持 PNG / JPG / WebP / 原图导出</p>
+                  <span class="card-arrow">进入 →</span>
+                </div>
+                <div class="home-card" data-page="convert" data-group="image" style="--accent:#f2a93b">
+                  <div class="card-icon"><svg><use href="#i-convert"/></svg></div>
+                  <h2>格式转换</h2>
+                  <p>真实像素级格式转换，支持 PNG ↔ JPG ↔ WebP ↔ BMP，可调质量参数，批量转换</p>
+                  <span class="card-arrow">进入 →</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 文档办公 -->
+            <div class="tool-group" data-group="doc" style="--accent:#2e9bd6">
+              <div class="tool-group-head">
+                <i></i>
+                <h3>文档办公</h3>
+                <span>3 个工具</span>
+              </div>
+              <div class="tool-cards">
+                <div class="home-card" data-page="document" data-group="doc" style="--accent:#2e9bd6">
+                  <div class="card-icon"><svg><use href="#i-doc"/></svg></div>
+                  <h2>文档转换</h2>
+                  <p>Word / Excel / PPT → PDF → 图片，基于 LibreOffice 精确转换，支持逐页预览和多格式导出</p>
+                  <span class="card-arrow">进入 →</span>
+                </div>
+                <div class="home-card" data-page="ppt" data-group="doc" style="--accent:#c94f4f">
+                  <div class="card-icon"><svg><use href="#i-ppt"/></svg></div>
+                  <h2>轻量PPT</h2>
+                  <p>纯浏览器端幻灯片制作工具，支持文本框、色块、背景图，可导出独立 HTML 放映稿或 JSON 源文件</p>
+                  <span class="card-arrow">进入 →</span>
+                </div>
+                <div class="home-card" data-page="docx-editor" data-group="doc" style="--accent:#4c6fe8">
+                  <div class="card-icon"><svg><use href="#i-docx"/></svg></div>
+                  <h2>文档编辑</h2>
+                  <p>纯前端 .docx 在线编辑器，零后端运行、OOXML 原生处理，支持修订模式、多人协作、AI 审稿</p>
+                  <span class="card-arrow">进入 →</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 效率工具 -->
+            <div class="tool-group" data-group="tool" style="--accent:#1fa97a">
+              <div class="tool-group-head">
+                <i></i>
+                <h3>效率工具</h3>
+                <span>6 个工具</span>
+              </div>
+              <div class="tool-cards">
+                <div class="home-card" data-page="counter" data-group="tool" style="--accent:#1fa97a">
+                  <div class="card-icon"><svg><use href="#i-counter"/></svg></div>
+                  <h2>计数器</h2>
+                  <p>在线计数工具，支持多计数器、目标设定、数据导出，专注模式沉浸计数</p>
+                  <span class="card-arrow">进入 →</span>
+                </div>
+                <a class="home-card" href="https://test.ustc.edu.cn/" target="_blank" rel="noopener" data-group="tool" style="--accent:#7c8fa8">
+                  <div class="card-icon"><svg><use href="#i-speed"/></svg></div>
+                  <h2>网络测速</h2>
+                  <p>跳转到中国科学技术大学测速站，测试下载/上传速度、网络延迟</p>
+                  <span class="card-arrow">打开 →</span>
+                </a>
+                <div class="home-card" data-page="timer" data-group="tool" style="--accent:#b08a4a">
+                  <div class="card-icon"><svg><use href="#i-timer"/></svg></div>
+                  <h2>计时工具</h2>
+                  <p>秒表计时器 + 倒计时器，支持计次/Lap、暂停继续、精确到毫秒，可全屏显示</p>
+                  <span class="card-arrow">进入 →</span>
+                </div>
+                <div class="home-card" data-page="fileshare" data-group="tool" style="--accent:#14b8b8">
+                  <div class="card-icon"><svg><use href="#i-share"/></svg></div>
+                  <h2>文件中转站</h2>
+                  <p>临时文件共享，支持免密/加密两种模式，拖拽上传、一键下载，24小时后自动过期清理</p>
+                  <span class="card-arrow">进入 →</span>
+                </div>
+                <div class="home-card" data-page="qr" data-group="tool" style="--accent:#6b7c93">
+                  <div class="card-icon"><svg><use href="#i-qr"/></svg></div>
+                  <h2>二维码工具</h2>
+                  <p>输入文字或数字一键生成二维码，也能上传图片识别解码，历史记录本地保存 24 小时</p>
+                  <span class="card-arrow">进入 →</span>
+                </div>
+                <div class="home-card" data-page="tasks" data-group="tool" style="--accent:#8ab723">
+                  <div class="card-icon"><svg><use href="#i-task"/></svg></div>
+                  <h2>任务管理</h2>
+                  <p>双核驱动：看板流转关注进度、四象限聚焦优先级决策，全文检索、批量操作、回收站</p>
+                  <span class="card-arrow">进入 →</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- AI 与实验 -->
+            <div class="tool-group" data-group="ai" style="--accent:#8b5cf6">
+              <div class="tool-group-head">
+                <i></i>
+                <h3>AI 与实验</h3>
+                <span>2 个工具</span>
+              </div>
+              <div class="tool-cards">
+                <div class="home-card" data-page="agent" data-group="ai" style="--accent:#8b5cf6">
+                  <div class="card-icon"><svg><use href="#i-agent"/></svg></div>
+                  <h2>AI 助手</h2>
+                  <p>智能服务器管理助手，可查看服务器状态、端口、文件，配置 AI 后可进行自然语言对话</p>
+                  <span class="card-arrow">进入 →</span>
+                </div>
+                <div class="home-card" data-page="lifesim" data-group="ai" style="--accent:#e85c7d">
+                  <div class="card-icon"><svg><use href="#i-life"/></svg></div>
+                  <h2>成长模拟器</h2>
+                  <p>文字人生模拟平台：一套引擎、多套人生。出身随机、岁段推进、事件抉择 + 主动行动，终局结算与成就图鉴。含人生百态 / 重生之我是公务员 / 白手起家 / 人生之书，以及《人生之书》加厚版五条世界线</p>
+                  <span class="card-arrow">进入 →</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="home-empty" id="home-empty">
+            <strong>没有匹配的工具</strong>
+            <span>换个关键词试试，或者点「全部」看完整的 13 个。</span>
+          </div>
+        </section>
+
+        <!-- ---------- 页脚 ---------- -->
+        <footer class="home-footer">
+          <span>图片拼接、格式转换、Markdown 转换均在本地浏览器完成；文档互转、PDF 工具、ICO 转换由后端处理，文件处理完成后自动删除</span>
+          <div class="visitor-count">
+            <span>👁 今日访问：<strong id="visitor-today">...</strong></span>
+            <span class="visitor-divider">|</span>
+            <span>📊 累计访问：<strong id="visitor-total">...</strong></span>
+          </div>
+        </footer>
+
+      </div>
+    </div>
+
+    <!-- ==================== 图片拼接页面 ==================== -->
+    <div id="page-compose" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-compose" class="btn btn-back" title="返回主页">← 返回</button>
+          <svg viewBox="0 0 64 64" width="24" height="24" style="flex-shrink:0;">
+            <defs><linearGradient id="logoGrad2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff6b4a"/><stop offset="100%" stop-color="#ffab84"/></linearGradient></defs>
+            <rect x="4" y="4" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.9"/><rect x="18" y="4" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.7"/><rect x="32" y="4" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.5"/><rect x="46" y="4" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.3"/><rect x="4" y="18" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.7"/><rect x="18" y="18" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="1"/><rect x="32" y="18" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.7"/><rect x="46" y="18" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.5"/><rect x="4" y="32" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.5"/><rect x="18" y="32" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.7"/><rect x="32" y="32" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.9"/><rect x="46" y="32" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.6"/><rect x="4" y="46" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.3"/><rect x="18" y="46" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.5"/><rect x="32" y="46" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.7"/><rect x="46" y="46" width="12" height="12" rx="2" fill="url(#logoGrad2)" opacity="0.9"/>
+          </svg>
+          <span class="logo">图片拼接</span>
+        </div>
+        <div class="toolbar-center">
+          <button id="btn-upload" class="btn btn-primary" title="上传图片">
+            <span class="icon">📁</span> 上传图片
+          </button>
+          <button id="btn-add-text" class="btn" title="添加文字">
+            <span class="icon">🔤</span> 添加文字
+          </button>
+          <button id="btn-undo" class="btn" title="撤销 (Ctrl+Z)" disabled>
+            <span class="icon">↩️</span> 撤销
+          </button>
+          <button id="btn-redo" class="btn" title="重做 (Ctrl+Shift+Z)" disabled>
+            <span class="icon">↪️</span> 重做
+          </button>
+        </div>
+        <div class="toolbar-right">
+          <div class="view-controls">
+            <button id="btn-zoom-fit" class="btn btn-sm" title="缩放至适合窗口">📐 适合</button>
+            <button id="btn-zoom-100" class="btn btn-sm" title="缩放至 100%">100%</button>
+            <span class="zoom-display" id="zoom-display">100%</span>
+          </div>
+          <div class="export-group">
+            <button id="btn-export-png" class="btn btn-export" title="导出 PNG">PNG</button>
+            <button id="btn-export-jpg" class="btn btn-export" title="导出 JPG">JPG</button>
+            <button id="btn-export-webp" class="btn btn-export" title="导出 WebP">WebP</button>
+            <button id="btn-export-original" class="btn btn-export btn-original" title="按原图尺寸导出 PNG">原图导出</button>
+          </div>
+          <button id="btn-clear" class="btn btn-danger" title="清空画布">
+            <span class="icon">🗑️</span> 清空
+          </button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="layer-panel" id="layer-panel">
+          <div class="panel-header">
+            <h3>图层列表</h3>
+            <span class="layer-count" id="layer-count">0</span>
+          </div>
+          <div class="layer-actions-bar">
+            <button id="btn-group" class="btn btn-sm" title="将选中图层编组 (Ctrl+G)">📦 编组</button>
+            <button id="btn-ungroup" class="btn btn-sm" title="取消编组 (Ctrl+Shift+G)">📤 拆组</button>
+            <button id="btn-lock-group" class="btn btn-sm" title="锁定/解锁编组">🔒</button>
+          </div>
+          <div class="layer-list" id="layer-list">
+            <div class="layer-empty">暂无图层，请上传图片</div>
+          </div>
+        </aside>
+
+        <div class="canvas-container" id="canvas-container">
+          <div class="canvas-wrapper" id="canvas-wrapper">
+            <canvas id="main-canvas"></canvas>
+            <div class="canvas-placeholder" id="canvas-placeholder">
+              <div class="placeholder-content">
+                <div class="placeholder-icon">🖼️</div>
+                <p>点击「上传图片」或拖拽图片到此处</p>
+                <p class="placeholder-hint">支持 JPG、PNG、WebP、SVG 格式</p>
+                <p class="placeholder-hint shortcuts-hint">🖱️ 滚轮缩放 | 空格+拖拽平移 | 中键平移</p>
+              </div>
+            </div>
+          </div>
+          <div class="canvas-info">
+            <span id="canvas-size">画布: 1200 × 800 | 缩放: 100%</span>
+            <div class="canvas-size-controls">
+              <label>宽: <input type="number" id="canvas-width" value="1200" min="100" max="10000" step="10" /></label>
+              <label>高: <input type="number" id="canvas-height" value="800" min="100" max="10000" step="10" /></label>
+              <button id="btn-resize-canvas" class="btn btn-sm">应用</button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="props-panel" id="props-panel">
+          <div class="panel-header">
+            <h3>属性</h3>
+          </div>
+          <div class="props-content" id="props-content">
+            <div class="props-empty">选择一个图层以编辑属性</div>
+          </div>
+        </aside>
+      </main>
+
+      <input type="file" id="file-input" accept="image/*" multiple hidden />
+    </div>
+
+    <!-- ==================== 格式转换页面 ==================== -->
+    <div id="page-convert" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-convert" class="btn btn-back" title="返回主页">← 返回</button>
+          <svg viewBox="0 0 64 64" width="24" height="24" style="flex-shrink:0;">
+            <defs><linearGradient id="logoGrad3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff6b4a"/><stop offset="100%" stop-color="#ffab84"/></linearGradient></defs>
+            <rect x="4" y="4" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.9"/><rect x="18" y="4" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.7"/><rect x="32" y="4" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.5"/><rect x="46" y="4" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.3"/><rect x="4" y="18" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.7"/><rect x="18" y="18" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="1"/><rect x="32" y="18" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.7"/><rect x="46" y="18" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.5"/><rect x="4" y="32" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.5"/><rect x="18" y="32" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.7"/><rect x="32" y="32" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.9"/><rect x="46" y="32" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.6"/><rect x="4" y="46" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.3"/><rect x="18" y="46" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.5"/><rect x="32" y="46" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.7"/><rect x="46" y="46" width="12" height="12" rx="2" fill="url(#logoGrad3)" opacity="0.9"/>
+          </svg>
+          <span class="logo">格式转换</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right">
+          <button id="btn-clear-convert" class="btn btn-danger btn-sm">清空列表</button>
+        </div>
+      </header>
+
+      <main class="convert-workspace">
+        <!-- 上传区域 -->
+        <div class="convert-upload-zone" id="convert-upload-zone">
+          <div class="upload-zone-content">
+            <div class="upload-zone-icon">📁</div>
+            <p>拖拽图片到此处，或点击上传</p>
+            <p class="upload-zone-hint">支持 JPG、PNG、WebP、BMP、SVG、ICO</p>
+            <button id="btn-convert-upload" class="btn btn-primary">选择图片</button>
+          </div>
+          <input type="file" id="convert-file-input" accept="image/*" multiple hidden />
+        </div>
+
+        <!-- 转换设置 -->
+        <div class="convert-settings" id="convert-settings" style="display:none;">
+          <div class="settings-row">
+            <label>目标格式：</label>
+            <select id="convert-target-format">
+              <option value="image/png">PNG</option>
+              <option value="image/jpeg">JPG</option>
+              <option value="image/webp">WebP</option>
+              <option value="image/bmp">BMP</option>
+              <option value="image/x-icon">ICO（后端处理）</option>
+            </select>
+          </div>
+          <div class="settings-row" id="quality-row">
+            <label>质量：</label>
+            <input type="range" id="convert-quality" min="10" max="100" value="92" />
+            <span id="convert-quality-value">92%</span>
+          </div>
+          <div class="settings-row">
+            <label>尺寸：</label>
+            <select id="convert-size-mode">
+              <option value="original">保持原始尺寸</option>
+              <option value="scale">按比例缩放</option>
+              <option value="fixed">固定尺寸</option>
+            </select>
+          </div>
+          <div class="settings-row" id="scale-row" style="display:none;">
+            <label>缩放比例：</label>
+            <input type="range" id="convert-scale" min="10" max="200" value="100" />
+            <span id="convert-scale-value">100%</span>
+          </div>
+          <div class="settings-row" id="fixed-size-row" style="display:none;">
+            <label>宽度：</label>
+            <input type="number" id="convert-fixed-w" min="1" max="10000" value="800" />
+            <label>高度：</label>
+            <input type="number" id="convert-fixed-h" min="1" max="10000" value="600" />
+          </div>
+          <div class="settings-actions">
+            <button id="btn-convert-all" class="btn btn-primary">全部转换并下载</button>
+            <button id="btn-convert-zip" class="btn" style="display:none;">打包下载 ZIP</button>
+          </div>
+        </div>
+
+        <!-- 预览列表 -->
+        <div class="convert-preview-list" id="convert-preview-list"></div>
+      </main>
+    </div>
+
+    <!-- ==================== 文档转换页面 ==================== -->
+    <div id="page-document" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-document" class="btn btn-back" title="返回主页">← 返回</button>
+          <svg viewBox="0 0 64 64" width="24" height="24" style="flex-shrink:0;">
+            <defs><linearGradient id="logoGrad4" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff6b4a"/><stop offset="100%" stop-color="#ffab84"/></linearGradient></defs>
+            <rect x="4" y="4" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.9"/><rect x="18" y="4" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.7"/><rect x="32" y="4" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.5"/><rect x="46" y="4" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.3"/><rect x="4" y="18" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.7"/><rect x="18" y="18" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="1"/><rect x="32" y="18" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.7"/><rect x="46" y="18" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.5"/><rect x="4" y="32" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.5"/><rect x="18" y="32" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.7"/><rect x="32" y="32" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.9"/><rect x="46" y="32" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.6"/><rect x="4" y="46" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.3"/><rect x="18" y="46" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.5"/><rect x="32" y="46" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.7"/><rect x="46" y="46" width="12" height="12" rx="2" fill="url(#logoGrad4)" opacity="0.9"/>
+          </svg>
+          <span class="logo">文档转换</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right"></div>
+      </header>
+
+      <main class="doc-workspace">
+        <!-- 功能 Tab 切换 -->
+        <div class="doc-tabs">
+          <button class="doc-tab active" data-tab="format-convert">🔄 格式互转</button>
+          <button class="doc-tab" data-tab="img-pdf">🖼️ 图片⇄PDF</button>
+          <button class="doc-tab" data-tab="pdf-merge">📑 合并拆分</button>
+          <button class="doc-tab" data-tab="pdf-tools">🔧 PDF工具</button>
+        </div>
+
+        <!-- Tab 1: 格式互转 -->
+        <div class="doc-tab-panel active" id="tab-format-convert">
+          <div class="doc-tab-content">
+            <div class="doc-upload-area">
+              <div class="doc-upload-zone" id="doc-upload-zone">
+                <div class="upload-zone-content">
+                  <div class="upload-zone-icon">📄</div>
+                  <p>拖拽文档到此处，或点击上传</p>
+                  <p class="upload-zone-hint">支持 .docx .doc .pdf .xlsx .xls .pptx .ppt .csv .ods .html</p>
+                  <button id="btn-doc-upload" class="btn btn-primary">选择文档</button>
+                </div>
+                <input type="file" id="doc-file-input" accept=".docx,.doc,.pdf,.xlsx,.xls,.pptx,.ppt,.csv,.ods,.html" hidden />
+              </div>
+              <div class="doc-info-bar" id="doc-info-bar" style="display:none;">
+                <div class="doc-file-info">
+                  <span class="doc-file-icon">📄</span>
+                  <div><div class="doc-file-name" id="doc-file-name">-</div><div class="doc-file-meta" id="doc-file-meta">-</div></div>
+                </div>
+                <div class="doc-convert-options">
+                  <div class="settings-row">
+                    <label>转为：</label>
+                    <select id="doc-target-format">
+                      <option value="pdf">PDF</option>
+                    </select>
+                    <div id="format-tip" style="font-size:11px;color:var(--text-muted);margin-top:4px;">上传文件后自动匹配可转换格式</div>
+                  </div>
+                  <div class="settings-row" id="docx-mode-row" style="display:none;">
+                    <label>模式：</label>
+                    <select id="docx-convert-mode">
+                      <option value="auto">智能还原（pdf2docx，格式近似）</option>
+                      <option value="image">图片嵌入（100% 排版还原，每页转为高清图嵌入 Word）</option>
+                    </select>
+                  </div>
+                  <button id="btn-doc-convert" class="btn btn-primary">开始转换</button>
+                </div>
+              </div>
+            </div>
+            <div class="doc-preview-container" id="doc-preview-container" style="display:none;">
+              <div class="doc-preview-header">
+                <span>预览</span>
+                <div class="doc-page-controls">
+                  <button id="btn-doc-prev" class="btn btn-sm" disabled>◀</button>
+                  <span id="doc-page-info">1 / 1</span>
+                  <button id="btn-doc-next" class="btn btn-sm" disabled>▶</button>
+                </div>
+              </div>
+              <div class="doc-preview-body" id="doc-preview-body">
+                <div class="doc-preview-empty">请上传文档</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: 图片⇄PDF -->
+        <div class="doc-tab-panel" id="tab-img-pdf">
+          <div class="doc-tab-content">
+            <div class="doc-sub-tabs">
+              <button class="doc-sub-tab active" data-sub="img2pdf">图片 → PDF</button>
+              <button class="doc-sub-tab" data-sub="pdf2img">PDF → 图片</button>
+            </div>
+            <div class="doc-sub-panel active" id="sub-img2pdf">
+              <div class="doc-upload-zone" id="img2pdf-zone">
+                <div class="upload-zone-content">
+                  <div class="upload-zone-icon">🖼️</div>
+                  <p>拖拽多张图片，合并为一个 PDF</p>
+                  <p class="upload-zone-hint">支持 JPG、PNG、WebP、BMP</p>
+                  <button id="btn-img2pdf-upload" class="btn btn-primary">选择图片</button>
+                </div>
+                <input type="file" id="img2pdf-input" accept="image/*" multiple hidden />
+              </div>
+              <div id="img2pdf-list" class="convert-preview-list"></div>
+              <button id="btn-img2pdf-convert" class="btn btn-primary" style="display:none;margin-top:12px;">合并为 PDF</button>
+              <!-- 进度条（处理中显示） -->
+              <div class="task-progress-wrap" id="img2pdf-progress">
+                <div class="task-progress-header">
+                  <span class="task-progress-status" id="img2pdf-status-text">正在处理...</span>
+                  <span class="task-progress-percent" id="img2pdf-percent">0%</span>
+                </div>
+                <div class="task-progress-bar">
+                  <div class="task-progress-fill" id="img2pdf-progress-fill"></div>
+                </div>
+                <div class="task-progress-current" id="img2pdf-current-file"></div>
+                <div class="task-progress-eta" id="img2pdf-eta"></div>
+                <div class="task-progress-error" id="img2pdf-error" style="display:none;"></div>
+              </div>
+            </div>
+            <div class="doc-sub-panel" id="sub-pdf2img">
+              <div class="doc-upload-zone" id="pdf2img-zone">
+                <div class="upload-zone-content">
+                  <div class="upload-zone-icon">📄→🖼️</div>
+                  <p>上传 PDF，每页导出为图片</p>
+                  <p class="upload-zone-hint">支持 PNG / JPG / WebP</p>
+                  <button id="btn-pdf2img-upload" class="btn btn-primary">选择 PDF</button>
+                </div>
+                <input type="file" id="pdf2img-input" accept=".pdf" hidden />
+              </div>
+              <div class="settings-row" style="margin-top:12px;">
+                <label>格式：</label>
+                <select id="pdf2img-format"><option value="png">PNG</option><option value="jpeg">JPG</option><option value="webp">WebP</option></select>
+                <button id="btn-pdf2img-convert" class="btn btn-primary" style="display:none;">导出图片</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: 合并拆分 -->
+        <div class="doc-tab-panel" id="tab-pdf-merge">
+          <div class="doc-tab-content">
+            <div class="doc-sub-tabs">
+              <button class="doc-sub-tab active" data-sub="merge">合并 PDF</button>
+              <button class="doc-sub-tab" data-sub="split">拆分 PDF</button>
+            </div>
+            <div class="doc-sub-panel active" id="sub-merge">
+              <div class="doc-upload-zone" id="merge-zone">
+                <div class="upload-zone-content">
+                  <div class="upload-zone-icon">📑</div>
+                  <p>拖拽多个 PDF，按顺序合并</p>
+                  <p class="upload-zone-hint">拖拽列表可调整顺序</p>
+                  <button id="btn-merge-upload" class="btn btn-primary">选择 PDF</button>
+                </div>
+                <input type="file" id="merge-input" accept=".pdf" multiple hidden />
+              </div>
+              <div id="merge-list" class="convert-preview-list"></div>
+              <button id="btn-merge-convert" class="btn btn-primary" style="display:none;margin-top:12px;">合并 PDF</button>
+            </div>
+            <div class="doc-sub-panel" id="sub-split">
+              <div class="doc-upload-zone" id="split-zone">
+                <div class="upload-zone-content">
+                  <div class="upload-zone-icon">✂️</div>
+                  <p>上传 PDF，按页拆分</p>
+                  <p class="upload-zone-hint">可选择每 N 页拆分为一个文件</p>
+                  <button id="btn-split-upload" class="btn btn-primary">选择 PDF</button>
+                </div>
+                <input type="file" id="split-input" accept=".pdf" hidden />
+              </div>
+              <div id="split-info" style="display:none;margin-top:12px;"></div>
+              <div class="settings-row" style="margin-top:12px;">
+                <label>每</label>
+                <input type="number" id="split-pages" value="1" min="1" max="100" style="width:60px;" />
+                <label>页一个文件</label>
+                <button id="btn-split-convert" class="btn btn-primary" style="display:none;">拆分</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: PDF工具 -->
+        <div class="doc-tab-panel" id="tab-pdf-tools">
+          <div class="doc-tab-content">
+            <div class="doc-sub-tabs">
+              <button class="doc-sub-tab active" data-sub="compress">压缩</button>
+              <button class="doc-sub-tab" data-sub="encrypt">加密</button>
+              <button class="doc-sub-tab" data-sub="decrypt">解密</button>
+              <button class="doc-sub-tab" data-sub="watermark">水印</button>
+            </div>
+            <div class="doc-sub-panel active" id="sub-compress">
+              <div class="doc-upload-zone" id="compress-zone">
+                <div class="upload-zone-content">
+                  <div class="upload-zone-icon">🗜️</div>
+                  <p>上传 PDF 进行压缩</p>
+                  <p class="upload-zone-hint">减小文件体积</p>
+                  <button id="btn-compress-upload" class="btn btn-primary">选择 PDF</button>
+                </div>
+                <input type="file" id="compress-input" accept=".pdf" hidden />
+              </div>
+              <div id="compress-info" style="display:none;margin-top:12px;"></div>
+              <button id="btn-compress-convert" class="btn btn-primary" style="display:none;margin-top:12px;">压缩 PDF</button>
+            </div>
+            <div class="doc-sub-panel" id="sub-encrypt">
+              <div class="doc-upload-zone" id="encrypt-zone">
+                <div class="upload-zone-content">
+                  <div class="upload-zone-icon">🔐</div>
+                  <p>上传 PDF 设置密码保护</p>
+                  <button id="btn-encrypt-upload" class="btn btn-primary">选择 PDF</button>
+                </div>
+                <input type="file" id="encrypt-input" accept=".pdf" hidden />
+              </div>
+              <div class="settings-row" style="margin-top:12px;">
+                <label>密码：</label>
+                <input type="text" id="encrypt-password" placeholder="输入密码" style="width:160px;" />
+                <button id="btn-encrypt-convert" class="btn btn-primary" style="display:none;">加密</button>
+              </div>
+            </div>
+            <div class="doc-sub-panel" id="sub-decrypt">
+              <div class="doc-upload-zone" id="decrypt-zone">
+                <div class="upload-zone-content">
+                  <div class="upload-zone-icon">🔓</div>
+                  <p>上传加密的 PDF 进行解密</p>
+                  <button id="btn-decrypt-upload" class="btn btn-primary">选择 PDF</button>
+                </div>
+                <input type="file" id="decrypt-input" accept=".pdf" hidden />
+              </div>
+              <div class="settings-row" style="margin-top:12px;">
+                <label>密码：</label>
+                <input type="text" id="decrypt-password" placeholder="输入密码" style="width:160px;" />
+                <button id="btn-decrypt-convert" class="btn btn-primary" style="display:none;">解密</button>
+              </div>
+            </div>
+            <div class="doc-sub-panel" id="sub-watermark">
+              <div class="doc-upload-zone" id="watermark-zone">
+                <div class="upload-zone-content">
+                  <div class="upload-zone-icon">💧</div>
+                  <p>上传 PDF 添加文字水印</p>
+                  <button id="btn-watermark-upload" class="btn btn-primary">选择 PDF</button>
+                </div>
+                <input type="file" id="watermark-input" accept=".pdf" hidden />
+              </div>
+              <div class="settings-row" style="margin-top:12px;flex-wrap:wrap;gap:8px;">
+                <label>文字：</label>
+                <input type="text" id="watermark-text" value="Confidential" style="width:120px;" />
+                <label>透明度：</label>
+                <input type="range" id="watermark-opacity" min="5" max="50" value="15" style="width:80px;" />
+                <span id="watermark-opacity-val">15%</span>
+                <label>颜色：</label>
+                <input type="color" id="watermark-color" value="#ff0000" />
+                <button id="btn-watermark-convert" class="btn btn-primary" style="display:none;">加水印</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+    <!-- ==================== AI助手页面 ==================== -->
+    <div id="page-agent" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-agent" class="btn btn-back" title="返回主页">← 返回</button>
+          <svg viewBox="0 0 64 64" width="24" height="24" style="flex-shrink:0;">
+            <defs><linearGradient id="logoGrad6" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff6b4a"/><stop offset="100%" stop-color="#ffab84"/></linearGradient></defs>
+            <rect x="4" y="4" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.9"/><rect x="18" y="4" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.7"/><rect x="32" y="4" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.5"/><rect x="46" y="4" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.3"/><rect x="4" y="18" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.7"/><rect x="18" y="18" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="1"/><rect x="32" y="18" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.7"/><rect x="46" y="18" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.5"/><rect x="4" y="32" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.5"/><rect x="18" y="32" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.7"/><rect x="32" y="32" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.9"/><rect x="46" y="32" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.6"/><rect x="4" y="46" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.3"/><rect x="18" y="46" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.5"/><rect x="32" y="46" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.7"/><rect x="46" y="46" width="12" height="12" rx="2" fill="url(#logoGrad6)" opacity="0.9"/>
+          </svg>
+          <span class="logo">AI 助手</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right"></div>
+      </header>
+      <main class="agent-workspace">
+        <!-- 会话侧栏：本机保存的最近会话（GET /api/agent/sessions） -->
+        <aside class="pk-side" id="agent-side">
+          <div class="pk-side-head">
+            <button id="agent-new-chat-btn" class="pk-new" title="开始一段新对话">＋ 新对话</button>
+            <button id="agent-side-toggle" class="pk-icon-btn" title="收起侧栏">‹</button>
+          </div>
+          <div class="pk-side-list" id="agent-sessions" aria-label="会话历史"></div>
+          <div class="pk-side-foot">
+            <button id="agent-side-refresh" class="pk-ghost" title="重新读取会话列表">↻ 刷新</button>
+            <span class="pk-side-note">仅本机保存</span>
+          </div>
+        </aside>
+
+        <!-- 对话主区 -->
+        <section class="agent-chat-container pk-main">
+          <div class="pk-chat-head">
+            <div class="pk-model">
+              <span class="pk-model-label">模型</span>
+              <select id="agent-model-select" class="pk-select" title="选择本次对话使用的模型"></select>
+              <span class="pk-model-state" id="agent-model-state"></span>
+            </div>
+            <div class="pk-head-actions">
+              <button id="agent-side-open" class="pk-icon-btn pk-only-narrow" title="会话历史">☰</button>
+              <button id="agent-theme-btn" class="pk-icon-btn" title="切换深色 / 浅色">◐</button>
+              <button id="agent-clear-chat" class="pk-ghost" title="清空当前对话（历史仍留在服务器）">清空</button>
+            </div>
+          </div>
+
+          <div class="pk-msgs-wrap">
+            <div class="agent-chat-list pk-msgs" id="agent-chat-list"></div>
+            <!-- 空状态：没有消息时显示；它是 chatList 的兄弟节点，清空消息不会把它删掉 -->
+            <div class="pk-empty" id="agent-empty">
+              <div class="pk-empty-card">
+              <div class="pk-empty-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.6c.62 4.3 2.5 6.18 6.8 6.8-4.3.62-6.18 2.5-6.8 6.8-.62-4.3-2.5-6.18-6.8-6.8 4.3-.62 6.18-2.5 6.8-6.8Z" fill="currentColor"/><circle cx="18.6" cy="18.4" r="1.9" fill="currentColor" opacity=".6"/></svg></div>
+              <h3>你好，我是 PixelKit 小助手</h3>
+              <p>可以陪你聊天、读文件、看图说话，也能直接把想法画成信息图</p>
+              <div class="pk-chips">
+                <button class="pk-chip" data-prompt="帮我画一张「一周计划」的信息图">🎨 画一张信息图</button>
+                <button class="pk-chip" data-prompt="今天有什么值得关注的科技新闻？">📰 查最新资讯</button>
+                <button class="pk-chip" data-prompt="帮我把这段话改得更有条理：">✍️ 帮我改文案</button>
+                <button class="pk-chip" data-prompt="用一句话解释什么是「注意力机制」">💡 解释一个概念</button>
+              </div>
+              <!-- 有历史会话时列出最近几条，点一下直接接着聊 -->
+              <div class="pk-recent" id="agent-recent"></div>
+              <p class="pk-empty-tip">支持拖拽 / 粘贴文件，Enter 发送，Shift+Enter 换行</p>
+              </div>
+            </div>
+          </div>
+          <button id="agent-scroll-bottom" class="agent-scroll-bottom pk-scroll-bottom" title="回到底部">↓</button>
+
+          <div class="agent-input-area pk-composer">
+            <div id="agent-file-preview" class="agent-file-preview" style="display:none;"></div>
+            <button id="agent-clear-files" style="display:none;"></button>
+            <div class="agent-input-row pk-input-row">
+              <button id="agent-attach-btn" class="agent-attach-btn pk-icon-btn" title="上传文件">📎</button>
+              <button id="agent-voice-btn" class="agent-voice-btn pk-icon-btn" title="语音输入">🎤</button>
+              <input type="file" id="agent-file-input" multiple hidden />
+              <textarea id="agent-chat-input" placeholder="输入消息…（Enter 发送）" rows="1"></textarea>
+              <button id="agent-stop-btn" class="pk-stop" style="display:none;" title="停止生成">■ 停止</button>
+              <button id="agent-send-btn" class="btn btn-primary pk-send">发送</button>
+            </div>
+            <div class="agent-input-footer pk-composer-foot">
+              <label class="agent-toggle pk-switch" title="开启后 AI 可以联网搜索和打开网页">
+                <input type="checkbox" id="agent-search-check" checked />
+                <span>🌐 联网</span>
+              </label>
+              <label class="agent-toggle pk-switch" title="内测模式：Pixel &amp; Kit 双 AI 协作对话">
+                <input type="checkbox" id="agent-dual-check" />
+                <span>🧪 内测双 AI</span>
+              </label>
+              <span class="agent-hint pk-hint" id="agent-hint">Enter 发送 · Shift+Enter 换行</span>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- ==================== 轻量PPT页面 ==================== -->
+    <div id="page-ppt" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-ppt" class="btn btn-back" title="返回主页">← 返回</button>
+          <svg viewBox="0 0 64 64" width="24" height="24" style="flex-shrink:0;">
+            <defs><linearGradient id="logoGrad5" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff6b4a"/><stop offset="100%" stop-color="#ffab84"/></linearGradient></defs>
+            <rect x="4" y="4" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.9"/><rect x="18" y="4" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.7"/><rect x="32" y="4" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.5"/><rect x="46" y="4" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.3"/><rect x="4" y="18" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.7"/><rect x="18" y="18" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="1"/><rect x="32" y="18" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.7"/><rect x="46" y="18" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.5"/><rect x="4" y="32" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.5"/><rect x="18" y="32" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.7"/><rect x="32" y="32" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.9"/><rect x="46" y="32" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.6"/><rect x="4" y="46" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.3"/><rect x="18" y="46" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.5"/><rect x="32" y="46" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.7"/><rect x="46" y="46" width="12" height="12" rx="2" fill="url(#logoGrad5)" opacity="0.9"/>
+          </svg>
+          <span class="logo">轻量PPT</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right"></div>
+      </header>
+      <iframe id="ppt-iframe" src="/ppt.html" class="ppt-iframe"></iframe>
+    </div>
+
+    <!-- ==================== 文档编辑器页面 (docx-editor) ==================== -->
+    <div id="page-docx-editor" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-docx-editor" class="btn btn-back" title="返回主页">← 返回</button>
+          <svg viewBox="0 0 64 64" width="24" height="24" style="flex-shrink:0;">
+            <defs><linearGradient id="logoGrad7" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff6b4a"/><stop offset="100%" stop-color="#ffab84"/></linearGradient></defs>
+            <rect x="4" y="4" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.9"/><rect x="18" y="4" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.7"/><rect x="32" y="4" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.5"/><rect x="46" y="4" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.3"/><rect x="4" y="18" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.7"/><rect x="18" y="18" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="1"/><rect x="32" y="18" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.7"/><rect x="46" y="18" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.5"/><rect x="4" y="32" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.5"/><rect x="18" y="32" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.7"/><rect x="32" y="32" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.9"/><rect x="46" y="32" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.6"/><rect x="4" y="46" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.3"/><rect x="18" y="46" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.5"/><rect x="32" y="46" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.7"/><rect x="46" y="46" width="12" height="12" rx="2" fill="url(#logoGrad7)" opacity="0.9"/>
+          </svg>
+          <span class="logo">文档编辑器</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right">
+          <span id="docx-room-link" class="docx-room-link"></span>
+          <button id="btn-docx-new" class="btn btn-sm" title="新建文档">📄 新建</button>
+          <button id="btn-docx-open" class="btn btn-sm" title="打开文档">📂 打开</button>
+          <button id="btn-docx-draw" class="btn btn-sm" title="在文档上涂鸦">🎨 画笔</button>
+          <button id="btn-docx-rename" class="btn btn-sm" title="修改我的名字">👤 <span id="docx-user-name">我</span></button>
+          <button id="btn-docx-collab" class="btn btn-sm" title="开启协同">👤 协同</button>
+          <button id="btn-docx-share" class="btn btn-sm" title="复制邀请链接" style="display:none;">🔗 分享</button>
+          <span id="docx-peers-badge" class="docx-peers-badge" style="display:none;"></span>
+          <button id="btn-docx-feedback" class="btn btn-sm" title="反馈建议">💬 反馈</button>
+        </div>
+      </header>
+      <main class="docx-editor-workspace" id="docx-editor-root">
+        <div class="docx-editor-loading">加载文档编辑器中...</div>
+      </main>
+    </div>
+
+    <!-- ==================== 计时工具页面 ==================== -->
+    <div id="page-timer" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-timer" class="btn btn-back" title="返回主页">← 返回</button>
+          <svg viewBox="0 0 64 64" width="24" height="24" style="flex-shrink:0;"><defs><linearGradient id="logoGrad9" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff6b4a"/><stop offset="100%" stop-color="#ffab84"/></linearGradient></defs><rect x="4" y="4" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.9"/><rect x="18" y="4" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.7"/><rect x="32" y="4" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.5"/><rect x="46" y="4" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.3"/><rect x="4" y="18" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.7"/><rect x="18" y="18" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="1"/><rect x="32" y="18" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.7"/><rect x="46" y="18" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.5"/><rect x="4" y="32" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.5"/><rect x="18" y="32" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.7"/><rect x="32" y="32" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.9"/><rect x="46" y="32" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.6"/><rect x="4" y="46" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.3"/><rect x="18" y="46" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.5"/><rect x="32" y="46" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.7"/><rect x="46" y="46" width="12" height="12" rx="2" fill="url(#logoGrad9)" opacity="0.9"/></svg>
+          <span class="logo">计时工具</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right"></div>
+      </header>
+      <main class="timer-workspace" id="timer-root"></main>
+    </div>
+
+    
+    <!-- ==================== 计数器页面 ==================== -->
+    <div id="page-counter" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-counter" class="btn btn-back" title="返回主页">← 返回</button>
+          <svg viewBox="0 0 64 64" width="24" height="24" style="flex-shrink:0;"><defs><linearGradient id="logoGrad11" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff6b4a"/><stop offset="100%" stop-color="#ffab84"/></linearGradient></defs><rect x="4" y="4" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.9"/><rect x="18" y="4" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.7"/><rect x="32" y="4" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.5"/><rect x="46" y="4" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.3"/><rect x="4" y="18" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.7"/><rect x="18" y="18" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="1"/><rect x="32" y="18" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.7"/><rect x="46" y="18" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.5"/><rect x="4" y="32" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.5"/><rect x="18" y="32" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.7"/><rect x="32" y="32" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.9"/><rect x="46" y="32" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.6"/><rect x="4" y="46" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.3"/><rect x="18" y="46" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.5"/><rect x="32" y="46" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.7"/><rect x="46" y="46" width="12" height="12" rx="2" fill="url(#logoGrad11)" opacity="0.9"/></svg>
+          <span class="logo">计数器</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right"></div>
+      </header>
+      <main class="counter-workspace" id="counter-root"></main>
+    </div>
+
+    <!-- ==================== 文件中转站页面 ==================== -->
+    <div id="page-fileshare" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-fileshare" class="btn btn-back" title="返回主页">← 返回</button>
+          <svg viewBox="0 0 64 64" width="24" height="24" style="flex-shrink:0;"><defs><linearGradient id="logoGrad10" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff6b4a"/><stop offset="100%" stop-color="#ffab84"/></linearGradient></defs><rect x="4" y="4" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.9"/><rect x="18" y="4" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.7"/><rect x="32" y="4" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.5"/><rect x="46" y="4" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.3"/><rect x="4" y="18" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.7"/><rect x="18" y="18" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="1"/><rect x="32" y="18" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.7"/><rect x="46" y="18" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.5"/><rect x="4" y="32" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.5"/><rect x="18" y="32" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.7"/><rect x="32" y="32" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.9"/><rect x="46" y="32" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.6"/><rect x="4" y="46" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.3"/><rect x="18" y="46" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.5"/><rect x="32" y="46" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.7"/><rect x="46" y="46" width="12" height="12" rx="2" fill="url(#logoGrad10)" opacity="0.9"/></svg>
+          <span class="logo">文件中转站</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right"></div>
+      </header>
+      <main class="fileshare-workspace" id="fileshare-root"></main>
+    </div>
+
+    <!-- =================== 二维码工具页面 =================== -->
+    <div id="page-qr" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-qr" class="btn btn-back" title="返回主页">← 返回</button>
+          <svg viewBox="0 0 64 64" width="24" height="24" style="flex-shrink:0;"><defs><linearGradient id="logoGrad12" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff6b4a"/><stop offset="100%" stop-color="#ffab84"/></linearGradient></defs><rect x="4" y="4" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.9"/><rect x="18" y="4" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.7"/><rect x="32" y="4" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.5"/><rect x="46" y="4" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.3"/><rect x="4" y="18" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.7"/><rect x="18" y="18" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="1"/><rect x="32" y="18" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.7"/><rect x="46" y="18" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.5"/><rect x="4" y="32" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.5"/><rect x="18" y="32" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.7"/><rect x="32" y="32" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.9"/><rect x="46" y="32" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.6"/><rect x="4" y="46" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.3"/><rect x="18" y="46" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.5"/><rect x="32" y="46" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.7"/><rect x="46" y="46" width="12" height="12" rx="2" fill="url(#logoGrad12)" opacity="0.9"/></svg>
+          <span class="logo">二维码工具</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right"></div>
+      </header>
+      <main class="qr-workspace" id="qr-root"></main>
+    </div>
+
+    <!-- ==================== 任务管理页面 ==================== -->
+    <div id="page-tasks" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-tasks" class="btn btn-back" title="返回主页">← 返回</button>
+          <svg viewBox="0 0 64 64" width="24" height="24" style="flex-shrink:0;"><defs><linearGradient id="logoGrad14" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff6b4a"/><stop offset="100%" stop-color="#ffab84"/></linearGradient></defs><rect x="4" y="4" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.9"/><rect x="18" y="4" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.7"/><rect x="32" y="4" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.5"/><rect x="46" y="4" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.3"/><rect x="4" y="18" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.7"/><rect x="18" y="18" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="1"/><rect x="32" y="18" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.7"/><rect x="46" y="18" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.5"/><rect x="4" y="32" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.5"/><rect x="18" y="32" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.7"/><rect x="32" y="32" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.9"/><rect x="46" y="32" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.6"/><rect x="4" y="46" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.3"/><rect x="18" y="46" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.5"/><rect x="32" y="46" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.7"/><rect x="46" y="46" width="12" height="12" rx="2" fill="url(#logoGrad14)" opacity="0.9"/></svg>
+          <span class="logo">任务管理</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right"></div>
+      </header>
+      <main id="task-root"></main>
+    </div>
+
+    <!-- ==================== 竹知了页面（已下线） ==================== -->
+    <!--
+      2026-09-14 下线：这是自带夜空竹林场景的沉浸式小游戏页，与新版视觉体系不兼容，
+      经确认移除。原始页面为 public/zhuzhiliao/index.html，文件仍保留在仓库中，
+      如需恢复：把本段替换回 <div id="page-zhuzhiliao" class="page"> 结构，
+      并在 src/main.js 的 pages 路由表中把 'zhuzhiliao' 加回去（否则 btn-back 绑定会报错）。
+    -->
+
+    <!-- ==================== 步步为营游戏页面 ==================== -->
+    <!-- [已注销] 本次更新暂不带步步为营功能
+    <div id="page-quoridor" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-quoridor" class="btn btn-back" title="返回主页">← 返回</button>
+          <svg viewBox="0 0 64 64" width="24" height="24" style="flex-shrink:0;"><defs><linearGradient id="logoGrad13" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ff6b4a"/><stop offset="100%" stop-color="#ffab84"/></linearGradient></defs><rect x="4" y="4" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.9"/><rect x="18" y="4" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.7"/><rect x="32" y="4" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.5"/><rect x="46" y="4" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.3"/><rect x="4" y="18" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.7"/><rect x="18" y="18" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="1"/><rect x="32" y="18" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.7"/><rect x="46" y="18" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.5"/><rect x="4" y="32" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.5"/><rect x="18" y="32" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.7"/><rect x="32" y="32" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.9"/><rect x="46" y="32" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.6"/><rect x="4" y="46" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.3"/><rect x="18" y="46" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.5"/><rect x="32" y="46" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.7"/><rect x="46" y="46" width="12" height="12" rx="2" fill="url(#logoGrad13)" opacity="0.9"/></svg>
+          <span class="logo">步步为营</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right">
+          <span id="quoridor-room-info" class="docx-room-link"></span>
+          <button id="btn-quoridor-copy" class="btn btn-sm" title="复制邀请链接" style="display:none;">🔗 分享</button>
+        </div>
+      </header>
+      <main class="quoridor-workspace" id="quoridor-root">
+        <div class="quoridor-lobby" id="quoridor-lobby">
+          <div class="lobby-card">
+            <div class="lobby-icon">♟️</div>
+            <h2>步步为营 · Quoridor</h2>
+            <p>在 9×9 棋盘上，移动棋子或放置挡板，最先到达对岸者获胜</p>
+            <div class="lobby-rules">
+              <p><strong>规则速览：</strong></p>
+              <ul>
+                <li>每回合选择：移动棋子 1 步，或放置 1 块挡板</li>
+                <li>每人有 <strong>10 块</strong>挡板，用完只能移动</li>
+                <li>挡板不能完全封死任何玩家的通路</li>
+                <li>可以跳过相邻的对手棋子</li>
+                <li>先到达对岸（对方起始行）者胜利</li>
+              </ul>
+            </div>
+            <div class="lobby-actions">
+              <button id="btn-quoridor-create" class="btn btn-primary">🎮 创建双人房间</button>
+              <button id="btn-quoridor-create4" class="btn btn-primary">🎮 创建四人房间</button>
+              <div class="lobby-or">— 或 —</div>
+              <div class="lobby-join">
+                <input type="text" id="quoridor-room-input" placeholder="输入房间号加入" maxlength="8" />
+                <button id="btn-quoridor-join" class="btn">加入</button>
+              </div>
+              <div class="lobby-quick">
+                <button id="btn-quoridor-match" class="btn btn-sm">⚡ 随机匹配</button>
+                <button id="btn-quoridor-local" class="btn btn-sm">🖥️ 本地双人（同机）</button>
+                <button id="btn-quoridor-local4" class="btn btn-sm">🎮 本地四人（同机）</button>
+                <button id="btn-quoridor-ai" class="btn btn-sm">🤖 本地策略 AI</button>
+                <button id="btn-quoridor-nn" class="btn btn-sm">🧠 超绝 AI</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="quoridor-game" id="quoridor-game" style="display:none;">
+          <div class="quoridor-sidebar">
+            <div class="game-status" id="game-status">等待对手加入...</div>
+            <div class="player-list" id="player-list"></div>
+            <div class="game-log" id="game-log"></div>
+            <div class="quoridor-btn-group">
+              <button id="btn-quoridor-undo" class="btn btn-warning btn-sm">↩️ 悔棋</button>
+              <button id="btn-quoridor-draw" class="btn btn-sm">🤝 求和</button>
+              <button id="btn-quoridor-surrender" class="btn btn-danger btn-sm">🏳️ 认输</button>
+              <button id="btn-quoridor-leave" class="btn btn-danger btn-sm">退出</button>
+            </div>
+          </div>
+          <div class="quoridor-board-wrap">
+            <canvas id="quoridor-canvas"></canvas>
+          </div>
+          <div class="quoridor-actions">
+            <div class="wall-tokens" id="wall-tokens">
+              <div class="wall-token-label">拖拽挡板到棋盘放置</div>
+              <button class="wall-token" data-dir="h" title="拖到棋盘放置横向挡板">━ 横墙</button>
+              <button class="wall-token" data-dir="v" title="拖到棋盘放置纵向挡板">┃ 竖墙</button>
+            </div>
+            <div class="action-info" id="action-info">点击你的棋子，再点击高亮格子移动</div>
+          </div>
+        </div>
+
+        <div class="quoridor-result" id="quoridor-result" style="display:none;">
+          <div class="result-card">
+            <div class="result-title" id="result-title"></div>
+            <div class="result-stats" id="result-stats"></div>
+            <div class="result-buttons">
+              <button id="btn-quoridor-restart" class="btn btn-primary">🔄 再来一局</button>
+              <button id="btn-quoridor-result-leave" class="btn">返回大厅</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="quoridor-replay" id="quoridor-replay" style="display:none;"></div>
+      </main>
+    </div>
+    -->
+
+    <!-- ==================== 成长模拟器页面 ==================== -->
+    <div id="page-lifesim" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-lifesim" class="btn btn-back" title="返回主页">← 返回</button>
+          <span class="logo">🌱 成长模拟器</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right">
+          <span id="lifesim-status" class="docx-room-link" style="display:none;"></span>
+        </div>
+      </header>
+      <main class="lifesim-workspace" id="lifesim-root"></main>
+    </div>
+
+    <!-- ==================== 人生之书（玩法加厚版）页面 ==================== -->
+    <div id="page-book" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-book" class="btn btn-back" title="返回主页">← 返回</button>
+          <span class="logo">📖 人生之书</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right">
+          <button id="bCodex" class="btn" title="灯谱 / 结局 / 事件图鉴">图鉴</button>
+          <button id="bAch" class="btn" title="成就">成就</button>
+          <button id="bHelp" class="btn" title="玩法说明">玩法</button>
+          <button id="bAI" class="btn" title="AI 增强（服务端提供）">AI</button>
+          <button id="bReset" class="btn" title="放弃当前人生">重开</button>
+        </div>
+      </header>
+      <main class="book-workspace">
+        <div class="pkb" id="pkb-root">
+          <div class="pkb-app"></div>
+        </div>
+      </main>
+    </div>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script type="module" src="/src/main.js"></script>
+  <script type="module" src="/src/home-redesign.js"></script>
+</body>
+</html>

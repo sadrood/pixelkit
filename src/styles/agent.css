@@ -1,0 +1,871 @@
+/* ============================================================================
+   AI 助手（聊天页）重设计 —— 2026-09-30
+   背景问题（都被实测确认过）：
+     ① 发送按钮 #app .btn-primary 被外壳 id 选择器压成白底白字 → 字看不见；
+     ② 桌面端只用了中间 820px，气泡收缩到 356px，右侧大片空白；
+     ③ 没有头像/时间/消息操作/空状态引导/模型选择/停止生成/会话历史。
+   设计取向：现代对话式（全宽工作区 + 头像气泡 + 输入卡片 + 空状态建议词），
+   深浅两套主题都走 CSS 变量，配色对比度按 WCAG AA 校准
+   （实测：白字配 #c2401d = 5.2:1 通过；配品牌橙 #ff6b4a 只有 2.7:1 不通过，
+     所以按钮底用加深的 --pk-brand-strong，品牌橙只用于描边/强调）。
+   作用域：全部规则以 #page-agent 打头，避免和 main.css 里 127 条旧 .agent-* 规则打架
+   （旧规则多为单 id/单 class，本文档用 #page-agent + 类名，特异性更高，无需 !important）。
+   ========================================================================== */
+
+#page-agent {
+  --pk-brand: var(--primary);
+  --pk-brand-strong: #c2401d;          /* 白字在其上对比度 5.2:1（AA 通过） */
+  --pk-brand-soft: var(--primary-soft);
+  --pk-bubble-me: var(--pk-brand-strong);
+  --pk-bubble-ai: var(--bg-secondary);
+  --pk-bubble-ai-border: var(--border);
+  --pk-side-w: 248px;
+  --pk-composer-bg: var(--bg-secondary);
+  --pk-ink-invert: #ffffff;
+}
+
+/* ---------------- 工作区骨架：侧栏 + 主区 ---------------- */
+#page-agent .agent-workspace {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+  gap: 0;
+}
+
+/* 侧栏 */
+#page-agent .pk-side {
+  width: var(--pk-side-w);
+  flex: 0 0 var(--pk-side-w);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  transition: margin-left var(--transition), opacity var(--transition);
+}
+#page-agent.pk-side-collapsed .pk-side {
+  margin-left: calc(-1 * var(--pk-side-w));
+  opacity: 0;
+  pointer-events: none;
+}
+#page-agent .pk-side-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 8px;
+}
+#page-agent .pk-new {
+  flex: 1;
+  height: 36px;
+  border: 1px dashed var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--pk-brand-soft);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+#page-agent .pk-new:hover { border-color: var(--pk-brand); color: var(--pk-brand-strong); }
+
+#page-agent .pk-side-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#page-agent .pk-sess {
+  position: relative;
+  padding: 9px 30px 9px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: var(--transition);
+}
+#page-agent .pk-sess:hover { background: var(--surface-hover); }
+#page-agent .pk-sess.is-active { background: var(--pk-brand-soft); border-color: var(--pk-brand); }
+#page-agent .pk-sess-title {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+#page-agent .pk-sess-meta { margin-top: 3px; font-size: 11px; color: var(--text-muted); }
+#page-agent .pk-sess-del {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: var(--transition);
+}
+#page-agent .pk-sess:hover .pk-sess-del { opacity: 1; }
+#page-agent .pk-sess-del:hover { background: var(--danger); color: #fff; }
+#page-agent .pk-side-empty { padding: 14px 10px; font-size: 12px; color: var(--text-muted); line-height: 1.7; }
+#page-agent .pk-side-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* 主区 */
+#page-agent .pk-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-width: none;         /* 覆盖 main.css 里的 820px 限宽 */
+  margin: 0;
+  position: relative;
+}
+
+/* 顶部信息条：模型选择 + 操作 */
+#page-agent .pk-chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+#page-agent .pk-model { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#page-agent .pk-model-label { font-size: 12px; color: var(--text-muted); letter-spacing: .06em; }
+#page-agent .pk-select {
+  height: 32px;
+  padding: 0 30px 0 10px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  max-width: 230px;
+}
+#page-agent .pk-select:focus { outline: 2px solid var(--pk-brand); outline-offset: 1px; }
+#page-agent .pk-select option:disabled { color: #8b93a8; }
+#page-agent .pk-model-state { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+#page-agent .pk-model-state.is-bad { color: var(--danger); }
+#page-agent .pk-head-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+/* 通用小按钮（图标 / 幽灵） */
+#page-agent .pk-icon-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+#page-agent .pk-icon-btn:hover { background: var(--surface-hover); color: var(--text); border-color: var(--border-light); }
+#page-agent .pk-ghost {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+#page-agent .pk-ghost:hover { background: var(--surface-hover); color: var(--text); }
+#page-agent .pk-only-narrow { display: none; }
+
+/* ---------------- 消息列表 ---------------- */
+#page-agent .pk-msgs-wrap { position: relative; flex: 1; min-height: 0; display: flex; }
+#page-agent .pk-msgs {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 22px clamp(14px, 3vw, 40px) 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  scroll-behavior: smooth;
+}
+/* 消息行：头像 + 内容 */
+#page-agent .pk-msgs .agent-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: min(92%, 1040px);
+  margin: 0;
+}
+#page-agent .pk-msgs .agent-msg-user { flex-direction: row-reverse; align-self: flex-end; }
+#page-agent .pk-msgs .agent-msg-assistant { align-self: flex-start; }
+
+#page-agent .pk-avatar {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  user-select: none;
+}
+#page-agent .agent-msg-user .pk-avatar { background: var(--pk-brand-soft); border-color: var(--pk-brand); }
+
+#page-agent .pk-body { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+#page-agent .agent-msg-user .pk-body { align-items: flex-end; }
+
+#page-agent .agent-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0 2px;
+}
+#page-agent .agent-mood-badge { font-size: 12px; color: var(--text-secondary); }
+
+/* 气泡：正文 16px 行高 1.75，最大 72ch 保证阅读舒适 */
+#page-agent .agent-bubble {
+  position: relative;
+  max-width: 72ch;
+  padding: 12px 16px;
+  border-radius: 14px;
+  font-size: 15px;
+  line-height: 1.72;
+  color: var(--text);
+  background: var(--pk-bubble-ai);
+  border: 1px solid var(--pk-bubble-ai-border);
+  box-shadow: var(--shadow);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+#page-agent .agent-msg-user .agent-bubble {
+  background: var(--pk-bubble-me);
+  border-color: transparent;
+  color: var(--pk-ink-invert);      /* 白字配 #c2401d：对比度 5.2:1 */
+  border-radius: 14px 14px 4px 14px;
+}
+#page-agent .agent-msg-assistant .agent-bubble { border-radius: 14px 14px 14px 4px; }
+#page-agent .agent-bubble img { max-width: 100%; border-radius: 10px; }
+
+/* 流式输出中的光标 */
+#page-agent .agent-bubble.pk-streaming::after {
+  content: '▍';
+  margin-left: 2px;
+  color: var(--pk-brand-strong);
+  animation: pk-caret 1s steps(2, start) infinite;
+}
+@keyframes pk-caret { to { opacity: 0; } }
+
+/* 消息操作条：默认淡出，hover / focus 时出现 */
+#page-agent .pk-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+#page-agent .agent-msg:hover .pk-actions,
+#page-agent .agent-msg:focus-within .pk-actions { opacity: 1; }
+#page-agent .pk-act {
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+#page-agent .pk-act:hover { color: var(--text); border-color: var(--border-light); background: var(--surface-hover); }
+#page-agent .pk-act.is-ok { color: var(--success); border-color: var(--success); }
+
+/* 代码 / 引用等在气泡里的排版 */
+#page-agent .agent-bubble pre {
+  margin: 10px 0;
+  padding: 12px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.6;
+}
+#page-agent .agent-bubble code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+#page-agent .agent-bubble :not(pre) > code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+#page-agent .agent-bubble a { color: var(--pk-brand-strong); text-decoration: underline; }
+#page-agent .agent-bubble blockquote {
+  margin: 10px 0;
+  padding: 4px 0 4px 12px;
+  border-left: 3px solid var(--pk-brand);
+  color: var(--text-secondary);
+}
+#page-agent .agent-bubble table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+#page-agent .agent-bubble th, #page-agent .agent-bubble td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+#page-agent .agent-bubble th { background: var(--bg-tertiary); }
+
+/* ---------------- 空状态 ---------------- */
+#page-agent .pk-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  pointer-events: none;
+}
+#page-agent .pk-empty[hidden] { display: none; }
+#page-agent .pk-empty-icon { font-size: 40px; line-height: 1; }
+#page-agent .pk-empty h3 { margin: 2px 0 0; font-size: 19px; color: var(--text); }
+#page-agent .pk-empty p { margin: 0; font-size: 13px; color: var(--text-secondary); max-width: 46ch; }
+#page-agent .pk-empty-tip { color: var(--text-muted) !important; font-size: 12px !important; }
+#page-agent .pk-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 8px; pointer-events: auto; }
+#page-agent .pk-chip {
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+#page-agent .pk-chip:hover {
+  color: var(--pk-brand-strong);
+  border-color: var(--pk-brand);
+  background: var(--pk-brand-soft);
+  transform: translateY(-1px);
+}
+
+/* 回到底部 */
+#page-agent .pk-scroll-bottom {
+  position: absolute;
+  right: 22px;
+  bottom: 148px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  display: none;
+  z-index: 3;
+}
+#page-agent .pk-scroll-bottom.is-show { display: block; }
+
+/* ---------------- 输入区 ---------------- */
+#page-agent .pk-composer {
+  position: relative;
+  padding: 12px clamp(14px, 3vw, 40px) 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+#page-agent .pk-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--pk-composer-bg);
+  box-shadow: var(--shadow);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+#page-agent .pk-input-row:focus-within {
+  border-color: var(--pk-brand);
+  box-shadow: 0 0 0 3px var(--pk-brand-soft);
+}
+#page-agent .pk-input-row textarea {
+  flex: 1;
+  min-height: 40px;
+  max-height: 190px;              /* 配合 JS 自动增高 */
+  padding: 9px 6px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+}
+#page-agent .pk-input-row textarea::placeholder { color: var(--text-muted); }
+#page-agent .pk-input-row .pk-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 16px;
+}
+#page-agent .pk-input-row .pk-icon-btn:hover { background: var(--surface-hover); }
+
+/* 发送 / 停止：这里必须显式写出前景与背景色——旧的 #app .btn-primary 会把
+   背景刷成白色而 color 仍是白色，形成白底白字（对比度 1.0，字看不见）。 */
+#page-agent #agent-send-btn.pk-send {
+  height: 36px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--pk-brand-strong);
+  color: var(--pk-ink-invert);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  cursor: pointer;
+  box-shadow: 0 4px 14px -6px rgba(194, 64, 29, .55);
+  transition: var(--transition);
+}
+#page-agent #agent-send-btn.pk-send:hover:not(:disabled) { background: #a8361a; }
+#page-agent #agent-send-btn.pk-send:disabled { opacity: .55; cursor: not-allowed; }
+#page-agent #agent-stop-btn.pk-stop {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--danger);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+#page-agent #agent-stop-btn.pk-stop:hover { background: var(--danger); color: #fff; }
+
+/* 输入区底部开关与提示 */
+#page-agent .pk-composer-foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 8px 4px 0;
+  /* 右侧留出悬浮吉祥物按钮的位置，否则提示文字（…Shift+Enter 换行）的尾字会被它压住 */
+  padding-right: 56px;
+  border: 0;
+  background: transparent;
+}
+#page-agent .pk-switch { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); cursor: pointer; }
+#page-agent .pk-switch input { accent-color: var(--pk-brand-strong); }
+#page-agent .pk-hint { margin-left: auto; font-size: 11px; color: var(--text-muted); }
+
+/* 文件预览条 */
+#page-agent .agent-file-preview { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 2px 8px; }
+#page-agent #agent-clear-files {
+  position: absolute;
+  top: -6px;
+  right: clamp(14px, 3vw, 40px);
+}
+
+/* ---------------- 窄屏：侧栏变抽屉 ---------------- */
+@media (max-width: 900px) {
+  #page-agent .pk-side {
+    position: absolute;
+    z-index: 6;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    box-shadow: var(--shadow-lg);
+  }
+  /* 顶栏在窄屏要收得住：状态文字隐藏、下拉变窄、按钮紧凑 */
+  #page-agent .pk-chat-head { padding: 8px 10px; gap: 8px; }
+  #page-agent .pk-model { gap: 6px; min-width: 0; }
+  #page-agent .pk-model-label { display: none; }
+  #page-agent .pk-select { max-width: 42vw; }
+  #page-agent .pk-model-state { display: none; }
+  #page-agent .pk-head-actions { gap: 4px; }
+  #page-agent .pk-head-actions .pk-ghost { padding: 0 8px; }
+  #page-agent.pk-side-collapsed .pk-side { margin-left: calc(-1 * var(--pk-side-w) - 10px); }
+  #page-agent .pk-only-narrow { display: inline-flex; }
+  #page-agent.pk-side-collapsed .pk-side { opacity: 1; }
+  #page-agent .pk-empty h3 { font-size: 17px; }
+  #page-agent .pk-chip { font-size: 12px; padding: 8px 12px; }
+  #page-agent .pk-scroll-bottom { bottom: 132px; right: 12px; }
+  #page-agent .pk-msgs { padding: 16px 12px 6px; gap: 14px; }
+  #page-agent .pk-msgs .agent-msg { max-width: 100%; }
+  #page-agent .agent-bubble { font-size: 15px; }
+  #page-agent .pk-actions { opacity: 1; }        /* 触屏没有 hover，直接常显 */
+  #page-agent .pk-hint { display: none; }
+}
+
+/* 默认（深色）：侧栏与主区边界更清晰 */
+:root:not([data-theme="light"]) #page-agent .pk-side { background: var(--bg-secondary); }
+:root:not([data-theme="light"]) #page-agent .agent-bubble { box-shadow: none; }
+:root:not([data-theme="light"]) #page-agent .pk-empty-icon { filter: drop-shadow(0 4px 12px rgba(255,107,74,.35)); }
+
+/* ============================================================================
+   2026-10-08 视觉打磨 —— 针对用户反馈"页面好丑 / 好难用"：
+     ① 空状态从"飘在虚空里的几行字"改成一张卡片（中间不再是一大片空白）；
+     ② 侧栏从"一堵灰字"改成按 今天/昨天/更早 分组、单行标题 + 右侧时间、选中带品牌色条；
+     ③ 头部去掉"另有 N 个模型不可用…"这类技术噪音（挪进下拉的 title）；
+     ④ 输入区抬升质感（卡面底色 + 更亮边框 + 更大圆角），气泡/头像加层次；
+     ⑤ 空状态里列出最近会话，一点就接着聊（顺带解决"难用"）。
+   ============================================================================ */
+
+/* ① 空状态卡片 */
+#page-agent .pk-empty { padding: 20px; }
+#page-agent .pk-empty-card {
+  pointer-events: auto;
+  width: min(560px, 100%);
+  padding: 30px 26px 20px;
+  border-radius: 22px;
+  background: var(--bg-secondary);
+  background-image: radial-gradient(120% 90% at 50% 0%, var(--primary-soft), transparent 72%);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+}
+#page-agent .pk-empty-icon { font-size: 46px; filter: drop-shadow(0 10px 22px rgba(255, 107, 74, .35)); }
+#page-agent .pk-empty h3 { font-size: 20px; margin-top: 2px; }
+#page-agent .pk-empty p { font-size: 13px; line-height: 1.7; }
+
+/* ⑤ 最近会话（空状态内） */
+#page-agent .pk-recent { width: 100%; margin-top: 8px; padding-top: 12px; border-top: 1px dashed var(--border); display: flex; flex-direction: column; gap: 6px; }
+#page-agent .pk-recent:empty { display: none; }
+#page-agent .pk-recent-title { font-size: 11px; letter-spacing: .1em; color: var(--text-muted); text-align: left; }
+#page-agent .pk-recent-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 11px; border: 1px solid var(--border); border-radius: 10px;
+  background: transparent; color: var(--text-secondary); font-size: 13px; cursor: pointer;
+  text-align: left; transition: var(--transition);
+}
+#page-agent .pk-recent-item:hover { border-color: var(--primary); color: var(--text); background: var(--surface-hover); transform: translateY(-1px); }
+#page-agent .pk-recent-item .pk-recent-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#page-agent .pk-recent-item .pk-recent-d { flex-shrink: 0; font-size: 11px; color: var(--text-muted); }
+
+/* ② 侧栏分组与行样式 */
+#page-agent .pk-side-group { padding: 12px 12px 4px; font-size: 11px; letter-spacing: .14em; color: var(--text-muted); }
+#page-agent .pk-sess { padding: 9px 30px 9px 12px; border-left: 2px solid transparent; border-radius: 0 10px 10px 0; }
+#page-agent .pk-sess:hover { background: var(--surface-hover); }
+#page-agent .pk-sess.is-active { background: var(--primary-soft); border-left-color: var(--primary); }
+#page-agent .pk-sess-title { -webkit-line-clamp: 1; font-size: 13px; color: var(--text-secondary); }
+#page-agent .pk-sess.is-active .pk-sess-title { color: var(--text); font-weight: 600; }
+#page-agent .pk-sess-meta { position: absolute; right: 28px; top: 50%; transform: translateY(-50%); margin: 0; font-size: 11px; white-space: nowrap; transition: opacity var(--transition); }
+#page-agent .pk-sess:hover .pk-sess-meta { opacity: 0; }
+
+/* ③ 头部更干净 */
+#page-agent .pk-chat-head { padding: 10px 18px; background: var(--bg-secondary); }
+#page-agent .pk-select { max-width: 208px; }
+#page-agent .pk-model-state { font-size: 11.5px; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ④ 输入区质感 */
+#page-agent .pk-composer { background: var(--bg-secondary); }
+#page-agent .pk-input-row {
+  border-radius: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow);
+  padding: 9px 10px;
+}
+#page-agent .pk-input-row .pk-icon-btn { color: var(--text-secondary); font-size: 17px; width: 34px; height: 34px; }
+#page-agent .pk-input-row .pk-icon-btn:hover { color: var(--primary); background: var(--primary-soft); }
+#page-agent .pk-input-row textarea { font-size: 15.5px; }
+#page-agent .pk-switch { color: var(--text-secondary); }
+
+/* 头像与气泡层次 */
+#page-agent .pk-avatar {
+  width: 36px; height: 36px; flex-basis: 36px; font-size: 18px;
+  background: linear-gradient(135deg, var(--bg-elevated), var(--bg-tertiary));
+  border: 1px solid var(--border-light);
+}
+#page-agent .agent-msg-user .pk-avatar { background: linear-gradient(135deg, var(--primary), #ff9a6b); border-color: transparent; color: #fff; }
+#page-agent .agent-msg-assistant .agent-bubble { background: var(--bg-elevated); border-color: var(--border); }
+#page-agent .pk-msgs { gap: 20px; padding-top: 24px; }
+#page-agent .agent-meta { font-size: 11.5px; }
+
+/* 窄屏：卡片内边距收紧 */
+@media (max-width: 900px) {
+  #page-agent .pk-empty-card { padding: 22px 16px 16px; border-radius: 18px; }
+  #page-agent .pk-empty h3 { font-size: 17px; }
+  #page-agent .pk-sess-meta { display: none; }
+}
+/* 修正：侧栏行改成 flex（标题 flex:1 省略号 + 右侧时间），避免时间压在标题上 */
+#page-agent .pk-sess { display: flex; align-items: center; gap: 8px; padding: 9px 30px 9px 12px; }
+#page-agent .pk-sess-title { flex: 1; min-width: 0; -webkit-line-clamp: 1; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#page-agent .pk-sess-meta { position: static; transform: none; margin: 0; flex-shrink: 0; opacity: 1; }
+#page-agent .pk-sess:hover .pk-sess-meta { opacity: 1; }
+/* 聊天页隐藏右下角全局主题吉祥物：它本来就压住输入区，而聊天页头部自带主题按钮 */
+body.pk-agent-active .theme-fab { display: none; }
+@media (max-width: 900px) {
+  #page-agent .pk-input-row textarea { font-size: 15px; }
+  #page-agent .pk-composer-foot { gap: 10px; }
+}
+/* ============================================================================
+   2026-10-08（下半场）：按用户反馈再改两处
+     ① 模型选择器不再默认展示（内部仍用服务端默认模型）；
+        想让它回来：给 <body> 加属性 data-pk-model-picker 即可。
+     ② 头像重做：不用 emoji / 颜文字，改矢量 SVG（助手=品牌色火花，用户=人像轮廓）。
+   ============================================================================ */
+
+body:not([data-pk-model-picker]) #page-agent .pk-model { display: none; }
+/* 藏了模型选择器后，头部只留右上角操作，高度收一点 */
+body:not([data-pk-model-picker]) #page-agent .pk-chat-head { padding: 8px 16px; min-height: 0; }
+
+/* 头像容器：居中放 SVG，尺寸改由内部图形决定 */
+#page-agent .pk-avatar {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  overflow: hidden;
+  line-height: 0;
+}
+#page-agent .pk-avatar svg { width: 58%; height: 58%; display: block; }
+
+#page-agent .pk-avatar-ai {
+  background: linear-gradient(135deg, #ff8a5c, #c2401d);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 4px 14px rgba(255, 107, 74, .30);
+}
+#page-agent .pk-avatar-user {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+}
+
+/* 空状态的大图标也用同一个火花，保持整套视觉一致 */
+#page-agent .pk-empty-icon {
+  width: 76px; height: 76px; border-radius: 24px;
+  display: grid; place-items: center;
+  background: linear-gradient(135deg, #ff8a5c, #c2401d);
+  color: #fff; font-size: 0;
+  box-shadow: 0 14px 34px rgba(255, 107, 74, .34);
+}
+#page-agent .pk-empty-icon svg { width: 46%; height: 46%; display: block; }
+/* 名字后面的颜文字情绪徽章（如 (◍•ᴗ•◍)）一并去掉 —— 用户在截图里点名的"丑"就包括它。
+   内部状态仍照常计算，只是不再显示。 */
+#page-agent .agent-mood-badge,
+#page-agent .mood-badge,
+#page-agent .agent-face { display: none !important; }
+/* ============================================================================
+   2026-10-08：仿 DeepSeek Harness 聊天界面（用户要求"仿照 DSH 做，头像去掉"）
+   设计令牌取自本机 DSH 前端产物（app.asar → dsh-web-frontend）：
+     文字主色 #0f1115 · 次级 #61666b · 三级 #81858c · 描边 rgb(0 0 0 / 10%) · 品牌 #0f1115
+     字体 Montserrat（已从 DSH 提取到 public/fonts/）
+   风格：无头像；助手消息是纯文本（无气泡）；用户消息右侧浅灰色卡片；细描边、近黑主色、
+        大量留白、对话列居中限宽。
+   ============================================================================ */
+
+@font-face { font-family: 'PkMontserrat'; src: url('/fonts/montserrat-regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'PkMontserrat'; src: url('/fonts/montserrat-medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+
+/* 深色（PixelKit 默认无 data-theme） */
+#page-agent {
+  --dsh-bg: #0f1115;
+  --dsh-panel: #15171c;
+  --dsh-card: #1c1f25;
+  --dsh-text-1: #f3f4f6;
+  --dsh-text-2: #9ba1a8;
+  --dsh-text-3: #6e747b;
+  --dsh-line: rgba(255, 255, 255, .10);
+  --dsh-hover: rgba(255, 255, 255, .07);
+  --dsh-font: 'PkMontserrat', -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --dsh-mono: 'SF Mono', 'JetBrains Mono', Consolas, monospace;
+  font-family: var(--dsh-font);
+}
+/* 浅色 */
+[data-theme="light"] #page-agent {
+  --dsh-bg: #ffffff;
+  --dsh-panel: #fafafa;
+  --dsh-card: #f4f4f5;
+  --dsh-text-1: #0f1115;
+  --dsh-text-2: #61666b;
+  --dsh-text-3: #81858c;
+  --dsh-line: rgba(0, 0, 0, .10);
+  --dsh-hover: rgba(0, 0, 0, .05);
+}
+
+/* 容器与滚动区：对话列居中限宽，像 DSH 那样留白 */
+#page-agent .pk-main { background: var(--dsh-bg); }
+#page-agent .pk-msgs {
+  display: block !important;
+  gap: 0 !important;
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 28px 24px 48px !important;
+}
+#page-agent .agent-msg { display: block; padding: 16px 0; margin: 0 !important; }
+#page-agent .agent-msg + .agent-msg { border-top: 1px solid transparent; }
+
+/* 助手：纯文本，去掉气泡 */
+#page-agent .agent-msg-assistant .agent-bubble {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  color: var(--dsh-text-1);
+  font-size: 14.5px;
+  line-height: 1.78;
+}
+/* 角色小标签 */
+#page-agent .agent-meta {
+  font-size: 12px !important;
+  color: var(--dsh-text-3) !important;
+  margin: 0 0 7px !important;
+  letter-spacing: .01em;
+}
+
+/* 用户：右侧浅灰卡片，无标签 */
+#page-agent .agent-msg-user { display: flex; justify-content: flex-end; }
+#page-agent .agent-msg-user .pk-body { max-width: 76%; }
+#page-agent .agent-msg-user .agent-meta { display: none !important; }
+#page-agent .agent-msg-user .agent-bubble {
+  background: var(--dsh-card) !important;
+  border: 1px solid var(--dsh-line) !important;
+  border-radius: 12px !important;
+  padding: 10px 14px !important;
+  color: var(--dsh-text-1);
+  font-size: 14.5px;
+  line-height: 1.7;
+}
+
+/* 操作条：平时很淡，hover 才清晰（DSH 的克制感） */
+#page-agent .pk-actions { opacity: .4; transition: opacity .15s ease; margin-top: 8px !important; gap: 2px !important; }
+#page-agent .agent-msg:hover .pk-actions { opacity: 1; }
+#page-agent .pk-act {
+  background: transparent !important;
+  border: 0 !important;
+  color: var(--dsh-text-3) !important;
+  font-size: 12px !important;
+  padding: 3px 7px !important;
+  border-radius: 6px !important;
+}
+#page-agent .pk-act:hover { background: var(--dsh-hover) !important; color: var(--dsh-text-1) !important; }
+
+/* 侧栏：DSH 式扁平列表 */
+#page-agent .pk-side { background: var(--dsh-panel) !important; border-right: 1px solid var(--dsh-line) !important; }
+#page-agent .pk-side-group { color: var(--dsh-text-3) !important; font-size: 11px !important; }
+#page-agent .pk-sess { border-left: 0 !important; border-radius: 8px !important; }
+#page-agent .pk-sess:hover { background: var(--dsh-hover) !important; }
+#page-agent .pk-sess.is-active { background: var(--dsh-hover) !important; border-left: 0 !important; }
+#page-agent .pk-sess.is-active .pk-sess-title { color: var(--dsh-text-1) !important; font-weight: 500 !important; }
+#page-agent .pk-sess-title { color: var(--dsh-text-2) !important; font-size: 13px !important; }
+
+/* 头部：极简，细描边 */
+#page-agent .pk-chat-head { background: transparent !important; border-bottom: 1px solid var(--dsh-line) !important; }
+#page-agent .pk-ghost, #page-agent .pk-icon-btn { color: var(--dsh-text-2) !important; }
+#page-agent .pk-ghost:hover, #page-agent .pk-icon-btn:hover { background: var(--dsh-hover) !important; color: var(--dsh-text-1) !important; }
+
+/* 输入区：DSH 式描边卡片 + 内部反色发送键 */
+#page-agent .pk-composer { background: transparent !important; }
+#page-agent .pk-input-row {
+  background: var(--dsh-panel) !important;
+  border: 1px solid var(--dsh-line) !important;
+  border-radius: 14px !important;
+  padding: 8px 8px 8px 12px !important;
+  box-shadow: none !important;
+  max-width: 780px;
+  margin: 0 auto;
+}
+#page-agent .pk-input-row:focus-within { border-color: rgba(128,128,128,0.35) !important; }
+#page-agent .pk-input-row textarea {
+  font-family: var(--dsh-font) !important;
+  font-size: 14.5px !important;
+  color: var(--dsh-text-1) !important;
+  background: transparent !important;
+}
+#page-agent .pk-input-row textarea::placeholder { color: var(--dsh-text-3) !important; }
+#page-agent .pk-input-row .pk-icon-btn { color: var(--dsh-text-3) !important; }
+#page-agent .pk-input-row .pk-icon-btn:hover { background: var(--dsh-hover) !important; color: var(--dsh-text-1) !important; }
+#page-agent .pk-send {
+  background: var(--dsh-text-1) !important;
+  color: var(--dsh-bg) !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  font-family: var(--dsh-font) !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+}
+#page-agent .pk-send:hover { opacity: .88; }
+#page-agent .pk-stop { border-radius: 10px !important; }
+#page-agent .pk-composer-foot { color: var(--dsh-text-3) !important; font-size: 12px !important; max-width: 780px; margin: 0 auto; }
+
+/* 空状态：去掉大色块，改成克制的单色标记 + 描边胶囊 */
+#page-agent .pk-empty-card {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  gap: 10px !important;
+}
+#page-agent .pk-empty-icon {
+  width: 52px !important; height: 52px !important; border-radius: 16px !important;
+  background: var(--dsh-hover) !important;
+  color: var(--dsh-text-2) !important;
+  box-shadow: none !important;
+}
+#page-agent .pk-empty-icon svg { width: 46% !important; height: 46% !important; }
+#page-agent .pk-empty h3 { color: var(--dsh-text-1) !important; font-weight: 500 !important; font-size: 18px !important; }
+#page-agent .pk-empty p { color: var(--dsh-text-3) !important; }
+#page-agent .pk-chip {
+  background: transparent !important;
+  border: 1px solid var(--dsh-line) !important;
+  color: var(--dsh-text-2) !important;
+  border-radius: 999px !important;
+  font-size: 13px !important;
+}
+#page-agent .pk-chip:hover { background: var(--dsh-hover) !important; color: var(--dsh-text-1) !important; border-color: transparent !important; }
+#page-agent .pk-recent-item { border-color: var(--dsh-line) !important; color: var(--dsh-text-2) !important; border-radius: 8px !important; }
+#page-agent .pk-recent-item:hover { background: var(--dsh-hover) !important; border-color: transparent !important; color: var(--dsh-text-1) !important; transform: none !important; }
+#page-agent .pk-empty-tip { color: var(--dsh-text-3) !important; }
+
+/* 代码块：DSH 用的等宽字体 */
+#page-agent .agent-bubble pre, #page-agent .agent-bubble code { font-family: var(--dsh-mono) !important; }
+/* 修正：用户消息必须靠右（覆盖早期规则里的 !important），且用户消息不显示操作条；
+   助手的操作条平时隐藏、hover 才出现（DSH 的克制感）。 */
+#page-agent .agent-msg-user { display: flex !important; justify-content: flex-end !important; width: 100% !important; }
+#page-agent .agent-msg-user .pk-actions { display: none !important; }
+#page-agent .agent-msg-assistant .pk-actions { opacity: 0 !important; }
+#page-agent .agent-msg:hover .pk-actions { opacity: 1 !important; }
+/* 修正二：flex 在旧结构里没生效 → 改用块级 + margin-left:auto 靠右（最稳） */
+#page-agent .agent-msg-user { display: block !important; }
+#page-agent .agent-msg-user .pk-body { margin-left: auto !important; max-width: 76% !important; }
+/* 侧栏主按钮也去品牌色，改成 DSH 的中性描边按钮 */
+#page-agent .pk-new-chat, #page-agent #agent-new-chat-btn {
+  background: var(--dsh-hover) !important;
+  color: var(--dsh-text-1) !important;
+  border: 1px solid var(--dsh-line) !important;
+  box-shadow: none !important;
+  font-family: var(--dsh-font) !important;
+  font-weight: 500 !important;
+  border-radius: 10px !important;
+}
+#page-agent .pk-new-chat:hover, #page-agent #agent-new-chat-btn:hover { background: rgba(128,128,128,0.7) !important; }

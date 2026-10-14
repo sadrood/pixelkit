@@ -1,0 +1,56 @@
+#!/bin/bash
+# ============================================================
+# 服务器端 post-receive hook
+# 本地 `git push` 成功后，本脚本自动执行：
+#   检出代码 -> 保护 data/ -> npm install -> npm run build -> 重启 PM2
+# 由 scripts/setup-server-git.sh 安装到 .git/hooks/post-receive
+# ============================================================
+set -e
+
+# ---- 改这里：你的实际路径 ----
+GIT_DIR="/home/pixelkit/pixelkit.git"      # 服务器裸仓库路径
+TARGET="/var/www/pixelkit"                 # 站点部署目录（server.js 所在目录）
+# --------------------------------
+
+echo ""
+echo "===== [git-deploy] 收到推送，开始自动部署 ====="
+
+# 1. 创建部署目录并检出最新代码
+mkdir -p "$TARGET"
+git --git-dir="$GIT_DIR" --work-tree="$TARGET" checkout -f
+echo "[1/4] 代码已检出到 $TARGET"
+
+# 2. 保护运行时数据目录（data/ 被 .gitignore 排除，检出不会覆盖）
+mkdir -p "$TARGET/data"
+echo "[2/4] data/ 数据目录已就绪（服务器数据安全）"
+
+# 3. 安装依赖并构建前端
+# 注意: 不能用 --production，否则 vite (devDependencies) 不会被安装，build 会失败
+cd "$TARGET"
+echo "[3/4] 安装依赖 (npm install)..."
+npm install > /tmp/pixelkit-npm-install.log 2>&1 || {
+    echo "!! npm install 失败，日志: /tmp/pixelkit-npm-install.log"
+    exit 1
+}
+echo "     构建前端 (vite build)..."
+npm run build > /tmp/pixelkit-build.log 2>&1 || {
+    echo "!! npm run build 失败，日志: /tmp/pixelkit-build.log"
+    exit 1
+}
+# 修复 dist 权限，确保 Nginx (www-data) 可读
+chmod 755 "$TARGET"
+chmod -R 755 "$TARGET/dist"
+echo "     权限已修正 (chmod 755)"
+
+# 4. 重启后端服务 (PM2)
+echo "[4/4] 重启 PM2 服务..."
+if command -v pm2 &> /dev/null; then
+    pm2 restart pixelkit-server 2>/dev/null || pm2 start server.js --name pixelkit-server
+    pm2 save > /dev/null 2>&1 || true
+else
+    echo "!! 未检测到 pm2，请先执行: npm install -g pm2"
+    exit 1
+fi
+
+echo ""
+echo "===== [git-deploy] 部署完成，当前版本: $(git --git-dir="$GIT_DIR" rev-parse --short HEAD) ====="
