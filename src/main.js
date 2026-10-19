@@ -218,7 +218,7 @@ class App {
       });
     });
 
-    const pages = ['compose', 'convert', 'document', 'agent', 'ppt', 'docx-editor', 'timer', 'fileshare', 'counter', 'qr', 'tasks', 'lifesim', 'book', 'nightmarket', 'radio'];
+    const pages = ['compose', 'convert', 'document', 'agent', 'ppt', 'docx-editor', 'timer', 'fileshare', 'counter', 'qr', 'tasks', 'lifesim', 'book', 'nightmarket', 'radio', 'movie'];
     for (const p of pages) {
       document.getElementById(`btn-back-${p}`).addEventListener('click', () => this.showPage('home'));
     }
@@ -252,6 +252,11 @@ class App {
     this.currentPage = name;
     // 记录当前页面，供 CSS 做页面级调整（例如隐藏右下角主题吉祥物）
     document.body.dataset.page = name;
+    // 影视发现：第一次进入时初始化
+    if (name === 'movie' && !this._movieInited) {
+      this._movieInited = true;
+      this._initMovie();
+    }
     // 世界电台：第一次进入时初始化（拉目录 + 绑定播放器）
     if (name === 'radio' && !this._radioInited) {
       this._radioInited = true;
@@ -268,6 +273,18 @@ class App {
       setTimeout(() => {
         this.canvas.render(this.layerManager.getLayers());
       }, 50);
+    }
+  }
+
+  /** 懒加载影视发现页（独立模块） */
+  async _initMovie() {
+    try {
+      const { MoviePage } = await import('./pages/MoviePage.js');
+      this._moviePage = new MoviePage(this.toast);
+      this._moviePage.init();
+    } catch (e) {
+      this._movieInited = false;
+      this.toast?.show?.('影视工具加载失败：' + (e.message || e), 'error');
     }
   }
 

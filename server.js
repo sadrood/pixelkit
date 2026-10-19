@@ -6977,6 +6977,100 @@ app.post('/api/agent/quoridor-move', async (req, res) => {
 // 若存在 dist/（npm run build 产物），由本服务直接托管前端。
 // 这样生产环境只对外暴露构建后的文件，不暴露任何源码；
 // 也避免在服务器上误跑 `npm run dev`（Vite 开发服务器会把源码按 URL 吐出去）。
+// ==================== 影视发现（TVmaze 开放 API + 可选 TMDB）2026-10-19 ====================
+/* 为什么自建：目标站点（看剧AI）用 CSP `frame-ancestors 'none'` 禁止被嵌入、也没有开源代码，
+   不能搬也不能嵌。这里改用开放的影视数据库（TVmaze 无需 key；TMDB 需配置 TMDB_API_KEY）
+   做一个"只做发现、不提供播放源"的工具。 */
+const TVMAZE_API = 'https://api.tvmaze.com';
+const TMDB_API = 'https://api.themoviedb.org/3';
+const TMDB_KEY = process.env.TMDB_API_KEY || '';
+const mediaCache = new Map();
+const MEDIA_IMG_HOSTS = new Set(['static.tvmaze.com', 'image.tmdb.org']);
+const MEDIA_GENRES = ['Action', 'Adventure', 'Anime', 'Comedy', 'Crime', 'Drama', 'Family', 'Fantasy', 'Horror', 'Music', 'Mystery', 'Romance', 'Science-Fiction', 'Sports', 'Thriller', 'War', 'Western'];
+
+async function mediaFetch(url, ttlMs = 30 * 60 * 1000) {
+  const hit = mediaCache.get(url);
+  if (hit && Date.now() - hit.t < ttlMs) return hit.data;
+  const r = await fetch(url, { headers: { 'User-Agent': 'PixelKit-Media/1.0', 'Accept': 'application/json' }, signal: AbortSignal.timeout(15000) });
+  if (!r.ok) throw new Error('数据源 HTTP ' + r.status);
+  const data = await r.json();
+  mediaCache.set(url, { t: Date.now(), data });
+  if (mediaCache.size > 300) { const oldest = [...mediaCache.entries()].sort((a, b) => a[1].t - b[1].t).slice(0, 60); for (const [k] of oldest) mediaCache.delete(k); }
+  return data;
+}
+const stripHtml = (s) => String(s || '').replace(/<[^>]+>/g, '').replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').trim();
+const showOut = (s) => ({
+  id: s.id, name: s.name || '', genres: (s.genres || []).slice(0, 3),
+  rating: typeof s.rating?.average === 'number' ? s.rating.average : null,
+  year: String(s.premiered || '').slice(0, 4),
+  image: s.image?.medium || s.image?.original || '',
+  summary: stripHtml(s.summary).slice(0, 240),
+  network: s.network?.name || s.webChannel?.name || '',
+  status: s.status || '', runtime: s.averageRuntime || null, url: s.url || '',
+});
+const movieOut = (m) => ({
+  id: m.id, name: m.title || m.name || '', genres: [],   // TMDB 列表接口不带类型名，详情里才有
+  rating: typeof m.vote_average === 'number' ? Math.round(m.vote_average * 10) / 10 : null,
+  year: String(m.release_date || '').slice(0, 4),
+  image: m.poster_path ? 'https://image.tmdb.org/t/p/w342' + m.poster_path : '',
+  summary: stripHtml(m.overview).slice(0, 240),
+  network: '', status: '', runtime: null,
+  url: m.id ? 'https://www.themoviedb.org/movie/' + m.id : '',
+});
+
+app.get('/api/media/genres', (req, res) => res.json({ success: true, genres: MEDIA_GENRES, hasMovies: Boolean(TMDB_KEY) }));
+
+app.get('/api/media/shows', async (req, res) => {
+  try {
+    const page = Math.max(Number(req.query.page) || 0, 0);
+    const genre = String(req.query.genre || '');
+    const q = String(req.query.q || '').trim();
+    let list;
+    if (q) {
+      const d = await mediaFetch(TVMAZE_API + '/search/shows?q=' + encodeURIComponent(q));
+      list = (Array.isArray(d) ? d : []).map((x) => x.show).filter(Boolean);
+    } else {
+      const d = await mediaFetch(TVMAZE_API + '/shows?page=' + page);
+      list = Array.isArray(d) ? d : [];
+    }
+    let shows = list.map(showOut).filter((s) => s.name && s.image);
+    if (genre) shows = shows.filter((s) => s.genres.includes(genre));
+    shows.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    res.json({ success: true, shows, page, hasMore: !q && page < 10 });
+  } catch (e) { res.status(503).json({ success: false, error: '影视数据源暂时不可用' }); }
+});
+
+app.get('/api/media/movies', async (req, res) => {
+  if (!TMDB_KEY) return res.status(200).json({ success: false, needsKey: true, error: '电影数据需要配置 TMDB_API_KEY（免费申请，见 README）' });
+  try {
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const q = String(req.query.q || '').trim();
+    const url = q
+      ? `${TMDB_API}/search/movie?api_key=${TMDB_KEY}&language=zh-CN&page=${page}&query=${encodeURIComponent(q)}`
+      : `${TMDB_API}/movie/popular?api_key=${TMDB_KEY}&language=zh-CN&page=${page}`;
+    const d = await mediaFetch(url);
+    const movies = (d.results || []).map(movieOut).filter((m) => m.name && m.image);
+    res.json({ success: true, movies, page, hasMore: page < (d.total_pages || 1) && page < 10 });
+  } catch (e) { res.status(503).json({ success: false, error: '电影数据源暂时不可用' }); }
+});
+
+/* 海报中转：服务器能直连图床，用户网络未必能；只允许白名单域名（防 SSRF） */
+app.get('/api/media/img', async (req, res) => {
+  let target;
+  try { target = new URL(String(req.query.u || '')); } catch { return res.status(400).end(); }
+  if (!/^https?:$/.test(target.protocol) || !MEDIA_IMG_HOSTS.has(target.host.toLowerCase())) return res.status(403).end();
+  const ac = new AbortController();
+  req.on('close', () => { try { ac.abort(); } catch { /* ignore */ } });
+  try {
+    const up = await fetch(target.toString(), { headers: { 'User-Agent': 'Mozilla/5.0 (PixelKit-Media)' }, signal: ac.signal });
+    if (!up.ok) return res.status(502).end();
+    res.status(200);
+    res.setHeader('Content-Type', up.headers.get('content-type') || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+    const buf = Buffer.from(await up.arrayBuffer());
+    res.end(buf);
+  } catch { try { res.status(502).end(); } catch { /* ignore */ } }
+});
 // ==================== 世界电台（目录代理 + 音频中转）2026-10-19 ====================
 /* 为什么由服务器中转：
    ① 电台目录（Radio Browser）在部分网络下直连不通、且有 IPv6 解析抖动 → 服务器走 IPv4 稳定；
