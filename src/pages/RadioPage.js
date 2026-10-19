@@ -505,33 +505,31 @@ export class RadioPage {
     this._labelTimer = setInterval(() => {
       if (!this._globe || this.view === 'fav') { box.innerHTML = ''; return; }
       let labels = [];
-      try { labels = this._globe.getLabels(26) || []; } catch { labels = []; }
+      try { labels = this._globe.getLabels(80) || []; } catch { labels = []; }
       const cur = this.current ? this.current.name : '';
       const w = box.clientWidth || 1, h = box.clientHeight || 1;
       const cx = w / 2, cy = h / 2;
-      const placed = [];
+      // 按离准星由近到远排序，再用屏幕网格分桶：每个格子最多一个标签，保证均匀散开
+      const sorted = labels
+        .map((l) => ({ ...l, d: Math.hypot(l.x - cx, l.y - cy) }))
+        .filter((l) => l.d >= 72)
+        .sort((a, b) => a.d - b.d);
+      // 准星右侧是「已锁定 · 分类 · KBPS」文字，这块区域不放标签
+      const lockRect = { x0: cx + 70, x1: cx + 330, y0: cy - 52, y1: cy + 26 };
+      const cellW = Math.max(150, w / 7);
+      const cellH = 104;
+      const used = new Set();
       const out = [];
-      for (const l of labels.slice().sort((a, b) => Math.hypot(b.x - cx, b.y - cy) - Math.hypot(a.x - cx, a.y - cy))) {
-        // 离准星太近的标签会压住「已锁定」文字，跳过
-        const d = Math.hypot(l.x - cx, l.y - cy);
-        if (d < 80) continue;
-        // 防止标签互相重叠（最小间距）
-        if (placed.some((p) => Math.hypot(p.x - l.x, p.y - l.y) < 110)) continue;
-        placed.push(l);
+      for (const l of sorted) {
+        if (l.x > lockRect.x0 && l.x < lockRect.x1 && l.y > lockRect.y0 && l.y < lockRect.y1) continue;
+        const key = Math.floor(l.x / cellW) + ',' + Math.floor(l.y / cellH);
+        if (used.has(key)) continue;
+        used.add(key);
         out.push(`<span class="radio-label${l.name === cur ? ' hot' : ''}" style="left:${Math.round(l.x)}px;top:${Math.round(l.y - 14)}px">${this.esc(l.name)}</span>`);
-        if (out.length >= 5) break;
-      }
-      if (!out.length) {
-        // 兜底：候选都在准星附近时，退一步显示最外侧的几个，至少让画面有台名
-        for (const l of labels) {
-          const d = Math.hypot(l.x - cx, l.y - cy);
-          if (d < 56) continue;
-          out.push(`<span class="radio-label" style="left:${Math.round(l.x)}px;top:${Math.round(l.y - 14)}px">${this.esc(l.name)}</span>`);
-          if (out.length >= 3) break;
-        }
+        if (out.length >= 8) break;
       }
       box.innerHTML = out.join('');
-    }, 180);
+    }, 200);
   }
 
   updateFavCount() {
