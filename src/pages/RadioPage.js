@@ -95,6 +95,10 @@ export class RadioPage {
       if (e.target.closest && e.target.closest('#radio-globe')) return;
       this.closeDial();
     });
+    // 准星刻度盘 + 时钟
+    this.buildReticle();
+    this.updateClock();
+    if (!this._clockTimer) this._clockTimer = setInterval(() => this.updateClock(), 15000);
     // 视图切换：地球 / 流派星云 / 收藏
     this.view = 'globe';
     this.genreFilter = -1;
@@ -347,6 +351,7 @@ export class RadioPage {
     const song = this.$('radio-now-song');
     if (song && this.current !== s) { song.textContent = ''; song.style.display = 'none'; }
     this.buildServices(s);
+    try { this.updateClock(); } catch { /* ignore */ }
     try { this.updateFavUI(); } catch { /* ignore */ }
   }
 
@@ -599,13 +604,16 @@ export class RadioPage {
   startLabels() {
     if (this._labelTimer) return;
     const box = this.$('radio-labels');
-    if (!box) return;
+    const list = this.$('radio-label-list');
+    const leaders = this.$('radio-leaders');
+    if (!box || !list) return;
     this._labelTimer = setInterval(() => {
-      if (!this._globe || this.view === 'fav') { box.innerHTML = ''; return; }
+      if (!this._globe || this.view === 'fav') { list.innerHTML = ''; if (leaders) leaders.innerHTML = ''; return; }
       if (this.view === 'nebula') {
         let clusters = [];
         try { clusters = this._globe.getNebulaLabels ? this._globe.getNebulaLabels() : []; } catch { clusters = []; }
-        box.innerHTML = clusters.map((c, k) => '<span class="nebula-cluster-label" style="left:' + Math.round(c.x) + 'px;top:' + Math.round(c.y + (k % 2 === 0 ? -46 : 30)) + 'px"><b>' + this.esc((this.genres && this.genres[c.i]) || '') + '</b><span>' + c.count.toLocaleString('zh-CN') + ' 个电台</span></span>').join('');
+        list.innerHTML = clusters.map((c, k) => '<span class="nebula-cluster-label" style="left:' + Math.round(c.x) + 'px;top:' + Math.round(c.y + (k % 2 === 0 ? -46 : 30)) + 'px"><b>' + this.esc((this.genres && this.genres[c.i]) || '') + '</b><span>' + c.count.toLocaleString('zh-CN') + ' 个电台</span></span>').join('');
+        if (leaders) leaders.innerHTML = '';
         return;
       }
       let labels = [];
@@ -613,30 +621,45 @@ export class RadioPage {
       const cur = this.current ? this.current.name : '';
       const w = box.clientWidth || 1, h = box.clientHeight || 1;
       const cx = w / 2, cy = h / 2;
-      // 按离准星由近到远排序，再用屏幕网格分桶：每个格子最多一个标签，保证均匀散开
       const sorted = labels
         .map((l) => ({ ...l, d: Math.hypot(l.x - cx, l.y - cy) }))
-        .filter((l) => l.d >= 72)
+        .filter((l) => l.d >= 118)
         .sort((a, b) => a.d - b.d);
       // 准星右侧是「已锁定 · 分类 · KBPS」文字，这块区域不放标签
-      const lockRect = { x0: cx + 70, x1: cx + 330, y0: cy - 52, y1: cy + 26 };
-      const cellW = Math.max(150, w / 7);
-      const cellH = 104;
+      const lockRect = { x0: cx + 60, x1: cx + 340, y0: cy - 56, y1: cy + 30 };
+      const cellW = Math.max(210, w / 5);
+      const cellH = 118;
       const used = new Set();
       const out = [];
+      let lines = '';
       for (const l of sorted) {
         if (l.x > lockRect.x0 && l.x < lockRect.x1 && l.y > lockRect.y0 && l.y < lockRect.y1) continue;
         const key = Math.floor(l.x / cellW) + ',' + Math.floor(l.y / cellH);
         if (used.has(key)) continue;
         used.add(key);
-        out.push(`<span class="radio-label${l.name === cur ? ' hot' : ''}" style="left:${Math.round(l.x)}px;top:${Math.round(l.y - 14)}px">${this.esc(l.name)}</span>`);
-        if (out.length >= 8) break;
+        // 标签从星点沿"离心方向"挪出去，并画一条引线（roamdial 的标注方式）
+        const ux = (l.x - cx) / (l.d || 1), uy = (l.y - cy) / (l.d || 1);
+        const lx = l.x + ux * 36, ly = l.y + uy * 24;
+        lines += '<line x1="' + Math.round(l.x) + '" y1="' + Math.round(l.y) + '" x2="' + Math.round(lx) + '" y2="' + Math.round(ly) + '" stroke="rgba(255,230,200,.26)" stroke-width="1"/>';
+        out.push('<span class="radio-label' + (l.name === cur ? ' hot' : '') + '" style="left:' + Math.round(lx) + 'px;top:' + Math.round(ly) + 'px">' + this.esc(l.name) + '</span>');
+        if (out.length >= 6) break;
       }
-      box.innerHTML = out.join('');
+      if (!out.length) {
+        for (const l of labels) {
+          const d = Math.hypot(l.x - cx, l.y - cy);
+          if (d < 56) continue;
+          const ux = (l.x - cx) / (d || 1), uy = (l.y - cy) / (d || 1);
+          const lx = l.x + ux * 30, ly = l.y + uy * 20;
+          lines += '<line x1="' + Math.round(l.x) + '" y1="' + Math.round(l.y) + '" x2="' + Math.round(lx) + '" y2="' + Math.round(ly) + '" stroke="rgba(255,230,200,.22)" stroke-width="1"/>';
+          out.push('<span class="radio-label" style="left:' + Math.round(lx) + 'px;top:' + Math.round(ly) + 'px">' + this.esc(l.name) + '</span>');
+          if (out.length >= 3) break;
+        }
+      }
+      list.innerHTML = out.join('');
+      if (leaders) leaders.innerHTML = lines;
     }, 200);
   }
 
-  /** 把构建期列式数据集转成电台对象数组 */
   parseDataset(d) {
     if (!d || !Array.isArray(d.name) || !d.name.length) return null;
     const n = d.name.length;
@@ -690,10 +713,46 @@ export class RadioPage {
       if (this.view === 'nebula') this.renderNebula();
       const slider = this.$('radio-slider');
       if (slider) slider.max = String(Math.max(0, this.geoStations.length - 1));
+      const meta = this.$('radio-top-meta');
+      if (meta) meta.textContent = this.geoStations.length.toLocaleString('zh-CN') + ' 个电台';
+      const brandSub = this.$('radio-brand-sub');
+      if (brandSub) brandSub.textContent = this.geoStations.length.toLocaleString('zh-CN') + ' 个电台 · ' + new Set(this.geoStations.map((x) => x.cc)).size + ' 个国家和地区';
       this.setHint('完整台库已载入 · ' + this.geoStations.length.toLocaleString('zh-CN') + ' 个电台');
       if (this.listStations && this.listStations.length < this.geoStations.length) this.renderList();
     } catch { this._fullLoaded = false; }
   }
+  /* ==================== 准星刻度 / 时钟 ==================== */
+  buildReticle() {
+    const g = this.$('reticle-ticks');
+    if (!g || g.childNodes.length) return;
+    let html = '';
+    for (let i = 0; i < 72; i++) {
+      const a = (i / 72) * Math.PI * 2 - Math.PI / 2;
+      const r1 = 46, r2 = i % 6 === 0 ? 54 : 50;
+      const x1 = 110 + Math.cos(a) * r1, y1 = 110 + Math.sin(a) * r1;
+      const x2 = 110 + Math.cos(a) * r2, y2 = 110 + Math.sin(a) * r2;
+      html += '<line x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '" stroke="rgba(255,217,160,' + (i % 6 === 0 ? '.75' : '.4') + ')" stroke-width="1"/>';
+    }
+    g.innerHTML = html;
+  }
+
+  updateClock() {
+    const t = this.$('radio-clock-time');
+    const w = this.$('radio-clock-where');
+    const st = this.current || (this.geoStations && this.geoStations[this.index]);
+    if (!t) return;
+    const lon = st && typeof st.lon === 'number' ? st.lon : 0;
+    const offset = Math.round(lon / 15);           // 用经度估一个当地时区
+    const now = new Date(Date.now() + offset * 3600 * 1000);
+    const hh = String(now.getUTCHours()).padStart(2, '0');
+    const mm = String(now.getUTCMinutes()).padStart(2, '0');
+    t.textContent = hh + ':' + mm;
+    if (w) {
+      const flag = st ? this.flagOf(st.cc) : '';
+      w.textContent = [flag, st && st.country, '当地时间'].filter(Boolean).join(' · ');
+    }
+  }
+
   /* ==================== 启动加载层 / 流派星云 ==================== */
   bootShow(text) {
     const box = this.$('radio-boot');

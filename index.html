@@ -721,9 +721,20 @@
           </div>
         </div>
 
-        <!-- 中心准星：停稳后自动锁定最近的台 -->
-        <div class="radio-cross" aria-hidden="true"><i class="h"></i><i class="v"></i><span></span><em id="radio-lock-meta" class="radio-lock-meta"></em></div>
-        <div class="radio-labels" id="radio-labels"></div>
+        <!-- 中心准星：刻度盘 + 轨道点，停稳后自动锁定最近的台 -->
+        <div class="radio-cross" aria-hidden="true">
+          <svg class="reticle-svg" viewBox="0 0 220 220">
+            <circle cx="110" cy="110" r="46" fill="none" stroke="rgba(255,217,160,.55)" stroke-width="1" />
+            <circle cx="110" cy="110" r="52" fill="none" stroke="rgba(255,217,160,.18)" stroke-width="1" />
+            <g id="reticle-ticks"></g>
+            <g class="reticle-orbit"><circle cx="110" cy="52" r="3.4" fill="#ffb37a" /></g>
+          </svg>
+          <em id="radio-lock-meta" class="radio-lock-meta"></em>
+        </div>
+        <div class="radio-labels" id="radio-labels">
+          <svg class="radio-leaders" id="radio-leaders" aria-hidden="true"></svg>
+          <div id="radio-label-list"></div>
+        </div>
 
         <!-- 星盘：点中星点后出现的圆形操作盘 -->
         <div class="radio-dial" id="radio-dial" hidden>
@@ -763,6 +774,11 @@
             <button id="radio-auto" class="radio-fab" type="button" title="自动漫游（每 25 秒换台）">▶</button>
             <button id="radio-sheet-toggle" class="radio-fab" type="button" title="浏览全部电台">☰</button>
           </div>
+        </div>
+
+        <div class="radio-clock">
+          <b id="radio-clock-time">--:--</b>
+          <span id="radio-clock-where"></span>
         </div>
 
         <!-- 搜索浮层 -->

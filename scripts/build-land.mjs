@@ -1,18 +1,20 @@
 /**
- * 构建期生成「陆地点阵」掩膜（RoamSky 星图底图用）
+ * 构建期生成「陆地点阵」掩膜（RoamSky 星图底图用）—— v2 高精度版
  *
- * 做法：拉 Natural Earth 110m 陆地轮廓（TopoJSON），按 1.5° 经纬网格
- * 做扫描线填充，得到 COLS×ROWS 的陆地位图，位压缩 + base64 存成 ~4KB 的 JSON。
- * 前端解码后把「陆地格」画成暗绿点、「海洋格」画成更暗的点，构成点阵地球。
+ * 做法：拉 Natural Earth 50m 陆地轮廓（TopoJSON），按可配置经纬网格
+ * 做扫描线填充，得到 COLS×ROWS 的陆地位图，位压缩 + base64 存成 JSON。
  *
- * 用法：node scripts/build-land.mjs
+ * 用法：node scripts/build-land.mjs [step]
+ *   默认 step=0.5（0.5° 网格，陆地约 7 万个点）
  * 输出：public/data/land-mask.json
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
 
+const STEP = Number(process.argv[2] || 0.5);
 const SOURCES = [
+  'https://unpkg.com/world-atlas@2/land-50m.json',
+  'https://cdn.jsdelivr.net/npm/world-atlas@2/land-50m.json',
   'https://unpkg.com/world-atlas@2/land-110m.json',
-  'https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json',
 ];
 
 let topo = null;
@@ -21,14 +23,16 @@ for (const url of SOURCES) {
   try {
     const res = await fetch(url, { headers: { 'User-Agent': 'PixelKit/1.0 (land-mask builder)' } });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    topo = await res.json();
+    const j = await res.json();
+    if (!j || !j.transform || !j.arcs || !j.objects) throw new Error('bad topojson');
+    topo = j;
     used = url;
     break;
   } catch (e) {
     console.warn(`  ${url} 失败：${e.message}`);
   }
 }
-if (!topo) throw new Error('所有镜像都拉不到 land-110m.json');
+if (!topo) throw new Error('所有镜像都拉不到 land TopoJSON');
 
 const [sx, sy] = topo.transform.scale;
 const [tx, ty] = topo.transform.translate;
@@ -51,7 +55,6 @@ for (const g of geoms) {
   for (const poly of polys) for (const ring of poly) rings.push(ringOf(ring));
 }
 
-const STEP = 1.5;
 const COLS = Math.round(360 / STEP);
 const ROWS = Math.round(180 / STEP);
 const grid = new Uint8Array(COLS * ROWS);
@@ -83,5 +86,5 @@ const out = { cols: COLS, rows: ROWS, step: STEP, landCells, mask: Buffer.from(b
 const json = JSON.stringify(out);
 writeFileSync('public/data/land-mask.json', json);
 console.log(`  来源: ${used}`);
-console.log(`  网格 ${COLS}×${ROWS}（${STEP}°），陆地格 ${landCells}，海洋格 ${grid.length - landCells}`);
+console.log(`  网格 ${COLS}×${ROWS}（${STEP}°），陆地格 ${landCells}，海洋格 ${grid.length - landCells}，总格 ${grid.length}`);
 console.log(`  写入 public/data/land-mask.json：${(json.length / 1024).toFixed(1)}KB`);

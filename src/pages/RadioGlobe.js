@@ -60,32 +60,41 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     const bin = atob(mask);
     const bits = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bits[i] = bin.charCodeAt(i);
-    const total = cols * rows;
-    const pos = new Float32Array(total * 3);
-    const col = new Float32Array(total * 3);
+    const isLand = (r, c) => (bits[(r * cols + c) >> 3] >> ((r * cols + c) & 7)) & 1;
+    // 陆地格全画（细），海洋格每 3 格取 1（稀疏，形成球面纹理）
+    const cells = [];
     for (let r = 0; r < rows; r++) {
+      const decimate = mobile && r % 2 === 1;
       for (let c = 0; c < cols; c++) {
-        const idx = r * cols + c;
-        const land = (bits[idx >> 3] >> (idx & 7)) & 1;
-        const lat = 90 - (r + 0.5) * step;
-        const lon = -180 + (c + 0.5) * step;
-        const v = toVec3Radius(lat, lon, LAND_R);
-        pos[idx * 3] = v.x; pos[idx * 3 + 1] = v.y; pos[idx * 3 + 2] = v.z;
-        // 目标颜色按 sRGB 指定，再转线性（否则会被 sRGB 输出提亮成一片白点）
-        if (land) { tmpC.setRGB(0.50, 0.68, 0.56).convertSRGBToLinear(); }
-        else { tmpC.setRGB(0.055, 0.115, 0.095).convertSRGBToLinear(); }
-        col[idx * 3] = tmpC.r; col[idx * 3 + 1] = tmpC.g; col[idx * 3 + 2] = tmpC.b;
-        landDots.push({ lat, lon, land });
+        if (decimate) continue;
+        const land = isLand(r, c);
+        if (!land && (r % 3 !== 0 || c % 3 !== 0)) continue;
+        cells.push({ r, c, land });
       }
+    }
+    const n = cells.length;
+    const pos = new Float32Array(n * 3);
+    const col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const { r, c, land } = cells[i];
+      const lat = 90 - (r + 0.5) * step;
+      const lon = -180 + (c + 0.5) * step;
+      const v = toVec3Radius(lat, lon, LAND_R);
+      pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
+      // 目标颜色按 sRGB 指定，再转线性（否则会被 sRGB 输出提亮成一片白点）
+      if (land) { tmpC.setRGB(0.48, 0.66, 0.54).convertSRGBToLinear(); }
+      else { tmpC.setRGB(0.045, 0.10, 0.085).convertSRGBToLinear(); }
+      col[i * 3] = tmpC.r; col[i * 3 + 1] = tmpC.g; col[i * 3 + 2] = tmpC.b;
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     landPoints = new THREE.Points(geo, new THREE.PointsMaterial({
-      size: 0.0055, vertexColors: true, transparent: true, opacity: 0.95,
+      size: mobile ? 0.0075 : 0.0042, vertexColors: true, transparent: true, opacity: 0.95,
       sizeAttenuation: true, depthWrite: false,
     }));
     world.add(landPoints);
+    console.log('[radio] 陆地点阵：' + n + ' 点（' + (mobile ? '移动版' : '桌面版') + '）');
   }
   fetch('/data/land-mask.json', { cache: 'force-cache' })
     .then((r) => r.json())
@@ -145,6 +154,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   let pointGeo = null;
   let dotTex = null;
   let points = null;
+  let pointsGlow = null;
   let selectedMesh = null;
   let hoverIndex = -1;
   let hoverRing = null;
@@ -218,6 +228,13 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
     }));
     world.add(points);
+    // 光晕层：同一份几何再画一层更大的柔光，制造 bloom 观感
+    if (pointsGlow) { world.remove(pointsGlow); pointsGlow.material.dispose(); }
+    pointsGlow = new THREE.Points(pointGeo, new THREE.PointsMaterial({
+      map: dotTex, size: mobile ? 0.16 : 0.115, transparent: true, opacity: 0.16,
+      vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+    }));
+    world.add(pointsGlow);
   }
   rebuild();
 
@@ -371,6 +388,11 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       points.material.opacity += (wantOpacity - points.material.opacity) * 0.12;
       const want = (mobile ? 0.05 : 0.036) * (1 + energy * 0.55);
       points.material.size += (want - points.material.size) * 0.15;
+    }
+    if (pointsGlow) {
+      const wantG = (layout === 'nebula' ? (mobile ? 0.22 : 0.17) : (mobile ? 0.16 : 0.115)) * (1 + energy * 0.5);
+      pointsGlow.material.size += (wantG - pointsGlow.material.size) * 0.15;
+      pointsGlow.material.opacity = layout === 'nebula' ? 0.10 : 0.16;
     }
     if (morph) {
       morph.t += dt / morph.dur;
