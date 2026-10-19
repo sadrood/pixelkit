@@ -128,6 +128,13 @@ export class RadioPage {
     });
 
     try { window.__pkRadio = this; } catch { /* 调试钩子 */ }
+    // 加载兜底提示：超过 12 秒还在加载就换文案，避免用户以为没加载出来
+    this._bootTimer = setTimeout(() => {
+      if (!this._globe) this.bootShow('正在加载星图（数据量较大，请稍候）…');
+    }, 12000);
+    window.addEventListener('resize', () => {
+      if (this.view === 'nebula') this.renderNebula();
+    });
 
     this.loadFilters();
     this.loadListStations();
@@ -140,65 +147,52 @@ export class RadioPage {
     const loading = this.$('radio-globe-loading');
     if (!el || this._loadingGeo || this._globe) return;
     this._loadingGeo = true;
+    this.bootShow('正在连接星图…');
     try {
       await this.loadCountryNames();
-      // 优先读构建期数据集（scripts/build-stations.mjs 产出，列式、gzip ~82KB）
+      // 先加载核心台库（约 500KB，先出图），完整台库随后后台补全
+      this.bootShow('正在加载核心台库…');
       let stations = null;
       try {
-        const d = await fetch('/data/stations.json', { cache: 'force-cache' }).then((r) => r.json());
-        if (d && Array.isArray(d.name) && d.name.length) {
-          const n = d.name.length;
-          const isV2 = d.v === 2 && Array.isArray(d.cc);
-          this.genres = d.genres || [];
-          this.genresEn = d.genresEn || [];
-          this.langs = d.langs || [];
-          stations = new Array(n);
-          for (let i = 0; i < n; i++) {
-            if (isV2) {
-              const cc = d.cc[d.c[i]] || '';
-              stations[i] = {
-                id: d.id[i], name: d.name[i], url: d.url[i], cc,
-                country: this.ccNames[cc] || cc,
-                tags: String(d.tags[i] || '').split(',').filter(Boolean),
-                lat: d.lat[i] / 100, lon: d.lng[i] / 100,
-                bitrate: d.br[i] || 0, codec: '',
-                g: d.g[i] | 0, l: d.l[i] | 0, prec: d.prec[i] | 0, pop: d.pop[i] | 0,
-              };
-            } else {
-              const cc = d.cc[i] || '';
-              stations[i] = {
-                id: String(d.id ? d.id[i] : 'ds' + i), name: d.name[i], url: d.url[i], cc,
-                country: this.ccNames[cc] || cc,
-                tags: String(d.tag ? d.tag[i] : '').split(',').filter(Boolean),
-                lat: d.lat[i], lon: d.lng[i], bitrate: d.br[i] || 0, codec: '', g: 0, l: 0,
-              };
-            }
-          }
-          this._datasetInfo = { builtAt: d.builtAt, n, v: d.v || 1 };
-        }
-      } catch { /* 数据集缺失时退回接口 */ }
-      if (!stations) {
-        const r = await fetch('/api/radio/geo');
-        const d = await r.json();
-        if (!d.success || !d.stations || !d.stations.length) throw new Error(d.error || '全球电台数据不可用');
-        stations = d.stations;
+        const d = await fetch('/data/stations-lite.json', { cache: 'force-cache' }).then((r) => r.json());
+        stations = this.parseDataset(d);
+      } catch { /* 核心包缺失时退回接口 */ }
+      if (!stations || !stations.length) {
+        try {
+          const r = await fetch('/api/radio/geo');
+          const d = await r.json();
+          if (d && d.success && d.stations && d.stations.length) stations = d.stations;
+        } catch { /* ignore */ }
       }
+      if (!stations || !stations.length) throw new Error('全球电台数据不可用');
       // 按经度排序：滑杆从左到右就像绕地球飞一圈
       this.geoStations = stations.slice().sort((a, b) => (a.lon - b.lon) || (a.lat - b.lat));
       this._globeStations = this.geoStations;   // 调试/测试用别名
+      this.bootShow(`正在绘制星图（${this.geoStations.length.toLocaleString('zh-CN')} 个电台）…`);
       const { createRadioGlobe } = await import('./RadioGlobe.js');
-      this._globe = await createRadioGlobe(el, this.geoStations, {
-        tooltipEl: this.$('radio-globe-tip'),
-        onPick: (s) => this.onGlobePick(s),
-      });
+      try {
+        this._globe = await createRadioGlobe(el, this.geoStations, {
+          tooltipEl: this.$('radio-globe-tip'),
+          onPick: (s) => this.onGlobePick(s),
+        });
+      } catch (err) {
+        // 3D 不可用（老显卡/WebGL 被禁）：退回 2D 星云视图，保证画面能出来
+        console.warn('3D 星图初始化失败，退回星云视图：', err);
+        this.bootHide();
+        this.renderNebula();
+        this.setView('nebula');
+        return;
+      }
       // 拖动停稳后：准星对准的最近电台自动收听（RoamDial 的核心交互）
       try { this._globe.onSettle?.(() => this.autoTuneFromCrosshair()); } catch { /* ignore */ }
+      this.loadFullStations();
       this.buildChips();
       this.startLabels();
       this.updateFavCount();
       const slider = this.$('radio-slider');
       if (slider) { slider.max = String(Math.max(0, this.geoStations.length - 1)); slider.disabled = false; }
       if (loading) loading.style.display = 'none';
+      this.bootHide();
       // 恢复上次听的电台（没有就从第一个开始）
       let startIdx = 0;
       try {
@@ -471,8 +465,22 @@ export class RadioPage {
     document.querySelectorAll('#page-radio .radio-view').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
     if (v === 'fav') { this.showFavSheet(); this.setHint('收藏 · 点一个台开始收听'); return; }
     this.toggleSheet(false);
-    if (this._globe) this._globe.setLayout(v === 'nebula' ? 'nebula' : 'globe');
-    this.setHint(v === 'nebula' ? '流派星云 · 拖动旋转，准星停稳自动收听' : '拖动旋转 · 滚轮远近 · 准星停稳自动收听');
+    const globeEl = this.$('radio-globe');
+    const neb = this.$('radio-nebula');
+    const labels = this.$('radio-labels');
+    if (v === 'nebula') {
+      // 真正的 2D 星云视图：每个分类一团光斑，点光斑就听那个台
+      if (globeEl) globeEl.style.display = 'none';
+      if (neb) neb.hidden = false;
+      if (labels) labels.innerHTML = '';
+      this.renderNebula();
+      this.setHint('流派星云 · 点任意光斑收听，或按 G 回到地球');
+      return;
+    }
+    if (neb) neb.hidden = true;
+    if (globeEl) globeEl.style.display = '';
+    if (this._globe) this._globe.setLayout('globe');
+    this.setHint('拖动旋转 · 滚轮远近 · 准星停稳自动收听');
   }
 
   /** 收藏视图：把收藏的台列进抽屉 */
@@ -530,6 +538,194 @@ export class RadioPage {
       }
       box.innerHTML = out.join('');
     }, 200);
+  }
+
+  /** 把构建期列式数据集转成电台对象数组 */
+  parseDataset(d) {
+    if (!d || !Array.isArray(d.name) || !d.name.length) return null;
+    const n = d.name.length;
+    const isV2 = d.v === 2 && Array.isArray(d.cc);
+    this.genres = d.genres || this.genres || [];
+    this.genresEn = d.genresEn || this.genresEn || [];
+    this.langs = d.langs || this.langs || [];
+    const out = new Array(n);
+    for (let i = 0; i < n; i++) {
+      if (isV2) {
+        const cc = d.cc[d.c[i]] || '';
+        out[i] = {
+          id: d.id[i], name: d.name[i], url: d.url[i], cc,
+          country: this.ccNames[cc] || cc,
+          tags: String(d.tags[i] || '').split(',').filter(Boolean),
+          lat: d.lat[i] / 100, lon: d.lng[i] / 100,
+          bitrate: d.br[i] || 0, codec: '',
+          g: d.g[i] | 0, l: d.l[i] | 0, prec: d.prec[i] | 0, pop: d.pop[i] | 0,
+        };
+      } else {
+        const cc = d.cc[i] || '';
+        out[i] = {
+          id: String(d.id ? d.id[i] : 'ds' + i), name: d.name[i], url: d.url[i], cc,
+          country: this.ccNames[cc] || cc,
+          tags: String(d.tag ? d.tag[i] : '').split(',').filter(Boolean),
+          lat: d.lat[i], lon: d.lng[i], bitrate: d.br[i] || 0, codec: '', g: 0, l: 0,
+        };
+      }
+    }
+    this._datasetInfo = { builtAt: d.builtAt, n, v: d.v || 1 };
+    return out;
+  }
+
+  /** 后台把完整台库（3.4 万）补进来：先出图，再加密星图 */
+  async loadFullStations() {
+    if (this._fullLoaded || !this._globe) return;
+    this._fullLoaded = true;
+    try {
+      const d = await fetch('/data/stations.json', { cache: 'force-cache' }).then((r) => r.json());
+      const all = this.parseDataset(d);
+      if (!all || all.length <= this.geoStations.length) return;
+      const curId = this.current ? this.current.id : null;
+      this.geoStations = all.slice().sort((a, b) => (a.lon - b.lon) || (a.lat - b.lat));
+      this._globeStations = this.geoStations;
+      if (this._globe && this._globe.setStations) this._globe.setStations(this.geoStations);
+      if (curId) {
+        const k = this.geoStations.findIndex((s) => s.id === curId);
+        if (k >= 0) { this.index = k; this.current = this.geoStations[k]; this.syncSlider(); }
+      }
+      this.buildChips();
+      if (this.view === 'nebula') this.renderNebula();
+      const slider = this.$('radio-slider');
+      if (slider) slider.max = String(Math.max(0, this.geoStations.length - 1));
+      this.setHint('完整台库已载入 · ' + this.geoStations.length.toLocaleString('zh-CN') + ' 个电台');
+      if (this.listStations && this.listStations.length < this.geoStations.length) this.renderList();
+    } catch { this._fullLoaded = false; }
+  }
+  /* ==================== 启动加载层 / 流派星云 ==================== */
+  bootShow(text) {
+    const box = this.$('radio-boot');
+    const t = this.$('radio-boot-text');
+    if (t && text) t.textContent = text;
+    if (box) box.hidden = false;
+  }
+
+  bootHide() {
+    const box = this.$('radio-boot');
+    if (box) box.hidden = true;
+  }
+
+  /** 2D 流派星云：每个分类一团光斑，点光斑就听那个台 */
+  renderNebula() {
+    const canvas = this.$('radio-nebula');
+    const stage = this.$('radio-globe-wrap');
+    if (!canvas || !stage || !this.geoStations.length) return;
+    const w = (canvas.width = stage.clientWidth || 1440);
+    const h = (canvas.height = stage.clientHeight || 900);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const nG = this.genres && this.genres.length ? this.genres.length : 11;
+    const cx = w / 2, cy = h / 2;
+    const R = Math.min(w, h) * 0.36;
+    const centers = [];
+    for (let g = 0; g < nG; g++) {
+      const th = g * 2.39996 - Math.PI / 2;
+      const rr = R * Math.sqrt((g + 0.6) / nG);
+      centers.push({ x: cx + Math.cos(th) * rr * 1.55, y: cy + Math.sin(th) * rr });
+    }
+    const counts = new Array(nG).fill(0);
+    const pos = new Float32Array(this.geoStations.length * 2);
+    const sizes = new Float32Array(this.geoStations.length);
+    for (let i = 0; i < this.geoStations.length; i++) {
+      const s = this.geoStations[i];
+      const g = (s.g || 0) % nG;
+      const c = centers[g];
+      let hsh = 0;
+      const t = String(s.id || s.name || '');
+      for (let k = 0; k < t.length; k++) hsh = (hsh * 31 + t.charCodeAt(k)) >>> 0;
+      const a = (hsh % 1024) / 1024 * Math.PI * 2;
+      const rr = Math.pow(((hsh >> 10) % 1024) / 1024, 0.7) * 52 + 3;
+      pos[i * 2] = c.x + Math.cos(a) * rr;
+      pos[i * 2 + 1] = c.y + Math.sin(a) * rr;
+      sizes[i] = 3.5 + ((hsh >> 20) % 100) / 100 * 5;
+      counts[g] += 1;
+    }
+    this._neb = { pos, sizes, centers, canvas, w, h, nG, counts };
+    this.paintNebula();
+  }
+
+  nebulaSprite(color) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 32;
+    const x = c.getContext('2d');
+    const gr = x.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gr.addColorStop(0, color);
+    gr.addColorStop(0.35, color + 'cc');
+    gr.addColorStop(1, color + '00');
+    x.fillStyle = gr;
+    x.fillRect(0, 0, 32, 32);
+    return c;
+  }
+
+  rgba(hex, a) {
+    const s = String(hex).replace('#', '');
+    const r = parseInt(s.slice(0, 2), 16), g = parseInt(s.slice(2, 4), 16), b = parseInt(s.slice(4, 6), 16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  paintNebula() {
+    const d = this._neb;
+    if (!d) return;
+    const { canvas, w, h, pos, sizes, centers, counts, nG } = d;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+    const bg = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.7);
+    bg.addColorStop(0, 'rgba(30,24,18,1)');
+    bg.addColorStop(1, 'rgba(10,8,6,1)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalCompositeOperation = 'lighter';
+    for (let g = 0; g < nG; g++) {
+      const c = centers[g];
+      const grad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 110);
+      grad.addColorStop(0, this.rgba(this.genreColor(g), 0.12));
+      grad.addColorStop(1, this.rgba(this.genreColor(g), 0));
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 130, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const spr = this._nebSprites || (this._nebSprites = []);
+    ctx.globalAlpha = 0.32;
+    for (let i = 0; i < this.geoStations.length; i++) {
+      const g = (this.geoStations[i].g || 0) % nG;
+      if (!spr[g]) spr[g] = this.nebulaSprite(this.genreColor(g));
+      const s = sizes[i];
+      ctx.drawImage(spr[g], pos[i * 2] - s / 2, pos[i * 2 + 1] - s / 2, s, s);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.textAlign = 'center';
+    for (let g = 0; g < nG; g++) {
+      const c = centers[g];
+      ctx.font = '600 16px "PingFang SC","Microsoft YaHei",sans-serif';
+      ctx.fillStyle = 'rgba(250,240,228,.94)';
+      ctx.shadowColor = 'rgba(0,0,0,.9)';
+      ctx.shadowBlur = 12;
+      ctx.fillText(this.genres[g] || '', c.x, c.y - 64);
+      ctx.font = '11px "PingFang SC","Microsoft YaHei",sans-serif';
+      ctx.fillStyle = 'rgba(240,225,205,.6)';
+      ctx.fillText(counts[g].toLocaleString('zh-CN') + ' 个电台', c.x, c.y - 46);
+      ctx.shadowBlur = 0;
+    }
+    canvas.onclick = (e) => {
+      const r = canvas.getBoundingClientRect();
+      const mx = (e.clientX - r.left) * (canvas.width / r.width);
+      const my = (e.clientY - r.top) * (canvas.height / r.height);
+      let best = -1, bestD = 30 * 30;
+      for (let i = 0; i < this.geoStations.length; i++) {
+        const dx = pos[i * 2] - mx, dy = pos[i * 2 + 1] - my;
+        const dd = dx * dx + dy * dy;
+        if (dd < bestD) { bestD = dd; best = i; }
+      }
+      if (best >= 0) this.setIndex(best, true);
+    };
   }
 
   updateFavCount() {

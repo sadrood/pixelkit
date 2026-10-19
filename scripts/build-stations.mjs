@@ -181,7 +181,6 @@ const data = {
   name: rows.map((r) => r.name),
   url: rows.map((r) => r.url),
   tags: rows.map((r) => r.tags),
-  state: rows.map((r) => r.state),
 };
 mkdirSync('public/data', { recursive: true });
 const json = JSON.stringify(data);
@@ -189,3 +188,17 @@ writeFileSync(OUT, json);
 const rawKB = (statSync(OUT).size / 1024).toFixed(0);
 const gzKB = (gzipSync(Buffer.from(json)).length / 1024).toFixed(0);
 console.log(`  写入 ${OUT}：${data.n} 个电台 / ${countriesOrder.length} 个国家 / ${rawKB}KB（gzip ${gzKB}KB）`);
+
+// 核心包：按原顺序（票数降序）取前 4000 台，先出图用（约 500KB）
+const LITE = Math.min(4000, data.n);
+const part = (arr) => arr.slice(0, LITE);
+const lite = {
+  v: 2, builtAt: data.builtAt, n: LITE,
+  genres: data.genres, genresEn: data.genresEn, langs: data.langs, cc: data.cc,
+  lat: part(data.lat), lng: part(data.lng), g: part(data.g), l: part(data.l),
+  c: part(data.c), br: part(data.br), prec: part(data.prec), pop: part(data.pop),
+  id: part(data.id), name: part(data.name), url: part(data.url), tags: part(data.tags),
+};
+const liteJson = JSON.stringify(lite);
+writeFileSync('public/data/stations-lite.json', liteJson);
+console.log(`  写入 public/data/stations-lite.json：${LITE} 个电台 / ${(liteJson.length / 1024).toFixed(0)}KB（核心包，首屏用）`);

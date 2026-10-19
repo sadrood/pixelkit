@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PixelKit - 在线工具箱</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="modulepreload" href="/night-market/vendor/three.module.js" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/src/styles/main.css" />
   <link rel="stylesheet" href="/src/styles/tasks.css" />
   <link rel="stylesheet" href="/src/styles/life.css" />
@@ -710,8 +711,14 @@
       <main class="radio-stage" id="radio-stage">
         <div class="radio-globe-wrap" id="radio-globe-wrap">
           <div class="radio-globe" id="radio-globe"></div>
+          <canvas id="radio-nebula" class="radio-nebula" hidden></canvas>
           <div class="radio-globe-tip" id="radio-globe-tip"></div>
-          <div class="radio-globe-loading" id="radio-globe-loading">正在加载全球电台…</div>
+          <div class="radio-globe-loading" id="radio-globe-loading">正在加载 34,540 个电台…</div>
+          <div class="radio-boot" id="radio-boot">
+            <div class="radio-boot-spin"></div>
+            <p id="radio-boot-text">正在连接星图…</p>
+            <small>首次加载需要几秒，之后会更快</small>
+          </div>
         </div>
 
         <!-- 中心准星：停稳后自动锁定最近的台 -->

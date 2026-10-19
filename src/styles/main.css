@@ -3419,3 +3419,33 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
   #page-radio .radio-cross { width: 72px; height: 72px; margin: -36px 0 0 -36px; }
   #page-radio .radio-cross span { inset: 22px; }
 }
+/* ============================================================================
+   电台 v6：加载兜底 + 流派星云（2D 光斑星云）
+   ============================================================================ */
+/* 启动加载层 */
+#page-radio .radio-boot {
+  position: absolute; inset: 0; z-index: 9; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; background: rgba(10, 8, 6, .72);
+  color: #f0e5d6; text-align: center; backdrop-filter: blur(2px);
+}
+#page-radio .radio-boot[hidden] { display: none; }
+#page-radio .radio-boot p { margin: 0; font-size: 14px; letter-spacing: .5px; }
+#page-radio .radio-boot small { font-size: 11px; color: rgba(240, 225, 205, .5); }
+#page-radio .radio-boot-spin {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 2px solid rgba(255, 200, 150, .18); border-top-color: #ffb37a;
+  animation: radio-spin 900ms linear infinite;
+}
+@keyframes radio-spin { to { transform: rotate(360deg); } }
+
+/* 流派星云画布 */
+#page-radio .radio-nebula { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 2; cursor: crosshair; }
+#page-radio .radio-nebula[hidden] { display: none; }
+
+/* 星云里的品类标签 */
+#page-radio .nebula-label {
+  position: absolute; transform: translate(-50%, -50%); z-index: 4; pointer-events: none;
+  text-align: center; color: rgba(250, 240, 228, .92); text-shadow: 0 2px 12px rgba(0,0,0,.9);
+}
+#page-radio .nebula-label b { display: block; font-size: 15px; letter-spacing: 1px; }
+#page-radio .nebula-label span { font-size: 10.5px; color: rgba(240, 225, 205, .55); }

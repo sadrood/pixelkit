@@ -372,6 +372,15 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       selectedIndex = -1;
       return filtered.length;
     },
+
+    /** 替换整份台站列表（核心包先出图，完整台库后台补进来） */
+    setStations(list) {
+      stations = Array.isArray(list) ? list : [];
+      filtered = stations.slice();
+      rebuild();
+      selectedIndex = -1;
+      return filtered.length;
+    },
     getFiltered() { return filtered; },
     dispose() {
       disposed = true;
