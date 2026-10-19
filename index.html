@@ -713,6 +713,10 @@
         </div>
         <div class="toolbar-center"></div>
         <div class="toolbar-right radio-top-actions">
+          <div class="radio-searchbox">
+            <input id="radio-q" type="search" placeholder="搜台名 / 国家 / 流派" autocomplete="off" />
+            <div id="radio-q-list" class="radio-q-list" hidden></div>
+          </div>
           <button id="radio-auto" class="btn btn-sm" type="button" title="每 25 秒自动换一台">自动漫游</button>
           <span id="radio-top-meta" class="radio-chip">正在加载…</span>
           <button id="radio-sheet-toggle" class="btn btn-sm" type="button">浏览</button>
@@ -729,6 +733,8 @@
             <span class="radio-now-country" id="radio-now-country">拖动滑杆漫游全球</span>
             <h2 class="radio-now-name" id="radio-now-name">世界电台</h2>
             <span class="radio-now-sub" id="radio-now-sub">松手即播放 · 也可以点地球上的光点</span>
+            <span class="radio-now-song" id="radio-now-song"></span>
+            <span class="radio-status" id="radio-status">就绪</span>
           </div>
           <div class="radio-dock">
             <button id="radio-prev" class="radio-icon-btn" type="button" title="上一个（←）">‹</button>
@@ -740,6 +746,7 @@
           </div>
           <div class="radio-dock-foot">
             <span id="radio-hint" class="radio-hint">拖动滑杆换台 · 点光点试听</span>
+            <div id="radio-spec" class="radio-spec" title="频谱"></div>
             <label class="radio-vol"><span>音量</span><input id="radio-volume" type="range" min="0" max="100" value="80" /></label>
           </div>
           <audio id="radio-audio" preload="none"></audio>

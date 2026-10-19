@@ -3180,3 +3180,49 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 /* 自动漫游按钮 */
 #page-radio #radio-auto { border-color: rgba(127, 216, 238, .35); color: #9fd8e8; }
 #page-radio #radio-auto.active { background: rgba(43, 179, 163, .9) !important; border-color: transparent !important; color: #fff !important; box-shadow: 0 0 18px rgba(43, 179, 163, .55); }
+/* ============================================================================
+   2026-10-19：RoamSky 规范补强 —— 歌名 / 状态 / 顶栏搜索 / 频谱条
+   ============================================================================ */
+#page-radio .radio-now-song { display: none; margin-top: 3px; font-size: 12.5px; color: #9fe3f2; text-shadow: 0 1px 10px rgba(0,0,0,.6); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#page-radio .radio-status {
+  display: inline-block; margin-top: 6px; font-size: 10.5px; letter-spacing: 1px;
+  padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(127,216,238,.28); color: rgba(159,216,232,.85);
+}
+#page-radio .radio-status[data-state="播放中"] { border-color: rgba(43,179,163,.85); color: #a9f5e2; }
+#page-radio .radio-status[data-state="连台中"],
+#page-radio .radio-status[data-state="待点击播放"] { border-color: rgba(242,169,59,.7); color: #ffd79a; }
+#page-radio .radio-status[data-state="流不可用"],
+#page-radio .radio-status[data-state="连不上，换台"] { border-color: rgba(255,120,120,.6); color: #ffb4b4; }
+
+#page-radio .radio-searchbox { position: relative; flex: 0 1 auto; }
+#page-radio .radio-searchbox input {
+  width: 190px; height: 32px; padding: 0 12px; border-radius: 999px; outline: none;
+  border: 1px solid rgba(140,210,235,.25); background: rgba(255,255,255,.06); color: #e8f4fa; font-size: 12.5px;
+}
+#page-radio .radio-searchbox input:focus { border-color: rgba(127,216,238,.6); box-shadow: 0 0 0 3px rgba(127,216,238,.12); }
+#page-radio .radio-searchbox input::placeholder { color: rgba(200,230,240,.45); }
+#page-radio .radio-q-list {
+  position: absolute; right: 0; top: 38px; width: 300px; max-height: 320px; overflow: auto; z-index: 9;
+  background: rgba(6,14,24,.98); border: 1px solid rgba(140,210,235,.25); border-radius: 12px;
+  padding: 6px; box-shadow: 0 24px 60px -24px rgba(0,0,0,.95);
+}
+#page-radio .radio-q-item {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
+  padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: #e8f4fa; cursor: pointer;
+}
+#page-radio .radio-q-item:hover { background: rgba(127,216,238,.16); }
+#page-radio .radio-q-item b { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#page-radio .radio-q-item small { font-size: 11px; color: rgba(210,235,245,.6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#page-radio .radio-q-empty { padding: 10px; font-size: 12px; color: rgba(210,235,245,.55); }
+
+#page-radio .radio-spec { display: flex; align-items: flex-end; gap: 2px; height: 16px; flex: 0 0 auto; opacity: .9; }
+#page-radio .radio-spec i {
+  display: block; width: 3px; height: 16px; border-radius: 2px;
+  background: linear-gradient(180deg, #7fe3ff, #2bb3a3); transform: scaleY(.12); transform-origin: bottom;
+  transition: transform .06s linear;
+}
+@media (max-width: 720px) {
+  #page-radio .radio-searchbox input { width: 128px; }
+  #page-radio .radio-q-list { width: min(300px, calc(100vw - 24px)); }
+  #page-radio .radio-spec { display: none; }
+}

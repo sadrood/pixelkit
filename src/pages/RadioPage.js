@@ -17,6 +17,14 @@ export class RadioPage {
     this.autoNextCount = 0;
     this._loadingGeo = false;
     this._loadingList = false;
+    this.ccNames = {};          // 国家代码 → 国家名
+    this._ac = null;            // AudioContext（频谱用）
+    this._analyser = null;
+    this._srcNode = null;
+    this._specRAF = null;
+    this._nowTimer = null;
+    this._hls = null;
+    this._pendingPlay = null;
   }
 
   $(id) { return document.getElementById(id); }
@@ -54,6 +62,11 @@ export class RadioPage {
         try { localStorage.setItem('pk_radio_volume', vol.value); } catch { /* ignore */ }
       });
     }
+
+    this.bindSearch();
+    // 自动播放被浏览器拦截时：用户下一次点击就继续
+    document.addEventListener('click', () => { const fn = this._pendingPlay; if (fn) { this._pendingPlay = null; fn(); } });
+    this.updateStatus('就绪');
 
     // 浏览面板
     this.$('radio-auto')?.addEventListener('click', () => this.toggleAutoTour());
@@ -95,11 +108,34 @@ export class RadioPage {
     if (!el || this._loadingGeo || this._globe) return;
     this._loadingGeo = true;
     try {
-      const r = await fetch('/api/radio/geo');
-      const d = await r.json();
-      if (!d.success || !d.stations || !d.stations.length) throw new Error(d.error || '全球电台数据不可用');
+      await this.loadCountryNames();
+      // 优先读构建期数据集（scripts/build-stations.mjs 产出，列式、gzip ~82KB）
+      let stations = null;
+      try {
+        const d = await fetch('/data/stations.json', { cache: 'force-cache' }).then((r) => r.json());
+        if (d && Array.isArray(d.name) && d.name.length) {
+          const n = d.name.length;
+          stations = new Array(n);
+          for (let i = 0; i < n; i++) {
+            stations[i] = {
+              id: 'ds' + i, name: d.name[i], url: d.url[i], cc: d.cc[i],
+              country: this.ccNames[d.cc[i]] || d.cc[i],
+              tags: String(d.tag[i] || '').split(',').filter(Boolean),
+              lat: d.lat[i], lon: d.lng[i], bitrate: d.br[i] || 0, codec: '',
+            };
+          }
+          this._datasetInfo = { builtAt: d.builtAt, n };
+        }
+      } catch { /* 数据集缺失时退回接口 */ }
+      if (!stations) {
+        const r = await fetch('/api/radio/geo');
+        const d = await r.json();
+        if (!d.success || !d.stations || !d.stations.length) throw new Error(d.error || '全球电台数据不可用');
+        stations = d.stations;
+      }
       // 按经度排序：滑杆从左到右就像绕地球飞一圈
-      this.geoStations = d.stations.slice().sort((a, b) => (a.lon - b.lon) || (a.lat - b.lat));
+      this.geoStations = stations.slice().sort((a, b) => (a.lon - b.lon) || (a.lat - b.lat));
+      this._globeStations = this.geoStations;   // 调试/测试用别名
       const { createRadioGlobe } = await import('./RadioGlobe.js');
       this._globe = await createRadioGlobe(el, this.geoStations, {
         tooltipEl: this.$('radio-globe-tip'),
@@ -166,6 +202,8 @@ export class RadioPage {
     if (country) country.textContent = [s.country, s.cc].filter(Boolean).join(' · ') || '未知地区';
     if (name) name.textContent = s.name || '未命名电台';
     if (sub) sub.textContent = [s.codec, s.bitrate ? s.bitrate + 'kbps' : '', (s.tags || []).slice(0, 2).join(' / ')].filter(Boolean).join(' · ') || '松手即播放';
+    const song = this.$('radio-now-song');
+    if (song && this.current !== s) { song.textContent = ''; song.style.display = 'none'; }
   }
 
   /* ==================== 播放 ==================== */
@@ -192,13 +230,48 @@ export class RadioPage {
     if (!s || !s.url) { this.toast?.show?.('这个电台没有可用音频地址', 'error'); return; }
     this.current = s;
     this.autoNextCount = 0;
+    this.stopNowPlaying();
     this.setPlayingUI(true);
     this.setNowPlaying(s);
     this.setHint('正在连接…');
-    this.audio.src = '/api/radio/stream?u=' + encodeURIComponent(s.url);
+    this.updateStatus('连台中');
+    // HLS（.m3u8）走 hls.js 动态加载；失败再退回原生 <audio>
+    const isHls = /\.m3u8($|\?)/i.test(s.url);
+    let hlsOk = false;
+    if (isHls && this._hls) { try { this._hls.destroy(); } catch { /* ignore */ } this._hls = null; }
+    try {
+      this.audio.removeAttribute('src');
+      this.audio.load();
+      if (isHls) {
+        try {
+          const Hls = await this.ensureHls();
+          if (Hls && Hls.isSupported && Hls.isSupported()) {
+            this._hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+            this._hls.loadSource(s.url);
+            this._hls.attachMedia(this.audio);
+            hlsOk = true;
+          }
+        } catch { /* 加载失败就退回原生 */ }
+      }
+      if (!hlsOk) this.audio.src = '/api/radio/stream?u=' + encodeURIComponent(s.url);
+    } catch { /* ignore */ }
     this.armStall();
-    try { await this.audio.play(); } catch { /* 需要用户手势时忽略 */ }
-    this.setHint('正在播放：' + s.name);
+    try {
+      await this.audio.play();
+      this.updateStatus('播放中');
+      this.setHint('正在播放：' + s.name);
+    } catch (e) {
+      if (e && e.name === 'NotAllowedError') {
+        // 浏览器拦截自动播放：等用户下一次点击
+        this._pendingPlay = () => this.playStation(s);
+        this.updateStatus('待点击播放');
+        this.setHint('点一下播放按钮开始');
+      } else {
+        this.updateStatus('流不可用');
+      }
+    }
+    this.setupSpectrum();
+    this.startNowPlaying(s);
   }
 
   togglePlay() {
@@ -224,7 +297,7 @@ export class RadioPage {
     this.clearStall();
     this.setPlayingUI(false);
     if (!this.current) return;
-    if (this.autoNextCount >= 3) { this.setHint('这个台打不开，换一个试试', true); return; }
+    if (this.autoNextCount >= 5) { this.setHint('这个台打不开，换一个试试', true); return; }
     this.autoNextCount += 1;
     this.setHint('这个台连不上，自动换下一个…', true);
     setTimeout(() => {
@@ -251,6 +324,158 @@ export class RadioPage {
       if (this.autoTour) this.step(1);
     }, 25000);
   }
+  /** 加载 HLS 库：优先本站 /vendor/hls.min.js（国内可达），失败再试 CDN */
+  async ensureHls() {
+    if (window.Hls) return window.Hls;
+    if (this._hlsLoading) return this._hlsLoading;
+    const load = (src) => new Promise((resolve, reject) => {
+      const sc = document.createElement('script');
+      sc.src = src; sc.async = true;
+      sc.onload = () => resolve(window.Hls || null);
+      sc.onerror = () => reject(new Error('load fail ' + src));
+      document.head.appendChild(sc);
+    });
+    this._hlsLoading = (async () => {
+      try { const h = await load('/vendor/hls.min.js'); if (h) return h; } catch { /* next */ }
+      try { const h = await load('https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js'); if (h) return h; } catch { /* next */ }
+      return null;
+    })();
+    const Hls = await this._hlsLoading;
+    this._hlsLoading = null;
+    return Hls;
+  }
+  /* ==================== 频谱 / 正在播放 / 状态 ==================== */
+  updateStatus(text) {
+    const el = this.$('radio-status');
+    if (el) { el.textContent = text; el.dataset.state = text; }
+  }
+
+  /** 音频经同源代理播放，才能接进 Web Audio 拿频谱（跨域流拿到的是全零） */
+  setupSpectrum() {
+    if (this._ac) {
+      if (this._ac.state === 'suspended') this._ac.resume().catch(() => {});
+      this.startSpectrum();
+      return;
+    }
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx || !this.audio) return;
+      this._ac = new Ctx();
+      this._analyser = this._ac.createAnalyser();
+      this._analyser.fftSize = 128;
+      this._analyser.smoothingTimeConstant = 0.82;
+      this._srcNode = this._ac.createMediaElementSource(this.audio);
+      this._srcNode.connect(this._analyser);
+      this._analyser.connect(this._ac.destination);
+      this._freq = new Uint8Array(this._analyser.frequencyBinCount);
+      this.startSpectrum();
+      if (this._ac.state === 'suspended') this._ac.resume().catch(() => {});
+    } catch { /* Web Audio 不可用：只保留点云自身动画 */ }
+  }
+
+  startSpectrum() {
+    if (this._specRAF) return;
+    const bars = this.$('radio-spec');
+    if (bars && !bars.children.length) bars.innerHTML = Array.from({ length: 14 }, () => '<i></i>').join('');
+    const tick = () => {
+      this._specRAF = requestAnimationFrame(tick);
+      if (!this._analyser) return;
+      this._analyser.getByteFrequencyData(this._freq);
+      const n = this._freq.length;
+      let bass = 0;
+      for (let i = 0; i < Math.min(8, n); i++) bass += this._freq[i];
+      bass = bass / (Math.min(8, n) * 255);
+      try { this._globe?.setEnergy?.(bass); } catch { /* ignore */ }
+      if (bars) {
+        const kids = bars.children;
+        for (let i = 0; i < kids.length; i++) {
+          const v = this._freq[Math.floor((i / kids.length) * n * 0.7)] / 255;
+          kids[i].style.transform = 'scaleY(' + Math.max(0.12, v).toFixed(3) + ')';
+        }
+      }
+    };
+    tick();
+  }
+
+  stopSpectrum() {
+    if (this._specRAF) { cancelAnimationFrame(this._specRAF); this._specRAF = null; }
+  }
+
+  /** 每 20 秒问一次服务端「现在播的是什么」（ICY StreamTitle） */
+  startNowPlaying(s) {
+    this.stopNowPlaying();
+    const song = this.$('radio-now-song');
+    if (song) { song.textContent = ''; song.style.display = 'none'; }
+    const poll = async () => {
+      if (!this.current || this.current.url !== s.url) return;
+      try {
+        const r = await fetch('/api/now?u=' + encodeURIComponent(s.url), { cache: 'no-store' }).then((x) => x.json());
+        const title = r && r.title;
+        if (song) {
+          song.textContent = title ? '正在播放：' + title : '';
+          song.style.display = title ? '' : 'none';
+        }
+      } catch { /* ignore */ }
+    };
+    poll();
+    this._nowTimer = setInterval(poll, 20000);
+  }
+
+  stopNowPlaying() {
+    if (this._nowTimer) { clearInterval(this._nowTimer); this._nowTimer = null; }
+  }
+
+  /** 顶栏搜索：在数据集里按台名 / 国家 / 流派过滤 */
+  bindSearch() {
+    const q = this.$('radio-q');
+    const list = this.$('radio-q-list');
+    if (!q || !list) return;
+    q.addEventListener('input', () => this.renderSearchList(q.value.trim()));
+    q.addEventListener('focus', () => { if (q.value.trim()) this.renderSearchList(q.value.trim()); });
+    q.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { list.hidden = true; q.blur(); }
+      else if (e.key === 'Enter') { const first = list.querySelector('.radio-q-item'); if (first) first.click(); }
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target || !e.target.closest || !e.target.closest('.radio-searchbox')) list.hidden = true;
+    });
+  }
+
+  renderSearchList(kw) {
+    const list = this.$('radio-q-list');
+    if (!list) return;
+    const k = kw.toLowerCase();
+    if (!k) { list.hidden = true; list.innerHTML = ''; return; }
+    const hits = [];
+    for (let i = 0; i < this.geoStations.length && hits.length < 12; i++) {
+      const s = this.geoStations[i];
+      const hay = (s.name + ' ' + (s.country || '') + ' ' + (s.cc || '') + ' ' + (s.tags || []).join(',')).toLowerCase();
+      if (hay.includes(k)) hits.push({ s, i });
+    }
+    if (!hits.length) { list.innerHTML = '<div class="radio-q-empty">没有匹配的电台</div>'; list.hidden = false; return; }
+    list.innerHTML = hits.map(({ s, i }) => `<button class="radio-q-item" data-i="${i}" type="button">
+      <b>${this.esc(s.name)}</b>
+      <small>${this.esc([s.country, s.cc, (s.tags || []).slice(0, 2).join(' / ')].filter(Boolean).join(' · '))}</small>
+    </button>`).join('');
+    list.hidden = false;
+    list.querySelectorAll('.radio-q-item').forEach((el) => {
+      el.onclick = () => {
+        this.setIndex(Number(el.dataset.i), true);
+        list.hidden = true;
+        const input = this.$('radio-q');
+        if (input) input.value = '';
+      };
+    });
+  }
+
+  async loadCountryNames() {
+    if (Object.keys(this.ccNames).length) return;
+    try {
+      const c = await fetch('/api/radio/countries').then((r) => r.json());
+      if (c && c.success) for (const x of c.countries) if (x.code) this.ccNames[x.code] = x.name;
+    } catch { /* ignore */ }
+  }
+
   /* ==================== 浏览面板（国家 / 流派 / 搜索） ==================== */
   toggleSheet(force) {
     const sheet = this.$('radio-sheet');

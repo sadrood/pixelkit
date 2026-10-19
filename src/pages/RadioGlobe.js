@@ -150,9 +150,11 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   const pointGeo = new THREE.BufferGeometry();
   pointGeo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
   pointGeo.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
+  const BASE_DOT = mobile ? 0.042 : 0.032;
+  let energy = 0;            // 频谱能量 0~1（RadioPage 通过 setEnergy 喂入）
   const dotTex = makeGlowTexture(THREE, 0.95);
   const stationPoints = new THREE.Points(pointGeo, new THREE.PointsMaterial({
-    map: dotTex, size: mobile ? 0.042 : 0.032, transparent: true, opacity: 1,
+    map: dotTex, size: BASE_DOT, transparent: true, opacity: 1,
     vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
   }));
   world.add(stationPoints);
@@ -383,6 +385,11 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     // 卫星绕行
     satellite.rotation.y = performance.now() / 2800;
 
+    // 频谱能量：点云随低频能量一起呼吸
+    const e = stationPoints.material.size;
+    const want = BASE_DOT * (1 + energy * 0.9);
+    if (Math.abs(e - want) > 1e-5) stationPoints.material.size = e + (want - e) * 0.18;
+
     // 扩散光圈动画（文章的 WaveMesh 公式）
     for (const r of rings) {
       r._s += dt * 0.42;
@@ -439,6 +446,8 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       setSelectedIndex(i);
     },
     pick(index) { if (stations[index]) { setSelectedIndex(index); onPick(stations[index]); } },
+    /** 频谱能量 0~1：点云呼吸 + 选中光圈脉动 */
+    setEnergy(v) { energy = Math.max(0, Math.min(1, Number(v) || 0)); },
     /** 把某个电台转到镜头正前方（滑杆 / 列表选台时用），带平滑动画 */
     focus(station) {
       if (!station || !Number.isFinite(station.lon)) return;

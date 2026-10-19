@@ -7053,6 +7053,59 @@ app.get('/api/radio/geo', (req, res) => {
   const stations = loadRadioGeo();
   res.json({ success: true, stations, total: stations.length });
 });
+/* 构建期数据集（scripts/build-stations.mjs 产出）：只在启动时读一次，
+   把里面的电台主机加入音频中转白名单，并供 /api/now 做 SSRF 校验。 */
+let radioDatasetHosts = new Set();
+function loadRadioDataset() {
+  try {
+    const file = path.join(__dirname, 'public', 'data', 'stations.json');
+    if (!existsSync(file)) return;
+    const d = JSON.parse(readFileSync(file, 'utf-8'));
+    const urls = Array.isArray(d.url) ? d.url : [];
+    for (const u of urls) {
+      try { const h = new URL(u).host.toLowerCase(); radioDatasetHosts.add(h); radioAllowedHosts.add(h); } catch { /* ignore */ }
+    }
+    console.log(`[radio] 数据集已加载：${d.n || urls.length} 个电台，${radioDatasetHosts.size} 个主机`);
+  } catch (e) { console.warn('[radio] 数据集读取失败:', e.message); }
+}
+
+/* GET /api/now?u=<streamUrl>：读 ICY 元数据里的 StreamTitle（正在播放的歌名/节目名）。
+   只读一小段就断开，不持续代理音频；总超时 5 秒。 */
+app.get('/api/now', async (req, res) => {
+  let target;
+  try { target = new URL(String(req.query.u || '')); } catch { return res.status(400).json({ title: null }); }
+  if (!/^https?:$/.test(target.protocol)) return res.status(400).json({ title: null });
+  if (radioDatasetHosts.size && !radioDatasetHosts.has(target.host.toLowerCase())) return res.status(403).json({ title: null, error: 'host 不在数据集' });
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), 5000);
+  try {
+    const r = await fetch(target.toString(), {
+      headers: { 'Icy-MetaData': '1', 'User-Agent': 'PixelKit/1.0 (radio now-playing)' },
+      signal: ac.signal, redirect: 'follow',
+    });
+    const metaint = parseInt(r.headers.get('icy-metaint') || '0', 10);
+    if (!r.ok || !metaint) { try { r.body && r.body.cancel(); } catch { /* ignore */ } return res.json({ title: null }); }
+    const reader = r.body.getReader();
+    let buf = Buffer.alloc(0), title = null;
+    while (buf.length < metaint + 4096) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf = Buffer.concat([buf, Buffer.from(value)]);
+      if (buf.length >= metaint + 1) {
+        const len = buf[metaint] * 16;
+        if (len > 0 && buf.length >= metaint + 1 + len) {
+          const meta = buf.subarray(metaint + 1, metaint + 1 + len).toString('latin1');
+          title = (/StreamTitle='([^']*)'/.exec(meta) || [])[1] || null;
+          break;
+        }
+      }
+    }
+    try { reader.cancel(); } catch { /* ignore */ }
+    res.json({ title: title && title.trim() ? title.trim() : null });
+  } catch { res.json({ title: null }); }
+  finally { clearTimeout(timer); }
+});
+loadRadioDataset();
 app.get('/api/radio/countries', async (req, res) => {
   try {
     const list = await radioFetch('/json/countries', 6 * 3600 * 1000);

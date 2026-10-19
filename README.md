@@ -25,7 +25,7 @@
 | | 生长模拟器 | 投胎 → 天赋 → 行动 → 事件抉择 |
 | **AI 与实验** | AI 助手 | 流式对话、联网搜索、看图、画信息图、文件问答 |
 | | 人生之书 | 互动小说：序章 → 章节选择 → 灯谱结算 |
-| | 世界电台 | 站内电台播放：目录来自 Radio Browser 开放数据库（242 个国家/地区），音频由本站服务器中转，可听全球电台 |
+| | 世界电台 | 全球电台漫游：3D 地球 + 底部滑杆选台，1859 个带坐标电台（151 国）；正在播放歌名（ICY）、频谱驱动地球呼吸、HLS 兜底、自动漫游；数据为构建期产出，音频经服务器单路中转 |
 | | 夜市：一百块 | Three.js 3D 夜市漫步小游戏：走进去逛、点单，最后猜自己花了多少；站内以 iframe 嵌入独立静态页（`public/night-market/`） |
 
 另有若干未在首页列出的实验页（如 3D 演示、小游戏），代码都在 `src/pages/` 下。
@@ -90,6 +90,30 @@ npm start                   # 只跑后端（生产用法）
 
 ---
 
+## 电台漫游数据（构建期）
+
+电台目录不是运行时去拉的，而是**构建期**跑脚本生成静态数据集：
+
+```bash
+node scripts/build-stations.mjs          # 拉 Radio Browser → public/data/stations.json
+# 想强制重拉（脚本自带 /tmp 缓存）：node scripts/build-stations.mjs --fresh
+```
+
+产物是列式 JSON（`name[] / url[] / cc[] / tag[] / lat[] / lng[] / br[]`），
+当前 **1859 个带坐标电台 / 151 个国家 / 226KB（gzip 82KB）**，运行时只读这一个文件。
+
+运行时的两个接口（都在 Express 里）：
+
+- `GET /api/now?u=<streamUrl>`：读 ICY `StreamTitle`，返回 `{ title }`（无元数据返回 `null`，总超时 5 秒，只读一小段就断开）
+- `GET /api/radio/stream?u=<streamUrl>`：**只转发当前在听的这一路**音频（同源），供 `<audio>` 播放与 Web Audio 频谱分析；客户端断开即断开上游
+
+Nginx 片段：
+
+```nginx
+location /data/stations.json    { gzip on; gzip_types application/json; expires 1d; }
+location /api/now               { proxy_pass http://127.0.0.1:3001; }
+location /api/radio/stream      { proxy_pass http://127.0.0.1:3001; proxy_buffering off; proxy_read_timeout 3600s; }
+```
 ## 部署
 
 部署走 **git push + 服务器端钩子**，不手工改服务器文件：

@@ -38,3 +38,6 @@ Thumbs.db
 
 # 本地设计评审截图（scripts/ui-shot.mjs 生成）
 .shots*/
+# 电台数据集是构建产物，但部署需要它（构建脚本可复现）
+!public/data/
+!public/data/stations.json
