@@ -42,9 +42,16 @@ export class RadioPage {
     this.audio?.addEventListener('pause', () => this.setPlayingUI(false));
     this.audio?.addEventListener('error', () => this.onAudioError());
     this.audio?.addEventListener('stalled', () => { /* 等看门狗处理 */ });
-    // 首次进入：并行拉筛选器与列表
+    // 视图切换：地球 / 列表（默认地球，像 RoamDial 那样先看世界）
+    this.view = 'globe';
+    this.$('radio-view-globe')?.addEventListener('click', () => this.setView('globe'));
+    this.$('radio-view-list')?.addEventListener('click', () => this.setView('list'));
+    try { window.__pkRadio = this; } catch { /* 调试钩子，无副作用 */ }
+    // 首次进入：拉筛选器与列表，并加载地球
     this.loadFilters();
     this.loadStations();
+    this.setView('globe');
+    this.loadGlobe();
   }
 
   /** 播放卡住看门狗：直播流 9 秒还没有任何进度，就当这个台不可用，自动换台 */
@@ -62,6 +69,43 @@ export class RadioPage {
     }, 9000);
   }
 
+  /** 切换「地球 / 列表」视图 */
+  setView(v) {
+    this.view = v;
+    const globeWrap = this.$('radio-globe-wrap');
+    const listView = this.$('radio-list-view');
+    const hint = this.$('radio-view-hint');
+    if (globeWrap) globeWrap.style.display = v === 'globe' ? '' : 'none';
+    if (listView) listView.style.display = v === 'list' ? '' : 'none';
+    this.$('radio-view-globe')?.classList.toggle('active', v === 'globe');
+    this.$('radio-view-list')?.classList.toggle('active', v === 'list');
+    if (hint) hint.textContent = v === 'globe' ? '拖动旋转 · 滚轮缩放 · 点光点试听' : '按国家 / 流派筛选';
+  }
+
+  /** 加载 3D 电台地球（数据来自静态数据集，秒开） */
+  async loadGlobe() {
+    const el = this.$('radio-globe');
+    const loading = this.$('radio-globe-loading');
+    if (!el || this._globeLoading || this._globe) return;
+    this._globeLoading = true;
+    try {
+      const r = await fetch('/api/radio/geo');
+      const d = await r.json();
+      if (!d.success || !d.stations || !d.stations.length) throw new Error(d.error || '全球电台数据不可用');
+      const { createRadioGlobe } = await import('./RadioGlobe.js');
+      this._globe = await createRadioGlobe(el, d.stations, {
+        tooltipEl: this.$('radio-globe-tip'),
+        onPick: (s) => this.playStation(s),
+      });
+      this._globeStations = d.stations;
+      if (loading) loading.style.display = 'none';
+      this.setHint(`地球上有 ${d.stations.length} 个电台，点光点试听`);
+    } catch (e) {
+      if (loading) loading.textContent = '地球加载失败：' + (e.message || e);
+      this.setView('list');
+      this.setHint('地球加载失败，已切到列表', true);
+    } finally { this._globeLoading = false; }
+  }
   applyVolume(v) {
     if (!this.audio) return;
     this.audio.volume = Math.max(0, Math.min(100, Number(v) || 0)) / 100;

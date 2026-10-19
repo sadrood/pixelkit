@@ -3193,7 +3193,7 @@ app.post('/api/agent/chat-stream', async (req, res) => {
     const quickFetchPage = async (url) => {
       try {
         const res = await fetch(url, {
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(timeoutMs),
           headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PixelKit-Agent/1.0)' }
         });
         if (!res.ok) return null;
@@ -6998,7 +6998,7 @@ function radioEvict() {
   const oldest = [...radioCache.entries()].sort((a, b) => a[1].t - b[1].t).slice(0, 50);
   for (const [k] of oldest) radioCache.delete(k);
 }
-async function radioFetch(path, ttlMs = 10 * 60 * 1000) {
+async function radioFetch(path, ttlMs = 10 * 60 * 1000, timeoutMs = 8000) {
   const hit = radioCache.get(path);
   if (hit && Date.now() - hit.t < ttlMs) return hit.data;
   const ordered = [radioApiBase, ...RADIO_API_BASES.filter((b) => b !== radioApiBase)];
@@ -7007,7 +7007,7 @@ async function radioFetch(path, ttlMs = 10 * 60 * 1000) {
     try {
       const r = await fetch(base + path, {
         headers: { 'User-Agent': 'PixelKit-Radio/1.0', 'Accept': 'application/json' },
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       if (!r.ok) throw new Error('目录源 HTTP ' + r.status);
       const data = await r.json();
@@ -7026,6 +7026,26 @@ const radioStationOut = (s) => ({
   homepage: s.homepage || '', url: s.url_resolved || s.url || '',
 });
 
+/* 地球视图数据：静态数据集（public/radio-geo.json，离线生成：带经纬度的热门电台，
+   120 个国家 / 2400 个电台）。接口直接读文件，秒开且不依赖上游可用性。 */
+const RADIO_GEO_FILE = path.join(__dirname, 'public', 'radio-geo.json');
+let radioGeoData = null;
+function loadRadioGeo() {
+  if (radioGeoData) return radioGeoData;
+  try {
+    const list = JSON.parse(readFileSync(RADIO_GEO_FILE, 'utf-8'));
+    radioGeoData = Array.isArray(list) ? list : [];
+    // 启动时把这些电台主机加入音频中转白名单
+    for (const s of radioGeoData) radioRemember(s.url);
+    console.log(`[radio] geo 静态数据集：${radioGeoData.length} 个电台`);
+  } catch (e) { radioGeoData = []; console.warn('[radio] geo 数据集读取失败:', e.message); }
+  return radioGeoData;
+}
+
+app.get('/api/radio/geo', (req, res) => {
+  const stations = loadRadioGeo();
+  res.json({ success: true, stations, total: stations.length });
+});
 app.get('/api/radio/countries', async (req, res) => {
   try {
     const list = await radioFetch('/json/countries', 6 * 3600 * 1000);

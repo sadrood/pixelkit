@@ -727,13 +727,24 @@
           </div>
           <audio id="radio-audio" preload="none"></audio>
         </section>
-        <section class="radio-filters">
+        <section class="radio-viewbar">
+          <button id="radio-view-globe" class="btn btn-sm active" type="button">地球</button>
+          <button id="radio-view-list" class="btn btn-sm" type="button">列表</button>
+          <span class="qr-hint" id="radio-view-hint">拖动旋转 · 滚轮缩放 · 点光点试听</span>
+        </section>
+        <div class="radio-globe-wrap" id="radio-globe-wrap">
+          <div class="radio-globe" id="radio-globe"></div>
+          <div class="radio-globe-tip" id="radio-globe-tip"></div>
+          <div class="radio-globe-loading" id="radio-globe-loading">正在加载全球电台…</div>
+        </div>
+        <div id="radio-list-view" style="display:none;">        <section class="radio-filters">
           <select id="radio-country" class="radio-select"><option value="">全部国家</option></select>
           <select id="radio-tag" class="radio-select"><option value="">全部流派</option></select>
           <button id="radio-refresh" class="btn btn-sm" type="button">🔄 刷新</button>
           <span class="qr-hint" id="radio-hint"></span>
         </section>
         <div class="radio-list" id="radio-list"><p class="radio-empty">正在取电台目录…</p></div>
+        </div>
         <p class="radio-note">电台目录来自 Radio Browser 社区数据库；音频由本站服务器中转，声音版权归各电台所有。</p>
       </main>
     </div>
