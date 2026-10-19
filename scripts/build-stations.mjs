@@ -1,14 +1,13 @@
 /**
- * 构建期拉取电台数据（RoamSky / 全球电台漫游）
+ * 构建期拉取电台数据（RoamSky）—— v2：高密度版本
  *
- * 用法：node scripts/build-stations.mjs
- * 输出：public/data/stations.json（列式结构，页面运行时只读这一个静态文件）
+ * 参考 roamdial 的数据模型（逆向所得）：
+ *   core: { n, genres[], langs[], countries[], lat[](×100), lng[](×100), g, l, c, br, pop }
+ *   rest: { id[], name[], url[], tags[], state[], tz[] }
+ * 共享数组 + 整数压缩，比对象数组小很多。
  *
- * 设计要点：
- *  - 只在构建期请求 Radio Browser，运行时不直连它（避免封 IP / 拖慢页面）；
- *  - 多个镜像轮着试（de1/de2/fi1），失败自动换镜像；
- *  - 只要「有坐标 + 有真实音频地址 + codec 是 audio」的台，保证地图上每点都能播；
- *  - 列式结构（name[] / url[] / ...）比对象数组省 40% 左右体积。
+ * 用法：node scripts/build-stations.mjs [--fresh]
+ * 输出：public/data/stations.json
  */
 import { writeFileSync, mkdirSync, statSync, existsSync, readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
@@ -18,27 +17,55 @@ const MIRRORS = [
   'https://de2.api.radio-browser.info',
   'https://fi1.api.radio-browser.info',
   'https://nl1.api.radio-browser.info',
-  'https://at1.api.radio-browser.info',
 ];
 const UA = { 'User-Agent': 'PixelKit/1.0 (radio-globe builder)' };
-const QUERY = '/json/stations/search?limit=3000&hidebroken=true&order=votes&reverse=true&has_geo_info=true';
 const OUT = 'public/data/stations.json';
-const CACHE = '/tmp/radio-raw.json';   // 原始响应缓存：调过滤规则时不必重复请求（--fresh 可强制重拉）
+const CACHE = '/tmp/radio-raw.json';
+const TARGET = Number(process.env.RADIO_TARGET || 12000);
+
+/** 11 个分类（中文 / 英文），和 roamdial 的分类维度一致 */
+const GENRES = [
+  { zh: '综合', en: 'General', tags: [] },
+  { zh: '流行', en: 'Pop', tags: ['pop', 'top 40', 'chart', 'hits'] },
+  { zh: '摇滚', en: 'Rock', tags: ['rock', 'alternative', 'indie', 'metal', 'punk', 'hardcore'] },
+  { zh: '电子', en: 'Electronic', tags: ['electronic', 'house', 'techno', 'trance', 'dance', 'edm', 'ambient', 'chillout'] },
+  { zh: '新闻谈话', en: 'News & Talk', tags: ['news', 'talk', 'information', 'current affairs', 'politics'] },
+  { zh: '爵士与古典', en: 'Jazz & Classical', tags: ['jazz', 'classical', 'blues', 'swing', 'opera', 'soul'] },
+  { zh: '地方与世界', en: 'Local & World', tags: ['world', 'folk', 'ethnic', 'local', 'latin', 'country', 'reggae'] },
+  { zh: '嘻哈节奏', en: 'Hip-Hop & R&B', tags: ['hip hop', 'hip-hop', 'rap', 'r&b', 'rnb', 'funk', 'urban'] },
+  { zh: '宗教', en: 'Religious', tags: ['religious', 'christian', 'gospel', 'islam', 'catholic', 'spiritual'] },
+  { zh: '运动与娱乐', en: 'Sports & Entertainment', tags: ['sport', 'sports', 'comedy', 'entertainment', 'game'] },
+  { zh: '轻松背景', en: 'Easy Listening', tags: ['easy listening', 'lounge', 'relax', 'sleep', 'meditation', 'soundtrack', 'oldies'] },
+];
+const LANGS = ['未标注', '英语', '法语', '西班牙语', '德语', '中文', '葡萄牙语', '意大利语', '俄语', '阿拉伯语', '日语', '韩语', '荷兰语', '波兰语', '土耳其语', '印地语', '其他'];
+const LANG_KEYS = [
+  [], ['english', '英语'], ['french', '法语'], ['spanish', '西班牙语'], ['german', '德语'], ['chinese', '中文', 'mandarin', 'cantonese'],
+  ['portuguese', '葡萄牙语'], ['italian', '意大利语'], ['russian', '俄语'], ['arabic', '阿拉伯语'], ['japanese', '日语'],
+  ['korean', '韩语'], ['dutch', '荷兰语'], ['polish', '波兰语'], ['turkish', '土耳其语'], ['hindi', '印地语'],
+];
 
 async function fetchStations() {
   let lastErr = null;
   for (const base of MIRRORS) {
     const t0 = Date.now();
     try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 180000);
-      const res = await fetch(base + QUERY, { headers: UA, signal: ctrl.signal });
-      clearTimeout(timer);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const list = await res.json();
-      if (!Array.isArray(list) || !list.length) throw new Error('empty list');
-      console.log(`  ${base} → ${list.length} 条，用时 ${((Date.now() - t0) / 1000).toFixed(1)}s`);
-      return list;
+      const pages = Math.ceil(TARGET / 3000);
+      const all = [];
+      for (let page = 0; page < pages; page++) {
+        const q = `/json/stations/search?limit=3000&offset=${page * 3000}&hidebroken=true&order=votes&reverse=true`;
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 240000);
+        const res = await fetch(base + q, { headers: UA, signal: ctrl.signal });
+        clearTimeout(timer);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const list = await res.json();
+        if (!Array.isArray(list) || !list.length) throw new Error('empty page');
+        all.push(...list);
+        console.log(`    ${base} 第 ${page + 1}/${pages} 页 → ${list.length} 条（累计 ${all.length}）`);
+        if (list.length < 3000) break;
+      }
+      console.log(`  ${base} 合计 ${all.length} 条，用时 ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+      return all;
     } catch (e) {
       lastErr = e;
       console.warn(`  ${base} 失败：${e.message}`);
@@ -48,8 +75,7 @@ async function fetchStations() {
 }
 
 let list;
-const fresh = process.argv.includes('--fresh');
-if (!fresh && existsSync(CACHE)) {
+if (!process.argv.includes('--fresh') && existsSync(CACHE)) {
   list = JSON.parse(readFileSync(CACHE, 'utf8'));
   console.log(`  复用缓存 ${CACHE}：${list.length} 条（重拉加 --fresh）`);
 } else {
@@ -57,55 +83,109 @@ if (!fresh && existsSync(CACHE)) {
   writeFileSync(CACHE, JSON.stringify(list));
 }
 
-// 分阶段过滤并打印剩余数量，方便排查。
-// 注意：Radio Browser 的 codec 是 MP3 / AAC / OGG / HLS 这类，而不是 audio/*。
-const AUDIO_CODEC = /^(mp3|aac|ogg|opus|flac|m4a|mp4a|audio|vorbis|he-aac|aacp|hls)/i;
-const stages = [];
-const step = (label, arr, fn) => { const r = arr.filter(fn); stages.push(`${label}: ${arr.length} → ${r.length}`); return r; };
+/* ---------- 清洗 ---------- */
+const ok = list.filter((s) => s.url_resolved && /^https?:\/\//i.test(s.url_resolved) && s.name);
+console.log(`  可用（有 url）: ${list.length} → ${ok.length}`);
 
-let arr = list;
-arr = step('有 url_resolved', arr, (s) => Boolean(s.url_resolved));
-arr = step('有坐标', arr, (s) => s.geo_lat != null && (s.geo_long != null || s.geo_lng != null));
-arr = step('坐标非 (0,0)', arr, (s) => !(+s.geo_lat === 0 && +(+s.geo_long || +s.geo_lng) === 0));
-arr = step('纬度合法', arr, (s) => Math.abs(+s.geo_lat) <= 85);
-arr = step('音频 codec', arr, (s) => !s.codec || AUDIO_CODEC.test(String(s.codec).replace(/[^a-z0-9-]/gi, '')));
-arr = step('http(s) 地址', arr, (s) => /^https?:\/\//i.test(s.url_resolved));
-const ok = arr;
-console.log('  过滤：\n    ' + stages.join('\n    '));
-const codecs = {};
-for (const s of list) { const k = String(s.codec || '(空)').slice(0, 12); codecs[k] = (codecs[k] || 0) + 1; }
-console.log('  原始 codec 分布：', Object.entries(codecs).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => `${k}=${v}`).join(', '));
-
-
-// 同一坐标最多留 3 个台，避免大城市光点堆成一坨
-const byCell = new Map();
-const picked = [];
+/* ---------- 国家中心点：用有坐标的台算出每个国家的大致中心 ---------- */
+const acc = new Map();
 for (const s of ok) {
-  const cell = `${(+s.geo_lat).toFixed(1)},${(+(+s.geo_long || +s.geo_lng)).toFixed(1)}`;
-  const n = byCell.get(cell) || 0;
-  if (n >= 3) continue;
-  byCell.set(cell, n + 1);
-  picked.push(s);
+  if (s.geo_lat == null || s.geo_long == null) continue;
+  const lat = +s.geo_lat, lng = +s.geo_long;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) continue;
+  const k = s.countrycode || '??';
+  const a = acc.get(k) || { lat: 0, lng: 0, n: 0 };
+  a.lat += lat; a.lng += lng; a.n += 1;
+  acc.set(k, a);
+}
+const centroid = new Map();
+for (const [k, a] of acc) centroid.set(k, { lat: a.lat / a.n, lng: a.lng / a.n });
+
+/* ---------- 分类 / 语言映射 ---------- */
+const norm = (s) => String(s || '').toLowerCase();
+function genreOf(tags) {
+  const t = norm(tags);
+  if (!t) return 0;
+  for (let i = 1; i < GENRES.length; i++) {
+    if (GENRES[i].tags.some((g) => t.includes(g))) return i;
+  }
+  return 0;
+}
+function langOf(s) {
+  const t = norm((s.language || '') + ',' + (s.tags || ''));
+  for (let i = 1; i < LANG_KEYS.length; i++) {
+    if (LANG_KEYS[i][0] && t.includes(LANG_KEYS[i][0])) return i;
+  }
+  return 0;
 }
 
-const data = {
-  builtAt: new Date().toISOString(),
-  n: picked.length,
-  name: picked.map((s) => s.name.trim().slice(0, 60)),
-  url: picked.map((s) => s.url_resolved),
-  cc: picked.map((s) => s.countrycode || ''),
-  tag: picked.map((s) => (s.tags || '').split(',').filter(Boolean).slice(0, 3).join(',')),
-  lat: picked.map((s) => +(+s.geo_lat).toFixed(3)),
-  lng: picked.map((s) => +(+(+s.geo_long || +s.geo_lng)).toFixed(3)),
-  br: picked.map((s) => s.bitrate | 0),
-};
+/* ---------- 列式数据 ---------- */
+const countriesOrder = [];
+const countryIndex = new Map();
+const rows = [];
+let usedFallback = 0;
+for (const s of ok) {
+  const cc = s.countrycode || '??';
+  let lat = s.geo_lat == null ? null : +s.geo_lat;
+  let lng = s.geo_long == null ? null : +s.geo_long;
+  let prec = 0;
+  if (lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0)) {
+    prec = 2;
+  } else {
+    const c = centroid.get(cc);
+    if (!c) continue;
+    lat = c.lat; lng = c.lng; prec = 0; usedFallback += 1;
+    // 同国家同中心会重叠：用台名哈希做微扰，避免完全叠在一起
+    let h = 0; for (let i = 0; i < s.name.length; i++) h = (h * 31 + s.name.charCodeAt(i)) >>> 0;
+    const jitter = 1.2;
+    lat += ((h % 1000) / 1000 - 0.5) * jitter;
+    lng += (((h >> 10) % 1000) / 1000 - 0.5) * jitter * 2;
+  }
+  let ci = countryIndex.get(cc);
+  if (ci == null) { ci = countriesOrder.length; countryIndex.set(cc, ci); countriesOrder.push(cc); }
+  rows.push({
+    id: String(s.stationuuid || '').replace(/-/g, '').slice(0, 12),
+    name: s.name.trim().slice(0, 60),
+    url: s.url_resolved,
+    tags: String(s.tags || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 4).join(','),
+    state: (s.state || '').slice(0, 30),
+    lat: Math.round(lat * 100),
+    lng: Math.round(lng * 100),
+    br: s.bitrate | 0,
+    g: genreOf(s.tags + ',' + (s.name || '')),
+    l: langOf(s),
+    c: ci,
+    prec,
+    pop: Math.min(9, Math.round(Math.log10((s.votes | 0) + 1) * 2)),
+  });
+}
+console.log(`  坐标兜底（落到国家中心）: ${usedFallback} 个`);
 
+const data = {
+  v: 2,
+  builtAt: new Date().toISOString(),
+  n: rows.length,
+  genres: GENRES.map((g) => g.zh),
+  genresEn: GENRES.map((g) => g.en),
+  langs: LANGS,
+  cc: countriesOrder,
+  lat: rows.map((r) => r.lat),
+  lng: rows.map((r) => r.lng),
+  g: rows.map((r) => r.g),
+  l: rows.map((r) => r.l),
+  c: rows.map((r) => r.c),
+  br: rows.map((r) => r.br),
+  prec: rows.map((r) => r.prec),
+  pop: rows.map((r) => r.pop),
+  id: rows.map((r) => r.id),
+  name: rows.map((r) => r.name),
+  url: rows.map((r) => r.url),
+  tags: rows.map((r) => r.tags),
+  state: rows.map((r) => r.state),
+};
 mkdirSync('public/data', { recursive: true });
 const json = JSON.stringify(data);
 writeFileSync(OUT, json);
-
 const rawKB = (statSync(OUT).size / 1024).toFixed(0);
 const gzKB = (gzipSync(Buffer.from(json)).length / 1024).toFixed(0);
-const ccs = new Set(data.cc);
-console.log(`  写入 ${OUT}：${data.n} 个电台 / ${ccs.size} 个国家 / ${rawKB}KB（gzip ${gzKB}KB）`);
-if (Number(gzKB) > 800) console.warn('  ⚠ gzip 后超过 800KB 预算，考虑减少 limit 或截断字段');
+console.log(`  写入 ${OUT}：${data.n} 个电台 / ${countriesOrder.length} 个国家 / ${rawKB}KB（gzip ${gzKB}KB）`);

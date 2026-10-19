@@ -715,7 +715,8 @@
         </div>
 
         <!-- 中心准星：停稳后自动锁定最近的台 -->
-        <div class="radio-cross" aria-hidden="true"><i class="h"></i><i class="v"></i><span></span></div>
+        <div class="radio-cross" aria-hidden="true"><i class="h"></i><i class="v"></i><span></span><em id="radio-lock-meta" class="radio-lock-meta"></em></div>
+        <div class="radio-labels" id="radio-labels"></div>
 
         <!-- 顶部浮动栏 -->
         <div class="radio-topbar">
@@ -724,6 +725,11 @@
             <div class="radio-brand"><b>RoamSky</b><span>随机一站，听见世界</span></div>
           </div>
           <div class="radio-top-right">
+            <div class="radio-views">
+              <button class="radio-view on" data-view="globe" type="button">地球</button>
+              <button class="radio-view" data-view="nebula" type="button">流派星云</button>
+              <button class="radio-view" data-view="fav" type="button">收藏 <b id="radio-fav-count">0</b></button>
+            </div>
             <span id="radio-top-meta" class="radio-count">正在加载…</span>
             <button id="radio-fav" class="radio-fab" type="button" title="收藏 / 取消收藏（F）">♡</button>
             <button id="radio-q-btn" class="radio-fab" type="button" title="搜索（/）">⌕</button>
@@ -747,7 +753,12 @@
             </div>
             <h2 id="radio-now-name" class="radio-now-name">世界电台</h2>
             <span id="radio-now-sub" class="radio-now-sub"></span>
-            <span id="radio-now-song" class="radio-now-song"></span>
+            <div class="radio-songline">
+              <span class="radio-songlabel">此刻</span>
+              <span id="radio-now-song" class="radio-now-song"></span>
+              <button id="radio-song-fav" class="radio-song-fav" type="button" title="收藏这个台">♡</button>
+            </div>
+            <div class="radio-services" id="radio-services"></div>
           </div>
           <div class="radio-controls">
             <div class="radio-dialrow">
@@ -765,7 +776,19 @@
               <label class="radio-vol" title="音量">音量<input id="radio-volume" type="range" min="0" max="100" value="80" /></label>
             </div>
           </div>
+          <!-- 右下角键盘提示（同 roamdial） -->
+          <div class="radio-hints">
+            <div>拖动 <b>旋转</b> · 滚轮 <b>远近</b></div>
+            <div>准星停稳 <b>自动收听</b></div>
+            <div>→ 下一站 · ← 上一站</div>
+            <div>G 切换视图 · / 搜索 · F 收藏</div>
+            <div>空格 暂停 · M 静音</div>
+            <div>Enter 进入当前电台</div>
+          </div>
         </div>
+
+        <!-- 底部流派筛选条 -->
+        <div class="radio-chips" id="radio-chips"></div>
 
         <!-- 浏览 / 筛选抽屉 -->
         <div class="radio-sheet" id="radio-sheet" hidden>

@@ -78,6 +78,13 @@ export class RadioPage {
     // 收藏（本机）
     this.loadFavs();
     this.$('radio-fav')?.addEventListener('click', () => this.toggleFav());
+    this.$('radio-song-fav')?.addEventListener('click', () => this.toggleFav());
+    // 视图切换：地球 / 流派星云 / 收藏
+    this.view = 'globe';
+    this.genreFilter = -1;
+    document.querySelectorAll('#page-radio .radio-view').forEach((b) => {
+      b.addEventListener('click', () => this.setView(b.dataset.view));
+    });
     // 进入：确保正在播放当前台（或从当前开始播）
     this.$('radio-enter')?.addEventListener('click', () => {
       if (this.current) { this.audio.play().catch(() => {}); this.updateStatus('播放中'); }
@@ -109,6 +116,8 @@ export class RadioPage {
       else if (e.key === 'ArrowRight') { e.preventDefault(); this.step(1); }
       else if (e.key === ' ') { e.preventDefault(); this.togglePlay(); }
       else if (e.key === 'F' || e.key === 'f') { this.toggleFav(); }
+      else if (e.key === 'G' || e.key === 'g') { this.setView(this.view === 'nebula' ? 'globe' : 'nebula'); }
+      else if (e.key === 'M' || e.key === 'm') { if (this.audio) { this.audio.muted = !this.audio.muted; this.setHint(this.audio.muted ? '已静音' : '已取消静音'); } }
       else if (e.key === 'Enter') { this.$('radio-enter')?.click(); }
       else if (e.key === '/') {
         e.preventDefault();
@@ -139,16 +148,33 @@ export class RadioPage {
         const d = await fetch('/data/stations.json', { cache: 'force-cache' }).then((r) => r.json());
         if (d && Array.isArray(d.name) && d.name.length) {
           const n = d.name.length;
+          const isV2 = d.v === 2 && Array.isArray(d.cc);
+          this.genres = d.genres || [];
+          this.genresEn = d.genresEn || [];
+          this.langs = d.langs || [];
           stations = new Array(n);
           for (let i = 0; i < n; i++) {
-            stations[i] = {
-              id: 'ds' + i, name: d.name[i], url: d.url[i], cc: d.cc[i],
-              country: this.ccNames[d.cc[i]] || d.cc[i],
-              tags: String(d.tag[i] || '').split(',').filter(Boolean),
-              lat: d.lat[i], lon: d.lng[i], bitrate: d.br[i] || 0, codec: '',
-            };
+            if (isV2) {
+              const cc = d.cc[d.c[i]] || '';
+              stations[i] = {
+                id: d.id[i], name: d.name[i], url: d.url[i], cc,
+                country: this.ccNames[cc] || cc,
+                tags: String(d.tags[i] || '').split(',').filter(Boolean),
+                lat: d.lat[i] / 100, lon: d.lng[i] / 100,
+                bitrate: d.br[i] || 0, codec: '',
+                g: d.g[i] | 0, l: d.l[i] | 0, prec: d.prec[i] | 0, pop: d.pop[i] | 0,
+              };
+            } else {
+              const cc = d.cc[i] || '';
+              stations[i] = {
+                id: String(d.id ? d.id[i] : 'ds' + i), name: d.name[i], url: d.url[i], cc,
+                country: this.ccNames[cc] || cc,
+                tags: String(d.tag ? d.tag[i] : '').split(',').filter(Boolean),
+                lat: d.lat[i], lon: d.lng[i], bitrate: d.br[i] || 0, codec: '', g: 0, l: 0,
+              };
+            }
           }
-          this._datasetInfo = { builtAt: d.builtAt, n };
+          this._datasetInfo = { builtAt: d.builtAt, n, v: d.v || 1 };
         }
       } catch { /* 数据集缺失时退回接口 */ }
       if (!stations) {
@@ -167,6 +193,9 @@ export class RadioPage {
       });
       // 拖动停稳后：准星对准的最近电台自动收听（RoamDial 的核心交互）
       try { this._globe.onSettle?.(() => this.autoTuneFromCrosshair()); } catch { /* ignore */ }
+      this.buildChips();
+      this.startLabels();
+      this.updateFavCount();
       const slider = this.$('radio-slider');
       if (slider) { slider.max = String(Math.max(0, this.geoStations.length - 1)); slider.disabled = false; }
       if (loading) loading.style.display = 'none';
@@ -225,11 +254,45 @@ export class RadioPage {
     const country = this.$('radio-now-country');
     const name = this.$('radio-now-name');
     const sub = this.$('radio-now-sub');
-    if (country) country.textContent = [s.country, s.cc].filter(Boolean).join(' · ') || '未知地区';
+    const flag = this.flagOf(s.cc);
+    if (country) country.textContent = [flag, s.country || s.cc].filter(Boolean).join(' ') || '未知地区';
     if (name) name.textContent = s.name || '未命名电台';
-    if (sub) sub.textContent = [s.codec, s.bitrate ? s.bitrate + 'kbps' : '', (s.tags || []).slice(0, 2).join(' / ')].filter(Boolean).join(' · ') || '松手即播放';
+    if (sub) {
+      const genre = this.genres && s.g != null ? (this.genres[s.g] || '') : '';
+      const tags = (s.tags || []).slice(0, 3).join(',').toUpperCase();
+      const lang = this.langs && s.l != null ? (this.langs[s.l] || '') : '';
+      sub.textContent = [genre, tags, lang, s.bitrate ? s.bitrate + ' KBPS' : ''].filter(Boolean).join(' · ');
+    }
+    const lock = this.$('radio-lock-meta');
+    if (lock) {
+      const genre = this.genres && s.g != null ? (this.genres[s.g] || '') : '';
+      lock.textContent = ['已锁定', genre, s.bitrate ? s.bitrate + ' KBPS' : ''].filter(Boolean).join(' · ');
+    }
     const song = this.$('radio-now-song');
     if (song && this.current !== s) { song.textContent = ''; song.style.display = 'none'; }
+    this.buildServices(s);
+    try { this.updateFavUI(); } catch { /* ignore */ }
+  }
+
+  flagOf(cc) {
+    if (!cc || cc.length !== 2) return '';
+    try { return String.fromCodePoint(...[...cc.toUpperCase()].map((c) => 127397 + c.charCodeAt(0))); } catch { return ''; }
+  }
+
+  /** 「此刻」下面的音乐服务外链（用台名去各平台搜，和 roamdial 一致） */
+  buildServices(s) {
+    const box = this.$('radio-services');
+    if (!box) return;
+    const q = encodeURIComponent(s.name || '');
+    const items = [
+      ['网易云', 'https://music.163.com/#/search/m/?s=' + q],
+      ['QQ音乐', 'https://y.qq.com/n/ryqq/search?w=' + q],
+      ['Spotify', 'https://open.spotify.com/search/' + q],
+      ['Apple Music', 'https://music.apple.com/us/search?term=' + q],
+      ['YouTube', 'https://www.youtube.com/results?search_query=' + q],
+      ['Google', 'https://www.google.com/search?q=' + q],
+    ];
+    box.innerHTML = items.map(([t, u]) => `<a href="${u}" target="_blank" rel="noopener noreferrer">${t}</a>`).join('');
   }
 
   /* ==================== 播放 ==================== */
@@ -370,6 +433,111 @@ export class RadioPage {
     this._hlsLoading = null;
     return Hls;
   }
+  /* ==================== 视图 / 分类筛选 / 标签 ==================== */
+  genreColor(g) {
+    const c = [0xe8dcc8, 0xffd9a0, 0xff9e7a, 0x8fe8ff, 0xdfe8f0, 0xffcf8f, 0xb8e6a8, 0xffb3c8, 0xd8c8ff, 0xffe08a, 0xcfe8d8];
+    return '#' + (c[g % c.length] || 0xe8dcc8).toString(16).padStart(6, '0');
+  }
+
+  /** 底部流派筛选条（带每个分类的数量，像 roamdial） */
+  buildChips() {
+    const box = this.$('radio-chips');
+    if (!box || !this.genres || !this.genres.length) return;
+    const counts = new Array(this.genres.length).fill(0);
+    for (const st of this.geoStations) counts[st.g || 0] = (counts[st.g || 0] || 0) + 1;
+    const items = [{ g: -1, label: '全部', count: this.geoStations.length },
+      ...this.genres.map((zh, i) => ({ g: i, label: zh, count: counts[i] }))];
+    box.innerHTML = items.map((it) => `<button class="radio-chip-btn${this.genreFilter === it.g ? ' on' : ''}" data-g="${it.g}" type="button">${it.g >= 0 ? `<i style="background:${this.genreColor(it.g)}"></i>` : ''}${this.esc(it.label)}<small>${it.count}</small></button>`).join('');
+    box.querySelectorAll('.radio-chip-btn').forEach((b) => {
+      b.onclick = () => this.applyGenreFilter(Number(b.dataset.g));
+    });
+  }
+
+  applyGenreFilter(g) {
+    this.genreFilter = g;
+    const n = this._globe ? this._globe.setFilter(g < 0 ? null : (s) => (s.g || 0) === g) : 0;
+    this.buildChips();
+    this.setHint(g < 0 ? `全部 ${n} 个电台` : `${this.genres[g] || ''} · ${n} 个电台`);
+    const first = this._globe && this._globe.getFiltered ? this._globe.getFiltered()[0] : null;
+    if (first) {
+      const i = this.geoStations.indexOf(first);
+      if (i >= 0) { this.index = i; this.syncSlider(); this.setNowPlaying(first); }
+    }
+  }
+
+  /** 切换视图：地球 / 流派星云 / 收藏 */
+  setView(v) {
+    this.view = v;
+    document.querySelectorAll('#page-radio .radio-view').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
+    if (v === 'fav') { this.showFavSheet(); this.setHint('收藏 · 点一个台开始收听'); return; }
+    this.toggleSheet(false);
+    if (this._globe) this._globe.setLayout(v === 'nebula' ? 'nebula' : 'globe');
+    this.setHint(v === 'nebula' ? '流派星云 · 拖动旋转，准星停稳自动收听' : '拖动旋转 · 滚轮远近 · 准星停稳自动收听');
+  }
+
+  /** 收藏视图：把收藏的台列进抽屉 */
+  showFavSheet() {
+    const list = [...(this.favs || [])];
+    const items = [];
+    for (const id of list) {
+      const st = this.geoStations.find((s) => String(s.id) === String(id));
+      if (st) items.push(st);
+    }
+    this.listStations = items;
+    const box = this.$('radio-list');
+    if (box) {
+      box.innerHTML = items.length ? items.map((s, i) => `<button class="radio-item" data-i="${i}" type="button">
+        <span class="radio-item-play">♥</span>
+        <span class="radio-item-main"><b>${this.esc(s.name)}</b><small>${this.esc([s.country, s.bitrate ? s.bitrate + 'kbps' : ''].filter(Boolean).join(' · '))}</small></span>
+      </button>`).join('') : '<p class="radio-empty">还没有收藏。播放时点 ♡ 收藏。</p>';
+      box.querySelectorAll('.radio-item').forEach((el) => {
+        el.onclick = () => { const s = this.listStations[Number(el.dataset.i)]; if (s) this.playFromList(s); };
+      });
+    }
+    this.toggleSheet(true);
+  }
+
+  /** 台名标签：每 180ms 把准星附近的台投影到屏幕上 */
+  startLabels() {
+    if (this._labelTimer) return;
+    const box = this.$('radio-labels');
+    if (!box) return;
+    this._labelTimer = setInterval(() => {
+      if (!this._globe || this.view === 'fav') { box.innerHTML = ''; return; }
+      let labels = [];
+      try { labels = this._globe.getLabels(26) || []; } catch { labels = []; }
+      const cur = this.current ? this.current.name : '';
+      const w = box.clientWidth || 1, h = box.clientHeight || 1;
+      const cx = w / 2, cy = h / 2;
+      const placed = [];
+      const out = [];
+      for (const l of labels.slice().sort((a, b) => Math.hypot(b.x - cx, b.y - cy) - Math.hypot(a.x - cx, a.y - cy))) {
+        // 离准星太近的标签会压住「已锁定」文字，跳过
+        const d = Math.hypot(l.x - cx, l.y - cy);
+        if (d < 80) continue;
+        // 防止标签互相重叠（最小间距）
+        if (placed.some((p) => Math.hypot(p.x - l.x, p.y - l.y) < 110)) continue;
+        placed.push(l);
+        out.push(`<span class="radio-label${l.name === cur ? ' hot' : ''}" style="left:${Math.round(l.x)}px;top:${Math.round(l.y - 14)}px">${this.esc(l.name)}</span>`);
+        if (out.length >= 5) break;
+      }
+      if (!out.length) {
+        // 兜底：候选都在准星附近时，退一步显示最外侧的几个，至少让画面有台名
+        for (const l of labels) {
+          const d = Math.hypot(l.x - cx, l.y - cy);
+          if (d < 56) continue;
+          out.push(`<span class="radio-label" style="left:${Math.round(l.x)}px;top:${Math.round(l.y - 14)}px">${this.esc(l.name)}</span>`);
+          if (out.length >= 3) break;
+        }
+      }
+      box.innerHTML = out.join('');
+    }, 180);
+  }
+
+  updateFavCount() {
+    const b = this.$('radio-fav-count');
+    if (b) b.textContent = String(this.favs ? this.favs.size : 0);
+  }
   /* ==================== 准星自动收听 / 收藏 ==================== */
   autoTuneFromCrosshair() {
     if (!this._globe || !this.geoStations.length) return;
@@ -385,6 +553,7 @@ export class RadioPage {
     try { this.favs = new Set(JSON.parse(localStorage.getItem('pk_radio_favs') || '[]')); }
     catch { this.favs = new Set(); }
     this.updateFavUI();
+    this.updateFavCount();
   }
 
   isFav(id) { return !!(this.favs && this.favs.has(String(id))); }
@@ -398,6 +567,7 @@ export class RadioPage {
     else this.favs.add(id);
     try { localStorage.setItem('pk_radio_favs', JSON.stringify([...this.favs])); } catch { /* ignore */ }
     this.updateFavUI();
+    this.updateFavCount();
     this.toast?.show?.(this.favs.has(id) ? '已收藏 · ' + s.name : '已取消收藏', 'success');
   }
 
