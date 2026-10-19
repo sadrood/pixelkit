@@ -2951,67 +2951,6 @@ body::before {
   #page-nightmarket .nightmarket-tip { display: none; }
 }
 /* ============================================================================
-   2026-10-19：世界电台漫游（第三方站点 roamdial.com，iframe 嵌入）
-   与夜市同样的思路：外部站点用 iframe 隔离，懒加载，全屏时可铺满。
-   ============================================================================ */
-#page-roamdial .embed-wrap {
-  flex: 1; min-height: 0;
-  display: flex; flex-direction: column; gap: 8px;
-  padding: 12px;
-}
-#page-roamdial .embed-frame {
-  flex: 1; width: 100%; min-height: 0;
-  border: 0; border-radius: 14px; background: #101f1d;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .18);
-}
-#page-roamdial:fullscreen .embed-wrap { padding: 0; gap: 0; }
-#page-roamdial:fullscreen .embed-frame { border-radius: 0; }
-#page-roamdial:fullscreen .nightmarket-tip { display: none; }
-@media (max-width: 720px) {
-  #page-roamdial .embed-wrap { padding: 8px; }
-  #page-roamdial .nightmarket-tip { display: none; }
-}
-/* ============================================================================
-   2026-10-19：世界电台漫游（第三方站点 roamdial.com）
-   对方站点限制被嵌入（浏览器报 ERR_BLOCKED_BY_RESPONSE），所以本站做一个"启动页"：
-   介绍 + 一键新窗口打开 + 复制链接，不复制、不代理对方的内容。
-   ============================================================================ */
-#page-roamdial .external-wrap {
-  flex: 1; min-height: 0; overflow: auto;
-  display: flex; align-items: center; justify-content: center;
-  padding: 24px;
-}
-#page-roamdial .external-card {
-  width: min(660px, 100%);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 30px 30px 24px;
-  box-shadow: var(--shadow-lg);
-  display: flex; flex-direction: column; gap: 12px;
-}
-#page-roamdial .external-icon {
-  width: 64px; height: 64px; border-radius: 18px;
-  display: grid; place-items: center;
-  background: linear-gradient(135deg, #23c4b0, #0e5f56);
-  color: #fff;
-  box-shadow: 0 10px 24px rgba(14, 95, 86, .3);
-}
-#page-roamdial .external-card h2 { margin: 2px 0 0; font-size: 22px; }
-#page-roamdial .external-lede { margin: 0; color: var(--text-secondary); line-height: 1.75; }
-#page-roamdial .external-points { margin: 2px 0 2px; padding-left: 20px; color: var(--text-secondary); line-height: 1.9; }
-#page-roamdial .external-points b { color: var(--text); }
-#page-roamdial .external-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
-#page-roamdial .external-note {
-  margin: 8px 0 0; padding-top: 12px; border-top: 1px dashed var(--border);
-  font-size: 12px; color: var(--text-muted); line-height: 1.7;
-}
-@media (max-width: 720px) {
-  #page-roamdial .external-wrap { padding: 12px; align-items: flex-start; }
-  #page-roamdial .external-card { padding: 22px 18px 18px; border-radius: 16px; }
-  #page-roamdial .external-card h2 { font-size: 19px; }
-}
-/* ============================================================================
    2026-10-19：世界电台（站内播放）
    电台目录由本站服务器代理（Radio Browser 开放数据库），音频经 /api/radio/stream 中转。
    ============================================================================ */

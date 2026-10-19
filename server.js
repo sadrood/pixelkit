@@ -6981,7 +6981,7 @@ app.post('/api/agent/quoridor-move', async (req, res) => {
 /* 为什么由服务器中转：
    ① 电台目录（Radio Browser）在部分网络下直连不通、且有 IPv6 解析抖动 → 服务器走 IPv4 稳定；
    ② 各电台的音频流地址五花八门，用户网络未必能直连 → 用本站服务器中转，保证站内能听；
-   ③ 不复制、不代理第三方站点（如 RoamDial）的界面与代码，只使用开放的电台数据库与公网音频流。 */
+   ③ 不复制、不代理任何第三方站点的界面与代码，只使用开放的电台数据库与公网音频流。 */
 // 多个镜像轮着试：单一镜像偶尔会不可达（实测 de1 会偶发失败），失败就换下一个
 const RADIO_API_BASES = (process.env.RADIO_API_BASE
   ? [process.env.RADIO_API_BASE]

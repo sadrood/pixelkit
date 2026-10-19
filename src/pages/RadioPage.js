@@ -42,7 +42,7 @@ export class RadioPage {
     this.audio?.addEventListener('pause', () => this.setPlayingUI(false));
     this.audio?.addEventListener('error', () => this.onAudioError());
     this.audio?.addEventListener('stalled', () => { /* 等看门狗处理 */ });
-    // 视图切换：地球 / 列表（默认地球，像 RoamDial 那样先看世界）
+    // 视图切换：地球 / 列表（默认地球，先看世界）
     this.view = 'globe';
     this.$('radio-view-globe')?.addEventListener('click', () => this.setView('globe'));
     this.$('radio-view-list')?.addEventListener('click', () => this.setView('list'));
