@@ -9,34 +9,34 @@
 
 ## 0.2 多供应商（2026-09-30 追加）
 
-站点现在同时接两家，按**模型 id 里有没有 `/`** 路由（`vendor/model` → OpenRouter，其余 → 商汤）：
+站点现在同时接两家，按**模型 id 里有没有 `/`** 路由（`vendor/model` → 备用网关，其余 → 主网关）：
 
 | 供应商 | 端点 | key 来源 | 承担 |
 | --- | --- | --- | --- |
-| 商汤 SenseNova | `token.sensenova.cn/v1` | `MAIN_KEY_POOL` / `DUAL_KEY_POOL` | 识图（多模态）、文生图、研究子代理、人生之书、画图优化 + **兜底** |
-| OpenRouter | `openrouter.ai/api/v1` | `OPENROUTER_API_KEY` | 主对话模型（可换任意 OpenRouter 模型） |
+| 主网关 | `（主网关地址，由环境变量配置）` | `MAIN_KEY_POOL` / `DUAL_KEY_POOL` | 识图（多模态）、文生图、研究子代理、人生之书、画图优化 + **兜底** |
+| 备用网关 | `（备用网关地址，由环境变量配置）` | `ALT_API_KEY` | 主对话模型（可换任意 备用网关 模型） |
 
 - `endpointFor(model, keyKind)` / `upstream(model, keyKind)` 统一解析端点、key 与请求头；
-  OpenRouter 还会带上 `HTTP-Referer` / `X-Title`（OpenRouter 建议的来源信息）。
-- **推理参数按供应商适配**（`reasoningParams`）：商汤用顶层 `reasoning_effort: none|low|…`；
-  OpenRouter 用 `reasoning: { enabled: false }` / `{ effort }`。否则短输出会把 max_tokens 烧在思考上。
+  备用网关 还会带上 `HTTP-Referer` / `X-Title`（备用网关 建议的来源信息）。
+- **推理参数按供应商适配**（`reasoningParams`）：主网关用顶层 `reasoning_effort: none|low|…`；
+  备用网关 用 `reasoning: { enabled: false }` / `{ effort }`。否则短输出会把 max_tokens 烧在思考上。
 - **自动兜底**：主模型端点不可用（404/no endpoints/guardrail/未开通）或被限流到快速失败时，
-  自动改用 `OPENAI_FALLBACK_MODEL`（默认商汤 `deepseek-flash`）；流式与非流式两条路都做了。
-  实测日志：`[provider] nvidia/…:free 端点不可用（HTTP 404）→ 改用兜底模型 deepseek-flash`。
+  自动改用 `OPENAI_FALLBACK_MODEL`（默认主网关 `主网关兜底模型`）；流式与非流式两条路都做了。
+  实测日志：`[provider] 备用网关免费模型 端点不可用（HTTP 404）→ 改用兜底模型 主网关兜底模型`。
 
-### OpenRouter 实测结论（2026-09-30）
+### 备用网关 实测结论（2026-09-30）
 
 | 事项 | 结果 |
 | --- | --- |
 | key 是否可用 | ✅ `/key` 返回 200；付费模型可直接出文 |
-| `nvidia/nemotron-3-ultra-550b-a55b`（付费） | ✅ 200，约 2.5s；1M 上下文；支持 tools/reasoning |
-| `nvidia/nemotron-3-ultra-550b-a55b:free`（免费） | ✅ **200（用户已开启免费端点后实测）**：1.7s、69 字、`cost = 0`；流式 21 块、工具调用 `finish=tool_calls` 均正常 |
-| 其它 `:free` 模型 | 同一账号设置放开后也可用（`nvidia/nemotron-3.5-lightning:free` 等） |
-| 账户额度 | `limit = 0.01` USD，`usage = 0` —— 付费模型只能试跑几次；免费模型不受额度限制，但按 OpenRouter 政策（充值 < $10）约 **20 次/分钟、50 次/天** |
+| `备用网关的付费对话模型`（付费） | ✅ 200，约 2.5s；1M 上下文；支持 tools/reasoning |
+| `备用网关的免费对话模型`（免费） | ✅ **200（用户已开启免费端点后实测）**：1.7s、69 字、`cost = 0`；流式 21 块、工具调用 `finish=tool_calls` 均正常 |
+| 其它 `:free` 模型 | 同一账号设置放开后也可用（`另一免费模型` 等） |
+| 账户额度 | `limit = 0.01` USD，`usage = 0` —— 付费模型只能试跑几次；免费模型不受额度限制，但按 备用网关 政策（充值 < $10）约 **20 次/分钟、50 次/天** |
 
-**要让免费模型真的能用，只需一步**：打开 https://openrouter.ai/settings/privacy
+**要让免费模型真的能用，只需一步**：打开 （备用网关控制台的隐私设置页）
 把「允许免费端点使用/训练我的提示词」（Free model training）打开。开完**无需改代码**：
-聊天页模型下拉里直接选 `Nemotron 3 Ultra (free)` 即可（状态会从 `guardrail` 变成 `available`）。
+聊天页模型下拉里直接选 `免费对话模型` 即可（状态会从 `guardrail` 变成 `available`）。
 
 ### 站点策略：只允许免费模型（硬约束，用户明确要求）
 
@@ -45,22 +45,22 @@
 1. `resolveModel()`：`/api/agent/chat`、`/api/agent/chat-stream` 传来的**收费模型一律拒绝**
    （日志 `[free-only] 拒绝收费模型「…」，回退到 …:free`），回退到当前默认（免费）模型；
 2. `upstream()`：**最后防线** —— 任何代码路径若拿到收费模型，就地降级成免费主模型，
-   保证收费模型永远不出网。判定：OpenRouter 模型（id 含 `/`）不以 `:free` 结尾即为收费；
+   保证收费模型永远不出网。判定：备用网关 模型（id 含 `/`）不以 `:free` 结尾即为收费；
    兜底模型同样判定（`safeFallbackModel()`，防止 `.env` 被配成收费模型）。
 
 `GET /api/agent/models` 返回 `freeOnly: true`，收费模型标为 `status: 'billable_disabled'` +
 `disabled: true`（前端下拉显示「收费·已禁用」且不可选）。
 
-**费用自查**：`curl -H "Authorization: Bearer $OR_KEY" https://openrouter.ai/api/v1/key` 看 `usage`。
+**费用自查**：`curl -H "Authorization: Bearer $OR_KEY" （备用网关的费用查询接口）` 看 `usage`。
 免费模型 `cost = 0` 不扣额度（2026-09-30 记录：`usage = 0.00127` USD 全部来自接入前的付费版连通性测试，
 此后全部走免费模型）。
 
 ### 免费端点会抖，已纳入降级
 
-`nvidia/nemotron-3-ultra-550b-a55b:free` 跑在共享免费端点上，实测出现过
-`503 Upstream error from Nvidia: Service temporarily overloaded`。
+`备用网关的免费对话模型` 跑在共享免费端点上，实测出现过
+`503 Upstream error from 上游: Service temporarily overloaded`。
 因此 `isEndpointUnavailable()` 把 **5xx / overloaded** 也算"端点不可用"，直接切兜底供应商
-（商汤 `deepseek-flash`），而不是原地重试。
+（主网关 `主网关兜底模型`），而不是原地重试。
 
 ## 0. 2026-09-30 复核：三种限流不是一回事
 
@@ -87,7 +87,7 @@
 
 ## 0.1 模型切换（2026-09-30）
 
-- 站点默认模型改为 **`deepseek-flash`**（服务器 `.env` 的 `OPENAI_MODEL` / `DUAL_MODEL` /
+- 站点默认模型改为 **`主网关兜底模型`**（服务器 `.env` 的 `OPENAI_MODEL` / `DUAL_MODEL` /
   `RESEARCH_MODEL` / `QUORIDOR_MODEL` 同步改，`pm2 restart --update-env` 生效；代码默认值也改了）。
 - 新增 `GET /api/agent/models`：候选模型 + 可用性状态（`available` / `plan_denied` /
   `not_found` / `unknown`）。状态**不额外花配额探测**，而是用真实请求学习（403→未开通、

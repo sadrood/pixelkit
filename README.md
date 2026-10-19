@@ -47,9 +47,9 @@ scripts/                  自检脚本（对比度巡检、截图、限流自测
 public/                   静态资源（字体、第三方库）
 ```
 
-**AI 供应商路由**：模型 id 里**带 `/`** 的走 OpenRouter，其余走商汤网关。
-这样换主模型不会把识图 / 画图 / 研究等留在商汤的能力一起打挂。
-详情见 `docs/AI限流与稳健性.md`。
+**AI 网关路由**：支持接入多家 OpenAI 兼容的模型网关 —— 模型 id 里**带 `/`** 的走备用网关，其余走主网关。
+这样切换主对话模型时，不会把识图 / 画图 / 研究等绑定在主网关上的能力一起打挂。
+网关地址、密钥与模型 id **全部由部署环境变量注入**，代码里不写死任何一家的账号信息。限流与降级细节见 `docs/AI限流与稳健性.md`。
 
 ---
 
@@ -75,14 +75,14 @@ npm start                   # 只跑后端（生产用法）
 | 变量 | 用途 |
 | --- | --- |
 | `PORT` | 后端端口（生产 3001 / 测试 3002） |
-| `OPENAI_BASE_URL` | 商汤网关地址，默认 `https://token.sensenova.cn/v1` |
-| `MAIN_KEY_POOL` | 商汤主池 key，逗号分隔（对话 / 画图共用） |
+| `OPENAI_BASE_URL` | 主模型网关地址（OpenAI 兼容；取值由部署时配置） |
+| `MAIN_KEY_POOL` | 主网关 key 池，逗号分隔（对话 / 画图共用） |
 | `DUAL_KEY_POOL` | 内测池 key（“内测双 AI”模式） |
-| `OPENAI_MODEL` | 主模型 id（带 `/` 走 OpenRouter，否则走商汤） |
+| `OPENAI_MODEL` | 主对话模型 id（带 `/` 表示走备用网关） |
 | `OPENAI_FALLBACK_MODEL` | 兜底模型（主模型失败时自动切换） |
-| `OPENAI_VISION_MODEL` | 识图模型 |
-| `IMAGE_MODEL` | 画图模型（默认 `sensenova-u1.5-lite`，旧名 `sensenova-u1-fast` 已下线） |
-| `OPENROUTER_API_KEY` | OpenRouter key（用免费模型时必须） |
+| `OPENAI_VISION_MODEL` | 识图模型 id |
+| `IMAGE_MODEL` | 画图模型 id（供应商侧模型下线时需更新，见发布记录） |
+| `ALT_API_KEY` | 备用模型网关 key（启用备用网关 / 免费模型时需要） |
 | `CHAT_REASONING_EFFORT` | `none` / `low` / `medium` / `high`，关掉推理能明显降低首字延迟 |
 | `PUBLIC_BASE_URL` | 站点对外地址，用于生成二维码文件链接、活码短链 |
 | `CORS_ALLOWED_ORIGINS` | 需要跨域时显式列白名单（默认不发 CORS 头） |
@@ -147,7 +147,7 @@ nginx 放在前面做反代（`/api/`、`/collab`、`/qr/`、`/fs/`、`/s/`）�
 - **降级链**：主模型不可用时按候选项自动切换（跨供应商），并在界面上如实显示“实际使用的模型”。
 - **限流稳健性**：区分“分钟窗口限流 / 每秒限流 / 配额或权限拒绝”三类，分别退避、熔断或切供应商；
   详见 `docs/AI限流与稳健性.md`。离线单测：`node scripts/ai-retry-check.mjs`。
-- 若配置了 OpenRouter，可开启“只允许免费模型”策略：收费模型在接口层就被拒绝、兜底层再拦一道。
+- 若配置了备用网关，可开启“只允许免费模型”策略：收费模型在接口层就被拒绝、兜底层再拦一道。
 
 ---
 

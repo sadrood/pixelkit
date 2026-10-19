@@ -1235,7 +1235,7 @@ const FREE_FALLBACK_ORDER = [
    路由规则很简单也很稳：**模型 id 里带 "/" 的走 OpenRouter，其余走商汤**。
    这样"识图模型 sensenova-6.8-flash-lite""deepseek-flash" 等自动留在商汤，
    不会因为主模型换了供应商而把识图/画图一起打挂。 */
-const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY || '';
+const OPENROUTER_KEY = process.env.ALT_API_KEY || process.env.OPENROUTER_API_KEY || '';   // ALT_API_KEY 为中性变量名，旧名保留兼容
 const PROVIDERS = {
   sensenova: {
     name: '商汤 SenseNova',
@@ -1245,7 +1245,7 @@ const PROVIDERS = {
   },
   openrouter: {
     name: 'OpenRouter',
-    baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
+    baseUrl: process.env.ALT_API_BASE || process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
     keys: OPENROUTER_KEY ? [OPENROUTER_KEY] : [],
     headers: {
       // OpenRouter 建议带上来源信息（用于归因/排行，不带也能用）
@@ -1263,7 +1263,7 @@ function endpointFor(model, keyKind = 'main') {
   if (!p || p.keys.length === 0) {
     // OpenRouter 没配 key 时明确降级回商汤，而不是抛异常
     if (pid === 'openrouter' && PROVIDERS.sensenova.keys.length) {
-      console.warn('[provider] 未配置 OPENROUTER_API_KEY，模型 ' + model + ' 回退到商汤网关的默认模型');
+      console.warn('[provider] 未配置备用网关 key（ALT_API_KEY），模型 ' + model + ' 回退到主网关的默认模型');
       const fb = safeFallbackModel();
       const ep = endpointFor(fb, keyKind);
       return { ...ep, degradedFrom: model, model: fb };
