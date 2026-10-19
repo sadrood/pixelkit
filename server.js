@@ -6977,6 +6977,128 @@ app.post('/api/agent/quoridor-move', async (req, res) => {
 // 若存在 dist/（npm run build 产物），由本服务直接托管前端。
 // 这样生产环境只对外暴露构建后的文件，不暴露任何源码；
 // 也避免在服务器上误跑 `npm run dev`（Vite 开发服务器会把源码按 URL 吐出去）。
+// ==================== 世界电台（目录代理 + 音频中转）2026-10-19 ====================
+/* 为什么由服务器中转：
+   ① 电台目录（Radio Browser）在部分网络下直连不通、且有 IPv6 解析抖动 → 服务器走 IPv4 稳定；
+   ② 各电台的音频流地址五花八门，用户网络未必能直连 → 用本站服务器中转，保证站内能听；
+   ③ 不复制、不代理第三方站点（如 RoamDial）的界面与代码，只使用开放的电台数据库与公网音频流。 */
+const RADIO_API = (process.env.RADIO_API_BASE || 'https://de1.api.radio-browser.info').replace(/\/$/, '');
+const radioCache = new Map();
+const radioAllowedHosts = new Set();      // 音频中转白名单：只允许目录里真实出现过的电台主机（防 SSRF）
+function radioRemember(url) {
+  try { radioAllowedHosts.add(new URL(url).host.toLowerCase()); } catch { /* ignore */ }
+}
+function radioEvict() {
+  if (radioCache.size <= 200) return;
+  const oldest = [...radioCache.entries()].sort((a, b) => a[1].t - b[1].t).slice(0, 50);
+  for (const [k] of oldest) radioCache.delete(k);
+}
+async function radioFetch(path, ttlMs = 10 * 60 * 1000) {
+  const hit = radioCache.get(path);
+  if (hit && Date.now() - hit.t < ttlMs) return hit.data;
+  const r = await fetch(RADIO_API + path, {
+    headers: { 'User-Agent': 'PixelKit-Radio/1.0', 'Accept': 'application/json' },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!r.ok) throw new Error('目录源 HTTP ' + r.status);
+  const data = await r.json();
+  radioCache.set(path, { t: Date.now(), data });
+  radioEvict();
+  return data;
+}
+const radioStationOut = (s) => ({
+  id: s.stationuuid, name: s.name, country: s.country || '', state: s.state || '',
+  tags: String(s.tags || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 4),
+  bitrate: s.bitrate || 0, codec: s.codec || '', favicon: s.favicon || '',
+  homepage: s.homepage || '', url: s.url_resolved || s.url || '',
+});
+
+app.get('/api/radio/countries', async (req, res) => {
+  try {
+    const list = await radioFetch('/json/countries', 6 * 3600 * 1000);
+    const countries = (Array.isArray(list) ? list : [])
+      .filter((c) => (c.stationcount || 0) > 0)
+      .sort((a, b) => (b.stationcount || 0) - (a.stationcount || 0))
+      .map((c) => ({ name: c.name, code: c.iso_3166_1 || '', stations: c.stationcount || 0 }));
+    res.json({ success: true, countries });
+  } catch (e) { res.status(503).json({ success: false, error: '电台目录暂时不可用' }); }
+});
+
+app.get('/api/radio/tags', async (req, res) => {
+  try {
+    const list = await radioFetch('/json/tags?limit=60&order=stationcount&reverse=true&hidebroken=true', 6 * 3600 * 1000);
+    const tags = (Array.isArray(list) ? list : []).map((t) => ({ name: t.name, stations: t.stationcount || 0 })).filter((t) => t.name);
+    res.json({ success: true, tags });
+  } catch (e) { res.status(503).json({ success: false, error: '电台目录暂时不可用' }); }
+});
+
+app.get('/api/radio/stations', async (req, res) => {
+  try {
+    const { country = '', tag = '', limit = '40', offset = '0' } = req.query;
+    const q = new URLSearchParams({ limit: String(Math.min(Number(limit) || 40, 100)), offset: String(Math.max(Number(offset) || 0, 0)), hidebroken: 'true', order: 'clickcount', reverse: 'true' });
+    if (country) q.set('country', country);
+    if (tag) q.set('tag', tag);
+    const list = await radioFetch('/json/stations/search?' + q.toString());
+    const stations = (Array.isArray(list) ? list : []).map(radioStationOut).filter((s) => s.url);
+    stations.forEach((s) => radioRemember(s.url));
+    res.json({ success: true, stations });
+  } catch (e) { res.status(503).json({ success: false, error: '电台目录暂时不可用' }); }
+});
+
+app.get('/api/radio/random', async (req, res) => {
+  try {
+    const { country = '', tag = '' } = req.query;
+    const q = new URLSearchParams({ limit: '1', hidebroken: 'true', order: 'random' });
+    if (country) q.set('country', country);
+    if (tag) q.set('tag', tag);
+    const list = await radioFetch('/json/stations/search?' + q.toString(), 0);   // 随机不缓存
+    const s = (Array.isArray(list) ? list : [])[0];
+    if (!s) return res.status(404).json({ success: false, error: '没有找到符合条件的电台' });
+    const out = radioStationOut(s);
+    radioRemember(out.url);
+    res.json({ success: true, station: out });
+  } catch (e) { res.status(503).json({ success: false, error: '电台目录暂时不可用' }); }
+});
+
+/* 音频中转：把电台流经本站转发（支持 Range；客户端断开就断开上游）。
+   白名单只认目录里出现过的电台主机，避免被当成任意 URL 代理（SSRF）。 */
+app.get('/api/radio/stream', async (req, res) => {
+  let target;
+  try { target = new URL(String(req.query.u || '')); } catch { return res.status(400).json({ success: false, error: '音频地址无效' }); }
+  if (!/^https?:$/.test(target.protocol)) return res.status(400).json({ success: false, error: '只支持 http/https' });
+  if (!radioAllowedHosts.has(target.host.toLowerCase())) return res.status(403).json({ success: false, error: '该地址不在允许列表' });
+  const ac = new AbortController();
+  req.on('close', () => { try { ac.abort(); } catch { /* ignore */ } });
+  try {
+    /* 注意：**不要**给上游发 `Icy-MetaData: 1` —— Icecast 会把曲目元数据按 icy-metaint
+       插进音频流里，而我们把响应当纯 audio/mpeg 透传，浏览器的 FFmpeg 解复用器会直接
+       "open context failed"（实测 Chrome 报 NotSupportedError）。要纯音频。 */
+    const headers = { 'User-Agent': 'Mozilla/5.0 (PixelKit-Radio)', 'Accept': 'audio/*,*/*;q=0.8' };
+    if (req.headers.range) headers.Range = req.headers.range;
+    const up = await fetch(target.toString(), { headers, redirect: 'follow', signal: ac.signal });
+    if (!up.ok) return res.status(502).end();
+    // 有些台在服务器网络下会被地区限制/重定向到错误页：返回空 200 或 text/html。
+    // 直接把这种"假成功"变成 502，播放器才会触发 error → 自动换台。
+    const upType = String(up.headers.get('content-type') || '');
+    const upLen = String(up.headers.get('content-length') || '');
+    if (!up.body || !upType || upLen === '0' || /text\/html/i.test(upType)) return res.status(502).end();
+    res.status(up.status === 206 ? 206 : 200);
+    res.setHeader('Content-Type', up.headers.get('content-type') || 'audio/mpeg');
+    const clen = up.headers.get('content-length'); if (clen) res.setHeader('Content-Length', clen);
+    const cr = up.headers.get('content-range'); if (cr) res.setHeader('Content-Range', cr);
+    for (const h of ['icy-name', 'icy-genre', 'icy-br', 'icy-description', 'icy-url']) { const v = up.headers.get(h); if (v) res.setHeader(h, v); }
+    res.setHeader('Cache-Control', 'no-store');
+    const reader = up.body.getReader();
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!res.write(value)) await new Promise((ok) => res.once('drain', ok));
+      }
+    } catch { /* 客户端断开或上游中断 */ }
+    res.end();
+  } catch { try { res.end(); } catch { /* ignore */ } }
+});
 // ==================== 活码（短链 + 扫码统计）2026-10-13 ====================
 /* 用途：二维码里放**短链**而不是原始长链接，之后可以改目标、还能看扫了多少次。
    与站点既有安全策略一致：列表/统计/删除都必须带设备标识（userId 或 x-pk-user 头），

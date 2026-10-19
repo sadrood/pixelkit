@@ -242,10 +242,10 @@
                   <p>智能服务器管理助手，可查看服务器状态、端口、文件，配置 AI 后可进行自然语言对话</p>
                   <span class="card-arrow">进入 →</span>
                 </div>
-                <div class="home-card" data-page="roamdial" data-group="ai" style="--accent:#2bb3a3">
+                <div class="home-card" data-page="radio" data-group="ai" style="--accent:#2bb3a3">
                   <div class="card-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none"><circle cx="12" cy="12" r="8.4" stroke="currentColor" stroke-width="1.6"/><ellipse cx="12" cy="12" rx="3.6" ry="8.4" stroke="currentColor" stroke-width="1.3"/><path d="M3.8 9.2h16.4M3.8 14.8h16.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="18.6" cy="5.6" r="1.7" fill="currentColor"/></svg></div>
-                  <h2>世界电台漫游</h2>
-                  <p>按下播放，随缘落在一个国家：全球 200+ 国家和地区的电台按流派铺成星空，可听、可逛、可收藏（第三方站点，新窗口打开）</p>
+                  <h2>世界电台</h2>
+                  <p>按国家或流派挑一个电台，或者点「下一站」随缘听：拉美电波、非洲鼓点、冰岛后摇……音频由本站服务器中转，不依赖你的网络能否直连</p>
                   <span class="card-arrow">进入 →</span>
                 </div>                <div class="home-card" data-page="nightmarket" data-group="ai" style="--accent:#f2a93b">
                   <div class="card-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M12 2.6v1.8M8.5 4.4h7M9.2 4.4 8 10.6h8L14.8 4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.4 10.6h9.2L15.4 20H8.6L7.4 10.6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 13.2v3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
@@ -699,32 +699,42 @@
       </main>
     </div>
     <!-- ==================== AI助手页面 ==================== -->
-    <!-- ==================== 世界电台漫游（第三方站点 roamdial.com，启动页）==================== -->
-    <div id="page-roamdial" class="page">
+    <!-- ==================== 世界电台（站内播放：目录代理 + 音频中转）==================== -->
+    <div id="page-radio" class="page">
       <header class="toolbar">
         <div class="toolbar-left">
-          <button id="btn-back-roamdial" class="btn btn-back" title="返回主页">← 返回</button>
-          <span class="logo">世界电台漫游</span>
+          <button id="btn-back-radio" class="btn btn-back" title="返回主页">← 返回</button>
+          <span class="logo">世界电台</span>
         </div>
         <div class="toolbar-center"></div>
-        <div class="toolbar-right"></div>
+        <div class="toolbar-right">
+          <a class="btn btn-sm" href="https://roamdial.com/" target="_blank" rel="noopener noreferrer" title="同类站点 RoamDial（新窗口打开）">↗ RoamDial</a>
+        </div>
       </header>
-      <main class="external-wrap">
-        <section class="external-card">
-          <div class="external-icon"><svg viewBox="0 0 24 24" width="34" height="34" fill="none"><circle cx="12" cy="12" r="8.4" stroke="currentColor" stroke-width="1.5"/><ellipse cx="12" cy="12" rx="3.6" ry="8.4" stroke="currentColor" stroke-width="1.2"/><path d="M3.8 9.2h16.4M3.8 14.8h16.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="18.6" cy="5.6" r="1.7" fill="currentColor"/></svg></div>
-          <h2>RoamDial · 世界电台漫游</h2>
-          <p class="external-lede">按下播放，随缘落在一个国家。电台目录来自社区维护的 Radio Browser，地理数据来自 GeoNames，声音直接从各电台服务器播放。</p>
-          <ul class="external-points">
-            <li><b>209 个国家和地区</b>的电台，按流派铺成一片星空，可以边听边逛</li>
-            <li>播放 / 下一站 / 收藏始终在手边；一个台的线路断了会自动换下一条</li>
-            <li>无账号、无广告，中英双语；只展示真实可得的码率与地点信息</li>
-          </ul>
-          <div class="external-actions">
-            <a class="btn btn-primary" href="https://roamdial.com/" target="_blank" rel="noopener noreferrer">打开 RoamDial ↗</a>
-            <button class="btn" id="btn-roamdial-copy" type="button">复制链接</button>
+      <main class="radio-wrap">
+        <section class="radio-player">
+          <div class="radio-now">
+            <div class="radio-badge">🎧</div>
+            <div class="radio-nowtext">
+              <h2 id="radio-name">选一个电台开始</h2>
+              <p id="radio-sub">按国家或流派筛选，或者直接点「下一站」随机听</p>
+            </div>
           </div>
-          <p class="external-note">这是第三方网站，内容与版权归 RoamDial 所有。对方限制了被站内嵌入，所以这里以新窗口打开（站点自身设置，不是本工具故障）。如果打不开，请确认网络能访问 Cloudflare 托管的站点。</p>
+          <div class="radio-controls">
+            <button id="radio-play" class="btn btn-primary" type="button">▶ 播放</button>
+            <button id="radio-next" class="btn" type="button">⏭ 下一站</button>
+            <label class="radio-vol">音量 <input id="radio-volume" type="range" min="0" max="100" value="80" /></label>
+          </div>
+          <audio id="radio-audio" preload="none"></audio>
         </section>
+        <section class="radio-filters">
+          <select id="radio-country" class="radio-select"><option value="">全部国家</option></select>
+          <select id="radio-tag" class="radio-select"><option value="">全部流派</option></select>
+          <button id="radio-refresh" class="btn btn-sm" type="button">🔄 刷新</button>
+          <span class="qr-hint" id="radio-hint"></span>
+        </section>
+        <div class="radio-list" id="radio-list"><p class="radio-empty">正在取电台目录…</p></div>
+        <p class="radio-note">电台目录来自 Radio Browser 社区数据库；音频由本站服务器中转，声音版权归各电台所有。</p>
       </main>
     </div>
     <!-- ==================== 夜市：一百块（独立静态页，iframe 嵌入）==================== -->

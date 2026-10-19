@@ -218,7 +218,7 @@ class App {
       });
     });
 
-    const pages = ['compose', 'convert', 'document', 'agent', 'ppt', 'docx-editor', 'timer', 'fileshare', 'counter', 'qr', 'tasks', 'lifesim', 'book', 'nightmarket', 'roamdial'];
+    const pages = ['compose', 'convert', 'document', 'agent', 'ppt', 'docx-editor', 'timer', 'fileshare', 'counter', 'qr', 'tasks', 'lifesim', 'book', 'nightmarket', 'radio'];
     for (const p of pages) {
       document.getElementById(`btn-back-${p}`).addEventListener('click', () => this.showPage('home'));
     }
@@ -235,12 +235,7 @@ class App {
       });
     }
 
-    // 世界电台漫游启动页：复制链接（对方站点禁止站内嵌入，只能新窗口打开）
-    const rdCopy = document.getElementById('btn-roamdial-copy');
-    if (rdCopy) rdCopy.addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText('https://roamdial.com/'); this.toast.show('已复制 RoamDial 链接', 'success'); }
-      catch { this.toast.show('浏览器不允许剪贴板，请手动复制', 'error'); }
-    });
+
 
     // 页内跳转（成长模拟器选中「人生之书 · 玩法加厚版」时切到 #page-book）
     window.addEventListener('pk-goto', (e) => {
@@ -255,6 +250,11 @@ class App {
     const pageEl = document.getElementById(`page-${name}`);
     if (pageEl) pageEl.classList.add('active');
     this.currentPage = name;
+    // 世界电台：第一次进入时初始化（拉目录 + 绑定播放器）
+    if (name === 'radio' && !this._radioInited) {
+      this._radioInited = true;
+      this._initRadio();
+    }
     // 夜市小游戏用 iframe 懒加载：只有第一次打开时才去加载那 2MB 静态资源
     if (name === 'nightmarket') {
       const f = document.getElementById('nightmarket-frame');
@@ -266,6 +266,18 @@ class App {
       setTimeout(() => {
         this.canvas.render(this.layerManager.getLayers());
       }, 50);
+    }
+  }
+
+  /** 懒加载世界电台页（独立模块，避免拖慢首屏） */
+  async _initRadio() {
+    try {
+      const { RadioPage } = await import('./pages/RadioPage.js');
+      this._radioPage = new RadioPage(this.toast);
+      this._radioPage.init();
+    } catch (e) {
+      this._radioInited = false;
+      this.toast?.show?.('电台工具加载失败：' + (e.message || e), 'error');
     }
   }
 
