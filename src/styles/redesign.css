@@ -999,3 +999,28 @@ html:not([data-theme="light"]) .home-blob {
     transform: none;
   }
 }
+
+/* ============================================================================
+   2026-10-19：修复「主按钮白底白字」——全站 .btn-primary 的渐变被外壳 #app 的选择器
+   覆盖成白底，而文字仍是 #fff，导致「上传图片 / 选择图片 / 全部转换并下载 / 打开 RoamDial」
+   等主按钮看起来是空白方块（审计里也提过聊天发送按钮同样的病）。
+   这里显式恢复渐变与前景色，并用 !important 压过外壳规则。
+   ============================================================================ */
+#app .btn-primary {
+  background: linear-gradient(135deg, var(--primary), #ff8a63) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+#app .btn-primary:hover {
+  background: linear-gradient(135deg, var(--primary-hover), #f2764f) !important;
+  color: #fff !important;
+}
+/* 浅色主题下用深一点的橙，保证白字可读（对比度更高） */
+[data-theme="light"] #app .btn-primary {
+  background: linear-gradient(135deg, #d94a2c, #ff8a63) !important;
+  color: #fff !important;
+}
+[data-theme="light"] #app .btn-primary:hover {
+  background: linear-gradient(135deg, #c2401d, #f2764f) !important;
+  color: #fff !important;
+}

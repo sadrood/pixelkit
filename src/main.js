@@ -218,7 +218,7 @@ class App {
       });
     });
 
-    const pages = ['compose', 'convert', 'document', 'agent', 'ppt', 'docx-editor', 'timer', 'fileshare', 'counter', 'qr', 'tasks', 'lifesim', 'book', 'nightmarket'];
+    const pages = ['compose', 'convert', 'document', 'agent', 'ppt', 'docx-editor', 'timer', 'fileshare', 'counter', 'qr', 'tasks', 'lifesim', 'book', 'nightmarket', 'roamdial'];
     for (const p of pages) {
       document.getElementById(`btn-back-${p}`).addEventListener('click', () => this.showPage('home'));
     }
@@ -234,6 +234,13 @@ class App {
         } catch { /* 浏览器不支持就忽略 */ }
       });
     }
+
+    // 世界电台漫游启动页：复制链接（对方站点禁止站内嵌入，只能新窗口打开）
+    const rdCopy = document.getElementById('btn-roamdial-copy');
+    if (rdCopy) rdCopy.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText('https://roamdial.com/'); this.toast.show('已复制 RoamDial 链接', 'success'); }
+      catch { this.toast.show('浏览器不允许剪贴板，请手动复制', 'error'); }
+    });
 
     // 页内跳转（成长模拟器选中「人生之书 · 玩法加厚版」时切到 #page-book）
     window.addEventListener('pk-goto', (e) => {
@@ -253,6 +260,7 @@ class App {
       const f = document.getElementById('nightmarket-frame');
       if (f && !f.getAttribute('src')) f.setAttribute('src', f.dataset.src);
     }
+
 
     if (name === 'compose' && this._composeInited) {
       setTimeout(() => {
