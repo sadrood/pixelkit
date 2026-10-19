@@ -189,20 +189,33 @@ export class RadioPage {
       this.geoStations = stations.slice().sort((a, b) => (a.lon - b.lon) || (a.lat - b.lat));
       this._globeStations = this.geoStations;   // 调试/测试用别名
       this.bootShow(`正在绘制星图（${this.geoStations.length.toLocaleString('zh-CN')} 个电台）…`);
-      const { createRadioGlobe } = await import('./RadioGlobe.js');
+      this.bootShow('正在加载 3D 地球…');
       try {
-        this._globe = await createRadioGlobe(el, this.geoStations, {
+        // 首选 globe.gl（GitHub 那个开源 3D 地球库）
+        const { createRadioGlobeGL } = await import('./RadioGlobeGL.js');
+        this._globe = await createRadioGlobeGL(el, this.geoStations, {
           tooltipEl: this.$('radio-globe-tip'),
           onPick: (s) => this.onGlobePick(s),
           onHover: (s, x, y) => this.onHover(s, x, y),
         });
+        console.log('[radio] 地球渲染器：globe.gl');
       } catch (err) {
-        // 3D 不可用（老显卡/WebGL 被禁）：退回 2D 星云视图，保证画面能出来
-        console.warn('3D 星图初始化失败，退回星云视图：', err);
-        this.bootHide();
-        this.renderNebula();
-        this.setView('nebula');
-        return;
+        console.warn('globe.gl 不可用，退回自绘点阵地球：', err);
+        try {
+          const { createRadioGlobe } = await import('./RadioGlobe.js');
+          this._globe = await createRadioGlobe(el, this.geoStations, {
+            tooltipEl: this.$('radio-globe-tip'),
+            onPick: (s) => this.onGlobePick(s),
+            onHover: (s, x, y) => this.onHover(s, x, y),
+          });
+          console.log('[radio] 地球渲染器：自绘点阵');
+        } catch (err2) {
+          console.warn('点阵地球也失败，退回 2D 星云：', err2);
+          this.bootHide();
+          this.renderNebula();
+          this.setView('nebula');
+          return;
+        }
       }
       // 拖动停稳后：准星对准的最近电台自动收听（RoamDial 的核心交互）
       try { this._globe.onSettle?.(() => this.autoTuneFromCrosshair()); } catch { /* ignore */ }
@@ -318,7 +331,8 @@ export class RadioPage {
     this.index = idx;
     const s = this.geoStations[idx];
     this.setNowPlaying(s);
-    try { this._globe?.setSelected(s); this._globe?.focus?.(s); } catch { /* ignore */ }
+    // 预览（play=false）时不移动镜头，保持初始的全球视角；切台才聚焦
+    try { this._globe?.setSelected(s); if (play) this._globe?.focus?.(s); } catch { /* ignore */ }
     this.syncSlider();
     this.setHint(`第 ${idx + 1} / ${n} 个 · ${[s.country, s.codec, s.bitrate ? s.bitrate + 'kbps' : ''].filter(Boolean).join(' · ')}`);
     if (play) this.playStation(s);
@@ -556,8 +570,16 @@ export class RadioPage {
     const neb = this.$('radio-nebula');
     const labels = this.$('radio-labels');
     if (v === 'nebula') {
-      if (this._globe && this._globe.setLayout) {
-        // 3D 星云：地球点云原地变形成 11 个星团（0.95 秒过渡）
+      if (this._globe && this._globe.isGlobeGL) {
+        // globe.gl 地球：星云切到 2D 动态星云画布
+        this._globe.setLayout('nebula');
+        if (neb) { neb.hidden = false; neb.style.display = ''; }
+        if (labels) labels.innerHTML = '';
+        this.renderNebula();
+        this.startNebulaAnim();
+        this.setHint('流派星云 · 点任意光斑收听；G 回地球');
+      } else if (this._globe && this._globe.setLayout) {
+        // 自绘点阵：地球点云原地变形成 11 个星团（0.95 秒过渡）
         if (neb) neb.hidden = true;
         if (globeEl) globeEl.style.display = '';
         this._globe.setLayout('nebula');
@@ -572,7 +594,8 @@ export class RadioPage {
       }
       return;
     }
-    if (neb) neb.hidden = true;
+    if (neb) { neb.hidden = true; neb.style.display = 'none'; }
+    this.stopNebulaAnim();
     if (globeEl) globeEl.style.display = '';
     if (this._globe) this._globe.setLayout('globe');
     this.setHint('拖动旋转 · 滚轮远近 · 准星停稳自动收听');
@@ -617,47 +640,30 @@ export class RadioPage {
         return;
       }
       let labels = [];
-      try { labels = this._globe.getLabels(80) || []; } catch { labels = []; }
+      try { labels = this._globe.getLabels(26) || []; } catch { labels = []; }
+      labels = labels.filter((l) => l.d !== 0).sort((a, b) => a.ang - b.ang);
       const cur = this.current ? this.current.name : '';
       const w = box.clientWidth || 1, h = box.clientHeight || 1;
       const cx = w / 2, cy = h / 2;
-      const sorted = labels
-        .map((l) => ({ ...l, d: Math.hypot(l.x - cx, l.y - cy) }))
-        .filter((l) => l.d >= 118)
-        .sort((a, b) => a.d - b.d);
-      // 准星右侧是「已锁定 · 分类 · KBPS」文字，这块区域不放标签
-      const lockRect = { x0: cx + 60, x1: cx + 340, y0: cy - 56, y1: cy + 30 };
-      const cellW = Math.max(210, w / 5);
-      const cellH = 118;
-      const used = new Set();
+      // roamdial 式：候选台围绕准星环形绽开（越近的台半径越小），并画引线指回星点
       const out = [];
       let lines = '';
-      for (const l of sorted) {
-        if (l.x > lockRect.x0 && l.x < lockRect.x1 && l.y > lockRect.y0 && l.y < lockRect.y1) continue;
-        const key = Math.floor(l.x / cellW) + ',' + Math.floor(l.y / cellH);
-        if (used.has(key)) continue;
-        used.add(key);
-        // 标签从星点沿"离心方向"挪出去，并画一条引线（roamdial 的标注方式）
-        const ux = (l.x - cx) / (l.d || 1), uy = (l.y - cy) / (l.d || 1);
-        const lx = l.x + ux * 36, ly = l.y + uy * 24;
-        lines += '<line x1="' + Math.round(l.x) + '" y1="' + Math.round(l.y) + '" x2="' + Math.round(lx) + '" y2="' + Math.round(ly) + '" stroke="rgba(255,230,200,.26)" stroke-width="1"/>';
+      const MAX = 10;
+      for (let k = 0; k < Math.min(MAX, labels.length); k++) {
+        const l = labels[k];
+        const angle = -2.2 + k * (Math.PI * 2 / MAX) * 0.85;
+        const radius = 132 + (k % 3) * 46 + Math.floor(k / 3) * 14;
+        const lx = cx + Math.cos(angle) * radius;
+        const ly = cy + Math.sin(angle) * radius * 0.72;
+        // 避开底部信息面板 / 顶部按钮区
+        if (ly > h - 190 || ly < 84) continue;
+        lines += '<line x1="' + Math.round(l.x) + '" y1="' + Math.round(l.y) + '" x2="' + Math.round(lx) + '" y2="' + Math.round(ly) + '" stroke="rgba(255,230,200,.28)" stroke-width="1"/>';
         out.push('<span class="radio-label' + (l.name === cur ? ' hot' : '') + '" style="left:' + Math.round(lx) + 'px;top:' + Math.round(ly) + 'px">' + this.esc(l.name) + '</span>');
-        if (out.length >= 6) break;
-      }
-      if (!out.length) {
-        for (const l of labels) {
-          const d = Math.hypot(l.x - cx, l.y - cy);
-          if (d < 56) continue;
-          const ux = (l.x - cx) / (d || 1), uy = (l.y - cy) / (d || 1);
-          const lx = l.x + ux * 30, ly = l.y + uy * 20;
-          lines += '<line x1="' + Math.round(l.x) + '" y1="' + Math.round(l.y) + '" x2="' + Math.round(lx) + '" y2="' + Math.round(ly) + '" stroke="rgba(255,230,200,.22)" stroke-width="1"/>';
-          out.push('<span class="radio-label" style="left:' + Math.round(lx) + 'px;top:' + Math.round(ly) + 'px">' + this.esc(l.name) + '</span>');
-          if (out.length >= 3) break;
-        }
+        if (out.length >= 8) break;
       }
       list.innerHTML = out.join('');
       if (leaders) leaders.innerHTML = lines;
-    }, 200);
+    }, 220);
   }
 
   parseDataset(d) {
@@ -721,6 +727,66 @@ export class RadioPage {
       if (this.listStations && this.listStations.length < this.geoStations.length) this.renderList();
     } catch { this._fullLoaded = false; }
   }
+  /* ==================== 星云动画（2D 动态星云） ==================== */
+  startNebulaAnim() {
+    if (this._nebRAF) return;
+    const step = () => {
+      this._nebRAF = requestAnimationFrame(step);
+      const d = this._neb;
+      if (!d || this.view !== 'nebula') return;
+      const t = performance.now() / 1000;
+      const ctx = d.canvas.getContext('2d');
+      ctx.clearRect(0, 0, d.w, d.h);
+      const bg = ctx.createRadialGradient(d.w / 2, d.h / 2, 0, d.w / 2, d.h / 2, Math.max(d.w, d.h) * 0.7);
+      bg.addColorStop(0, 'rgba(30,24,18,1)');
+      bg.addColorStop(1, 'rgba(10,8,6,1)');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, d.w, d.h);
+      ctx.globalCompositeOperation = 'lighter';
+      for (let g = 0; g < d.nG; g++) {
+        const c = d.centers[g];
+        const cx2 = c.x + Math.sin(t * 0.25 + g) * 6;
+        const cy2 = c.y + Math.cos(t * 0.21 + g * 1.3) * 5;
+        const grad = ctx.createRadialGradient(cx2, cy2, 0, cx2, cy2, 120);
+        grad.addColorStop(0, this.rgba(this.genreColor(g), 0.10 + 0.02 * Math.sin(t * 0.8 + g)));
+        grad.addColorStop(1, this.rgba(this.genreColor(g), 0));
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx2, cy2, 120, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const spr = this._nebSprites || (this._nebSprites = []);
+      for (let i = 0; i < this.geoStations.length; i++) {
+        const g = (this.geoStations[i].g || 0) % d.nG;
+        if (!spr[g]) spr[g] = this.nebulaSprite(this.genreColor(g));
+        const drift = Math.sin(t * 0.6 + i * 0.37) * 1.6;
+        const s = d.sizes[i] * (0.85 + 0.25 * Math.sin(t * 1.2 + i * 0.7));
+        ctx.globalAlpha = 0.22 + 0.12 * Math.sin(t * 0.9 + i * 0.23);
+        ctx.drawImage(spr[g], d.pos[i * 2] - s / 2 + drift, d.pos[i * 2 + 1] - s / 2, s, s);
+      }
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.textAlign = 'center';
+      for (let g = 0; g < d.nG; g++) {
+        const c = d.centers[g];
+        ctx.font = '600 15px "PingFang SC","Microsoft YaHei",sans-serif';
+        ctx.fillStyle = 'rgba(250,240,228,.92)';
+        ctx.shadowColor = 'rgba(0,0,0,.9)';
+        ctx.shadowBlur = 12;
+        ctx.fillText(this.genres[g] || '', c.x, c.y - 62);
+        ctx.font = '11px "PingFang SC","Microsoft YaHei",sans-serif';
+        ctx.fillStyle = 'rgba(240,225,205,.55)';
+        ctx.fillText(d.counts[g].toLocaleString('zh-CN') + ' 个电台', c.x, c.y - 44);
+        ctx.shadowBlur = 0;
+      }
+    };
+    step();
+  }
+
+  stopNebulaAnim() {
+    if (this._nebRAF) { cancelAnimationFrame(this._nebRAF); this._nebRAF = null; }
+  }
+
   /* ==================== 准星刻度 / 时钟 ==================== */
   buildReticle() {
     const g = this.$('reticle-ticks');
