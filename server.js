@@ -6982,7 +6982,12 @@ app.post('/api/agent/quoridor-move', async (req, res) => {
    ① 电台目录（Radio Browser）在部分网络下直连不通、且有 IPv6 解析抖动 → 服务器走 IPv4 稳定；
    ② 各电台的音频流地址五花八门，用户网络未必能直连 → 用本站服务器中转，保证站内能听；
    ③ 不复制、不代理第三方站点（如 RoamDial）的界面与代码，只使用开放的电台数据库与公网音频流。 */
-const RADIO_API = (process.env.RADIO_API_BASE || 'https://de1.api.radio-browser.info').replace(/\/$/, '');
+// 多个镜像轮着试：单一镜像偶尔会不可达（实测 de1 会偶发失败），失败就换下一个
+const RADIO_API_BASES = (process.env.RADIO_API_BASE
+  ? [process.env.RADIO_API_BASE]
+  : ['https://de1.api.radio-browser.info', 'https://nl1.api.radio-browser.info', 'https://at1.api.radio-browser.info', 'https://fi1.api.radio-browser.info', 'https://all.api.radio-browser.info'])
+  .map((u) => u.replace(/\/$/, ''));
+let radioApiBase = RADIO_API_BASES[0];
 const radioCache = new Map();
 const radioAllowedHosts = new Set();      // 音频中转白名单：只允许目录里真实出现过的电台主机（防 SSRF）
 function radioRemember(url) {
@@ -6996,15 +7001,23 @@ function radioEvict() {
 async function radioFetch(path, ttlMs = 10 * 60 * 1000) {
   const hit = radioCache.get(path);
   if (hit && Date.now() - hit.t < ttlMs) return hit.data;
-  const r = await fetch(RADIO_API + path, {
-    headers: { 'User-Agent': 'PixelKit-Radio/1.0', 'Accept': 'application/json' },
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!r.ok) throw new Error('目录源 HTTP ' + r.status);
-  const data = await r.json();
-  radioCache.set(path, { t: Date.now(), data });
-  radioEvict();
-  return data;
+  const ordered = [radioApiBase, ...RADIO_API_BASES.filter((b) => b !== radioApiBase)];
+  let lastErr = null;
+  for (const base of ordered) {
+    try {
+      const r = await fetch(base + path, {
+        headers: { 'User-Agent': 'PixelKit-Radio/1.0', 'Accept': 'application/json' },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!r.ok) throw new Error('目录源 HTTP ' + r.status);
+      const data = await r.json();
+      radioApiBase = base;                       // 记住可用的镜像
+      radioCache.set(path, { t: Date.now(), data });
+      radioEvict();
+      return data;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('所有电台目录镜像都不可用');
 }
 const radioStationOut = (s) => ({
   id: s.stationuuid, name: s.name, country: s.country || '', state: s.state || '',

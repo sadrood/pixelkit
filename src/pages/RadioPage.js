@@ -110,7 +110,7 @@ export class RadioPage {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  async loadStations() {
+  async loadStations(retry) {
     const box = this.$('radio-list');
     if (!box) return;
     box.innerHTML = '<p class="radio-empty">正在取电台目录…</p>';
@@ -126,7 +126,13 @@ export class RadioPage {
       this.renderStations();
       this.setHint(`共 ${this.stations.length} 个电台`);
     } catch (e) {
-      box.innerHTML = `<p class="radio-empty">${this.esc(e.message)}</p>`;
+      // 目录源偶发不可达：自动重试一次，再失败才提示（页面上还有「🔄 刷新」可手动重试）
+      if (!retry) {
+        this.setHint('目录源连接中，正在重试…');
+        setTimeout(() => this.loadStations(true), 1500);
+        return;
+      }
+      box.innerHTML = `<p class="radio-empty">${this.esc(e.message)}</p><p class="radio-empty">点上面的「🔄 刷新」再试一次</p>`;
       this.setHint(e.message, true);
     }
   }

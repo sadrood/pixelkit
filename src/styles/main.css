@@ -3060,3 +3060,39 @@ body::before {
   #page-radio .radio-select { max-width: 46%; }
   #page-radio .radio-vol input { width: 90px; }
 }
+/* ============================================================================
+   2026-10-19：世界电台 / 夜市 的手机适配
+   - 播放、下一站、筛选等触控控件在手机上放大到 ≥44px（之前只有 29px，不好点）
+   - 音量在窄屏独占一行，滑杆更长
+   - 这两个页面隐藏右下角全局主题吉祥物（会压住列表/游戏画面）
+   ============================================================================ */
+body[data-page="radio"] .theme-fab,
+body[data-page="nightmarket"] .theme-fab { display: none !important; }
+
+@media (max-width: 720px) {
+  #page-radio .radio-controls { gap: 8px; }
+  #page-radio .radio-controls .btn { min-height: 44px; padding: 10px 16px; font-size: 14.5px; }
+  #page-radio .radio-select { min-height: 44px; font-size: 14px; max-width: none; flex: 1 1 40%; }
+  #page-radio .radio-filters { gap: 8px; }
+  #page-radio .radio-filters .btn { min-height: 40px; }
+  #page-radio .radio-vol { flex: 1 1 100%; justify-content: space-between; font-size: 13px; }
+  #page-radio .radio-vol input { flex: 1; width: auto; min-width: 0; height: 28px; }
+  #page-radio .radio-nowtext h2 { font-size: 17px; }
+  #page-radio .radio-item { padding: 12px 12px; min-height: 56px; }
+  #page-radio .radio-item-main b { font-size: 14.5px; }
+  #page-radio .radio-item-main small { font-size: 12px; }
+  #page-radio .radio-wrap { padding: 10px 10px calc(18px + env(safe-area-inset-bottom, 0px)); }
+  /* 夜市：手机上隐藏底部提示、让 iframe 占满 */
+  #page-nightmarket .nightmarket-wrap { padding: 6px; }
+}
+/* 修正：select 的内容（长国家名）会把 flex 子项撑开，必须允许收缩 */
+#page-radio .radio-select { min-width: 0; }
+@media (max-width: 720px) {
+  #page-radio .radio-select { flex: 1 1 0; min-width: 0; max-width: 50%; }
+  #page-radio .radio-filters { align-items: stretch; }
+}
+@media (max-width: 720px) {
+  /* 两个下拉各占约一半，刷新按钮与提示分行，避免把下拉压得太窄 */
+  #page-radio .radio-select { flex: 1 1 44%; max-width: 48%; }
+  #page-radio .radio-filters #radio-hint { flex: 1 1 100%; margin-top: 2px; }
+}

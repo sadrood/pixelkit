@@ -250,6 +250,8 @@ class App {
     const pageEl = document.getElementById(`page-${name}`);
     if (pageEl) pageEl.classList.add('active');
     this.currentPage = name;
+    // 记录当前页面，供 CSS 做页面级调整（例如隐藏右下角主题吉祥物）
+    document.body.dataset.page = name;
     // 世界电台：第一次进入时初始化（拉目录 + 绑定播放器）
     if (name === 'radio' && !this._radioInited) {
       this._radioInited = true;
