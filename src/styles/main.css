@@ -3120,3 +3120,9 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 @media (max-width: 720px) {
   #page-radio .radio-globe-wrap { height: 340px; }
 }
+/* 激活态按钮：外壳 .btn 的白色背景会盖掉主题色，这里显式压过（同 .btn-primary 的老问题） */
+#page-radio .radio-viewbar .btn.active {
+  background: var(--primary) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
