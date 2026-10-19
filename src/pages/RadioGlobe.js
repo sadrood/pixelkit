@@ -466,13 +466,25 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       const inv = new THREE.Matrix4().copy(world.matrixWorld).invert();
       const camLocal = camera.position.clone().applyMatrix4(inv);
       const v = new THREE.Vector3();
-      let best = -1, bestAngle = 0.32;   // ~18°
+      let best = -1, bestAngle = 0.62;   // ~35° 内选最近的台
       for (let i = 0; i < stations.length; i++) {
         v.set(posArr[i * 3], posArr[i * 3 + 1], posArr[i * 3 + 2]);
         const toCam = camLocal.clone().sub(v).normalize();
         const n = v.clone().normalize();
         const ang = Math.acos(Math.max(-1, Math.min(1, n.dot(toCam))));
         if (ang < bestAngle) { bestAngle = ang; best = i; }
+      }
+      if (best < 0) {
+        // 中心附近没有台时，退而求其次：取整颗球上离准星最近的台（限 75° 内）
+        let any = -1, anyAngle = 1.31;
+        for (let i = 0; i < stations.length; i++) {
+          v.set(posArr[i * 3], posArr[i * 3 + 1], posArr[i * 3 + 2]);
+          const toCam = camLocal.clone().sub(v).normalize();
+          const n = v.clone().normalize();
+          const ang = Math.acos(Math.max(-1, Math.min(1, n.dot(toCam))));
+          if (ang < anyAngle) { anyAngle = ang; any = i; }
+        }
+        return any;
       }
       return best;
     },
