@@ -246,6 +246,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
 
   /* ==================== 10. 选中标记 ==================== */
   let selectedIndex = -1;
+  let focusTarget = null;      // 滑杆选台时的镜头目标朝向 { y, x }
   const selectTex = makeRingTexture(THREE);
   const selectRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
     map: selectTex, color: 0xffffff, transparent: true, opacity: 0.9,
@@ -368,8 +369,16 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     stars.rotation.x += dt * 0.0015;
     stars.material.opacity = 0.78 + Math.sin(performance.now() / 2600) * 0.12;
 
-    // 地球自转（拖动后 2.5 秒恢复）
-    if (!dragging && Date.now() - lastInteract > 2500) world.rotation.y += dt * 0.05;
+    // 地球自转 / 聚焦动画：滑杆选台时把目标电台转到镜头正前方
+    if (focusTarget) {
+      const dy = Math.atan2(Math.sin(focusTarget.y - world.rotation.y), Math.cos(focusTarget.y - world.rotation.y));
+      const dx = focusTarget.x - world.rotation.x;
+      world.rotation.y += dy * 0.085;
+      world.rotation.x += dx * 0.085;
+      if (Math.abs(dy) < 0.008 && Math.abs(dx) < 0.008) { world.rotation.y = focusTarget.y; world.rotation.x = focusTarget.x; focusTarget = null; }
+    } else if (!dragging && Date.now() - lastInteract > 2500) {
+      world.rotation.y += dt * 0.05;
+    }
 
     // 卫星绕行
     satellite.rotation.y = performance.now() / 2800;
@@ -430,6 +439,16 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       setSelectedIndex(i);
     },
     pick(index) { if (stations[index]) { setSelectedIndex(index); onPick(stations[index]); } },
+    /** 把某个电台转到镜头正前方（滑杆 / 列表选台时用），带平滑动画 */
+    focus(station) {
+      if (!station || !Number.isFinite(station.lon)) return;
+      const theta = (station.lon + 180) * Math.PI / 180;
+      focusTarget = {
+        y: Math.PI / 2 - theta,
+        x: Math.max(-0.95, Math.min(0.95, -(station.lat || 0) * Math.PI / 180 * 0.9)),
+      };
+      lastInteract = Date.now();
+    },
     dispose() {
       disposed = true;
       cancelAnimationFrame(raf);

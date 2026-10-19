@@ -3136,3 +3136,112 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 @media (max-width: 720px) {
   #page-radio .radio-globe-wrap { height: 380px; }
 }
+/* ============================================================================
+   2026-10-19：电台页 v3 —— 全屏沉浸式（参考 RoamDial：地球铺满 + 底部滑动选台）
+   ============================================================================ */
+#page-radio.radio-page { position: relative; min-height: 0; }
+#page-radio .radio-stage { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; background: #020924; }
+#page-radio .radio-globe-wrap {
+  position: absolute; inset: 0; width: 100%; height: 100% !important;
+  border: 0; border-radius: 0; box-shadow: none;
+  background: radial-gradient(120% 120% at 50% 30%, #0a1f33 0%, #04101c 55%, #020924 100%);
+}
+#page-radio .radio-globe { position: absolute; inset: 0; }
+#page-radio .radio-globe canvas { display: block; width: 100%; height: 100%; }
+#page-radio .radio-globe-loading { position: absolute; inset: 0; display: grid; place-items: center; color: #7fb6c9; font-size: 13px; letter-spacing: .5px; }
+#page-radio .radio-globe-tip {
+  position: absolute; display: none; z-index: 3; max-width: 220px; padding: 5px 9px; border-radius: 7px;
+  background: rgba(6, 14, 24, .92); color: #dcecf1; font-size: 12px; pointer-events: none;
+  border: 1px solid rgba(140, 210, 235, .25); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#page-radio .radio-hud {
+  position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between;
+  padding: 18px 20px; pointer-events: none;
+  background: linear-gradient(180deg, rgba(2, 6, 20, .72) 0%, rgba(2, 6, 20, 0) 20%, rgba(2, 6, 20, 0) 52%, rgba(2, 6, 20, .84) 100%);
+}
+#page-radio .radio-hud > * { pointer-events: auto; }
+#page-radio .radio-now { max-width: 620px; color: #eaf4f9; text-shadow: 0 2px 16px rgba(0, 0, 0, .75); }
+#page-radio .radio-now-country { display: inline-block; font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; color: #7fd8ee; }
+#page-radio .radio-now-name { margin: 6px 0 4px; font-size: 30px; line-height: 1.15; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#page-radio .radio-now-sub { font-size: 12.5px; color: rgba(220, 238, 246, .72); }
+#page-radio .radio-dock {
+  align-self: center; display: flex; align-items: center; gap: 12px; width: min(780px, 100%);
+  padding: 10px 16px; border-radius: 999px;
+  background: rgba(8, 16, 30, .72); border: 1px solid rgba(140, 210, 235, .22);
+  box-shadow: 0 18px 50px -18px rgba(0, 0, 0, .85); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+}
+#page-radio .radio-slider-wrap { flex: 1 1 auto; min-width: 0; padding: 0 4px; }
+#page-radio .radio-slider {
+  -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 4px; border-radius: 999px;
+  background: linear-gradient(90deg, rgba(127, 216, 238, .95), rgba(127, 216, 238, .22)); outline: none; cursor: pointer;
+}
+#page-radio .radio-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #eaf8ff;
+  border: 3px solid #0a1a2a; box-shadow: 0 0 0 2px rgba(127, 216, 238, .45), 0 0 18px rgba(127, 216, 238, .8); cursor: grab;
+}
+#page-radio .radio-slider::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%; background: #eaf8ff; border: 3px solid #0a1a2a;
+  box-shadow: 0 0 14px rgba(127, 216, 238, .75); cursor: grab;
+}
+#page-radio .radio-icon-btn {
+  flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(160, 220, 240, .28);
+  background: rgba(255, 255, 255, .05); color: #dff4fc; font-size: 20px; line-height: 1; cursor: pointer;
+  display: grid; place-items: center; transition: var(--transition);
+}
+#page-radio .radio-icon-btn:hover { background: rgba(127, 216, 238, .16); border-color: rgba(127, 216, 238, .5); }
+#page-radio .radio-play-btn {
+  flex: 0 0 auto; width: 52px; height: 52px; border-radius: 50%; border: 0; color: #fff; font-size: 17px;
+  background: linear-gradient(135deg, #2bb3a3, #0e7c74); cursor: pointer; display: grid; place-items: center;
+  box-shadow: 0 10px 26px -10px rgba(43, 179, 163, .95); transition: var(--transition);
+}
+#page-radio .radio-play-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+#page-radio .radio-dock-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 11.5px; color: rgba(210, 235, 245, .6); }
+#page-radio .radio-chip { font-size: 11.5px; color: #9fd8e8; padding: 3px 9px; border-radius: 999px; border: 1px solid rgba(127, 216, 238, .3); }
+#page-radio .radio-vol { display: inline-flex; align-items: center; gap: 8px; color: rgba(210, 235, 245, .7); }
+#page-radio .radio-vol input { width: 110px; accent-color: #2bb3a3; }
+#page-radio .radio-hint.is-bad { color: #ffb4b4; }
+
+/* 浏览面板：底部抽屉 */
+#page-radio .radio-sheet {
+  position: absolute; left: 14px; right: 14px; bottom: 14px; max-height: 62%; z-index: 5;
+  display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 16px;
+  background: rgba(6, 14, 24, .95); border: 1px solid rgba(140, 210, 235, .22);
+  box-shadow: 0 -20px 60px -20px rgba(0, 0, 0, .95);
+}
+#page-radio .radio-sheet[hidden] { display: none; }
+#page-radio .radio-sheet-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#page-radio .radio-search {
+  flex: 1 1 190px; min-width: 0; padding: 9px 12px; border-radius: 9px;
+  border: 1px solid rgba(140, 210, 235, .25); background: rgba(255, 255, 255, .06); color: #e8f4fa; font-size: 13px;
+}
+#page-radio .radio-select {
+  padding: 8px 10px; border-radius: 9px; border: 1px solid rgba(140, 210, 235, .25);
+  background: rgba(255, 255, 255, .06); color: #e8f4fa; font-size: 12.5px; max-width: 170px;
+}
+#page-radio .radio-list { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+#page-radio .radio-list .radio-item { color: #e8f4fa; border-color: rgba(140, 210, 235, .14); background: transparent; }
+#page-radio .radio-list .radio-item:hover,
+#page-radio .radio-list .radio-item.is-on { background: rgba(127, 216, 238, .14); border-color: rgba(127, 216, 238, .5); }
+#page-radio .radio-list .radio-item small { color: rgba(210, 235, 245, .55); }
+#page-radio .radio-empty { color: rgba(210, 235, 245, .55); font-size: 13px; padding: 18px; text-align: center; }
+
+@media (max-width: 720px) {
+  #page-radio .radio-hud { padding: 12px; }
+  #page-radio .radio-now-name { font-size: 20px; }
+  #page-radio .radio-dock { gap: 8px; padding: 8px 12px; }
+  #page-radio .radio-play-btn { width: 46px; height: 46px; }
+  #page-radio .radio-icon-btn { width: 34px; height: 34px; font-size: 17px; }
+  #page-radio .radio-vol input { width: 76px; }
+  #page-radio .radio-dock-foot { font-size: 10.5px; }
+  #page-radio .radio-sheet { left: 8px; right: 8px; bottom: 8px; max-height: 72%; }
+  #page-radio .radio-select { max-width: 45%; }
+}
+/* v3 修正：顶部信息块必须是竖排（旧的 .radio-now 横向布局会把它挤成一行） */
+#page-radio .radio-hud .radio-now {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: min(620px, 72%);
+}
+#page-radio .radio-now-name { color: #f2fbff !important; margin: 4px 0 2px; }
+#page-radio .radio-now-country { color: #7fd8ee; }
+#page-radio .radio-now-sub { color: rgba(220, 238, 246, .78); }
+#page-radio .radio-dock-foot { color: rgba(215, 238, 248, .72); }
+#page-radio .radio-dock-foot #radio-hint { font-size: 11.5px; }

@@ -704,51 +704,54 @@
       </main>
     </div>
     <!-- ==================== AI助手页面 ==================== -->
-    <!-- ==================== 世界电台（站内播放：目录代理 + 音频中转）==================== -->
-    <div id="page-radio" class="page">
-      <header class="toolbar">
+    <!-- ==================== 世界电台（全屏沉浸式：地球 + 底部滑动选台）==================== -->
+    <div id="page-radio" class="page radio-page">
+      <header class="toolbar radio-toolbar">
         <div class="toolbar-left">
           <button id="btn-back-radio" class="btn btn-back" title="返回主页">← 返回</button>
-          <span class="logo">世界电台</span>
+          <span class="logo">电台漫游</span>
         </div>
         <div class="toolbar-center"></div>
-        <div class="toolbar-right"></div>
+        <div class="toolbar-right radio-top-actions">
+          <span id="radio-top-meta" class="radio-chip">正在加载…</span>
+          <button id="radio-sheet-toggle" class="btn btn-sm" type="button">浏览</button>
+        </div>
       </header>
-      <main class="radio-wrap">
-        <section class="radio-player">
-          <div class="radio-now">
-            <div class="radio-badge">🎧</div>
-            <div class="radio-nowtext">
-              <h2 id="radio-name">选一个电台开始</h2>
-              <p id="radio-sub">按国家或流派筛选，或者直接点「下一站」随机听</p>
-            </div>
-          </div>
-          <div class="radio-controls">
-            <button id="radio-play" class="btn btn-primary" type="button">▶ 播放</button>
-            <button id="radio-next" class="btn" type="button">⏭ 下一站</button>
-            <label class="radio-vol">音量 <input id="radio-volume" type="range" min="0" max="100" value="80" /></label>
-          </div>
-          <audio id="radio-audio" preload="none"></audio>
-        </section>
-        <section class="radio-viewbar">
-          <button id="radio-view-globe" class="btn btn-sm active" type="button">地球</button>
-          <button id="radio-view-list" class="btn btn-sm" type="button">列表</button>
-          <span class="qr-hint" id="radio-view-hint">拖动旋转 · 滚轮缩放 · 点光点试听</span>
-        </section>
+      <main class="radio-stage" id="radio-stage">
         <div class="radio-globe-wrap" id="radio-globe-wrap">
           <div class="radio-globe" id="radio-globe"></div>
           <div class="radio-globe-tip" id="radio-globe-tip"></div>
           <div class="radio-globe-loading" id="radio-globe-loading">正在加载全球电台…</div>
         </div>
-        <div id="radio-list-view" style="display:none;">        <section class="radio-filters">
-          <select id="radio-country" class="radio-select"><option value="">全部国家</option></select>
-          <select id="radio-tag" class="radio-select"><option value="">全部流派</option></select>
-          <button id="radio-refresh" class="btn btn-sm" type="button">🔄 刷新</button>
-          <span class="qr-hint" id="radio-hint"></span>
-        </section>
-        <div class="radio-list" id="radio-list"><p class="radio-empty">正在取电台目录…</p></div>
+        <div class="radio-hud">
+          <div class="radio-now">
+            <span class="radio-now-country" id="radio-now-country">拖动滑杆漫游全球</span>
+            <h2 class="radio-now-name" id="radio-now-name">世界电台</h2>
+            <span class="radio-now-sub" id="radio-now-sub">松手即播放 · 也可以点地球上的光点</span>
+          </div>
+          <div class="radio-dock">
+            <button id="radio-prev" class="radio-icon-btn" type="button" title="上一个（←）">‹</button>
+            <div class="radio-slider-wrap">
+              <input id="radio-slider" class="radio-slider" type="range" min="0" max="0" value="0" step="1" aria-label="滑动选择电台" />
+            </div>
+            <button id="radio-next" class="radio-icon-btn" type="button" title="下一个（→）">›</button>
+            <button id="radio-play" class="radio-play-btn" type="button" title="播放 / 暂停（空格）">▶</button>
+          </div>
+          <div class="radio-dock-foot">
+            <span id="radio-hint" class="radio-hint">拖动滑杆换台 · 点光点试听</span>
+            <label class="radio-vol"><span>音量</span><input id="radio-volume" type="range" min="0" max="100" value="80" /></label>
+          </div>
+          <audio id="radio-audio" preload="none"></audio>
         </div>
-        <p class="radio-note">电台目录来自 Radio Browser 社区数据库；音频由本站服务器中转，声音版权归各电台所有。</p>
+        <div class="radio-sheet" id="radio-sheet" hidden>
+          <div class="radio-sheet-head">
+            <input id="radio-search" class="radio-search" type="search" placeholder="搜台名，例如 jazz / rock" autocomplete="off" />
+            <select id="radio-country" class="radio-select"><option value="">全部国家</option></select>
+            <select id="radio-tag" class="radio-select"><option value="">全部流派</option></select>
+            <button id="radio-sheet-close" class="radio-icon-btn" type="button" title="关闭">×</button>
+          </div>
+          <div class="radio-list" id="radio-list"></div>
+        </div>
       </main>
     </div>
     <!-- ==================== 影视发现（TVmaze 开放数据 + 可选 TMDB）==================== -->

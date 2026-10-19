@@ -28,7 +28,6 @@ import {
   sleep, isQuotaText, isRpsQuotaText, parseRetryAfterMs, quotaWaitMs, backoffMs,
   describeWait, createBreaker, createPacer, DEFAULT_MAX_WAIT_MS,
 } from './lib/ai-retry.js';
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // 加载 .env 文件（手动解析，无需 dotenv 依赖）
@@ -7169,7 +7168,20 @@ app.get('/api/radio/stations', async (req, res) => {
     const stations = (Array.isArray(list) ? list : []).map(radioStationOut).filter((s) => s.url);
     stations.forEach((s) => radioRemember(s.url));
     res.json({ success: true, stations });
-  } catch (e) { res.status(503).json({ success: false, error: '电台目录暂时不可用' }); }
+  } catch (e) {
+    // 目录源不可用时，用静态 geo 数据集兜底（690 个带坐标的电台），保证「浏览」面板始终可用
+    try {
+      const geo = loadRadioGeo();
+      const limitN = Math.max(1, Math.min(Number(req.query.limit) || 40, 100));
+      const country = String(req.query.country || '').trim().toLowerCase();
+      let list = geo.map((g) => ({ id: g.id, name: g.name, country: g.country, cc: g.cc, tags: g.tags || [], bitrate: g.bitrate || 0, codec: g.codec || '', favicon: g.favicon || '', url: g.url }))
+        .filter((s) => s.url && (!country || String(s.country).toLowerCase() === country || String(s.cc).toLowerCase() === country));
+      list.forEach((s) => radioRemember(s.url));
+      res.json({ success: true, fallback: true, stations: list.slice(0, limitN) });
+    } catch {
+      res.status(503).json({ success: false, error: '电台目录暂时不可用' });
+    }
+  }
 });
 
 app.get('/api/radio/random', async (req, res) => {
@@ -7401,5 +7413,9 @@ server.listen(PORT, () => {
   console.log('  POST /api/agent/chat     - AI 对话(带记忆)');
   console.log('  POST /api/agent/ping     - 心跳保活');
   console.log('  POST /api/agent/execute  - AI 智能文件处理');
+  console.log('  POST /api/novel/register - 注册小说书源');
+  console.log('  POST /api/novel/search   - 书源搜索');
+  console.log('  POST /api/novel/toc      - 抓取目录');
+  console.log('  POST /api/novel/content  - 抓取正文');
   console.log('');
 });
