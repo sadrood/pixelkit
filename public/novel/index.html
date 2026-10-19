@@ -1,479 +1,359 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="paper">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>静读 · 小说阅读器</title>
-<!-- 内联 favicon：避免依赖构建产物，少一次 404 请求 -->
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23f2ead9'/%3E%3Cpath d='M9 8h7c2 0 3 1 3 3v13c0-1-1-2-3-2H9z' fill='%23b0713f'/%3E%3Cpath d='M23 8h-4v16h1c2 0 3 1 3 2z' fill='%23c98f5e'/%3E%3C/svg%3E" />
 <style>
 /* ============================================================
-   静读 —— 仿生墨水阅读器
-   设计取向：纸感优先。少颜色、少边框、少装饰，让字本身成为界面。
+   静读 · 小说阅读器（重设计版）
+   纸感浅色 / 夜间两种主题；书架、搜索、目录、阅读四个视图。
    ============================================================ */
-:root {
-  --ink:        #2f2a24;
-  --ink-2:      #6b6154;
-  --ink-3:      #9a9084;
-  --paper:      #f2ead9;
-  --paper-2:    #e8dcc4;
-  --rule:       rgba(80, 66, 48, 0.13);
-  --accent:     #b0713f;
-  --shell:      #faf7f2;
-  --card:       #fffdf9;
-  --r:          14px;
-  --r-sm:       9px;
-  --ease:       cubic-bezier(.22,.61,.36,1);
+:root{
+  --ink:#2b2621; --ink-2:#6c6258; --ink-3:#9a9084;
+  --paper:#f6f0e4; --paper-2:#efe7d7; --card:#fffdf8; --card-2:#faf5ea;
+  --rule:rgba(78,62,44,.14); --rule-2:rgba(78,62,44,.08);
+  --accent:#a8663a; --accent-2:#c98a5a; --accent-soft:rgba(168,102,58,.1);
+  --ok:#4a7c59; --bad:#a8402c;
+  --shadow:0 2px 8px rgba(70,52,30,.06), 0 10px 30px -18px rgba(70,52,30,.25);
+  --r:14px; --r-sm:10px;
+  --read-w:700px; --font-read:"Songti SC","Noto Serif SC","Source Han Serif SC","STSong",serif;
+  --font-ui:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
 }
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { height: 100%; }
-body {
-  margin: 0;
-  font-family: var(--font-sans, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif);
-  background: var(--shell);
-  color: var(--ink);
-  font-size: 14px;
-  line-height: 1.6;
-  overflow: hidden;
+html[data-theme="night"]{
+  --ink:#e6e1d6; --ink-2:#a9a294; --ink-3:#77705f;
+  --paper:#15171a; --paper-2:#1b1e22; --card:#1d2126; --card-2:#23282e;
+  --rule:rgba(255,255,255,.1); --rule-2:rgba(255,255,255,.05);
+  --accent:#d99a63; --accent-2:#e8b184; --accent-soft:rgba(217,154,99,.12);
+  --ok:#7fb08c; --bad:#e0907e;
+  --shadow:0 2px 8px rgba(0,0,0,.3), 0 12px 30px -18px rgba(0,0,0,.6);
 }
-button { font: inherit; color: inherit; cursor: pointer; border: none; background: none; }
-input, textarea, select { font: inherit; color: inherit; }
-::selection { background: rgba(176,113,63,.18); }
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--font-ui); font-size:14px; line-height:1.6;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+button{font-family:inherit; cursor:pointer}
+input,textarea,select{font-family:inherit}
+a{color:var(--accent); text-decoration:none}
+::selection{background:var(--accent-soft)}
 
 /* ---------- 顶栏 ---------- */
-.bar {
-  height: 52px; flex: none;
-  display: flex; align-items: center; gap: 10px;
-  padding: 0 16px;
-  background: var(--card);
-  border-bottom: 1px solid var(--rule);
-  position: relative; z-index: 20;
+.top{
+  position:sticky; top:0; z-index:30;
+  display:flex; align-items:center; gap:14px;
+  padding:12px max(20px, calc((100vw - 1080px) / 2));
+  background:var(--paper); border-bottom:1px solid var(--rule-2);
 }
-.bar h1 {
-  font-size: 15px; font-weight: 500; margin: 0;
-  letter-spacing: .01em; flex: none;
+@supports (backdrop-filter: blur(1px)) { .top{ background:color-mix(in srgb, var(--paper) 86%, transparent); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px) } }
+.brand{display:flex; align-items:center; gap:9px; flex-shrink:0}
+.brand .mark{width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg,#b9773f,#8e5327); display:grid; place-items:center; color:#fff; font-size:15px; box-shadow:var(--shadow)}
+.brand h1{margin:0; font-size:17px; font-weight:700; letter-spacing:.5px}
+.searchbar{flex:1; display:flex; align-items:center; gap:8px; min-width:0}
+.searchbar input{
+  flex:1; min-width:0; height:38px; padding:0 14px; font-size:13.5px;
+  border:1px solid var(--rule); border-radius:999px; background:var(--card); color:var(--ink);
+  outline:none; transition:.18s;
 }
-.bar .sp { flex: 1; }
-.icon-btn {
-  width: 32px; height: 32px; border-radius: var(--r-sm);
-  display: grid; place-items: center;
-  color: var(--ink-2); transition: background .16s;
+.searchbar input:focus{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft)}
+.top-acts{display:flex; align-items:center; gap:6px; flex-shrink:0}
+.tbtn{
+  height:36px; padding:0 13px; font-size:13px; border-radius:999px;
+  border:1px solid var(--rule); background:var(--card); color:var(--ink-2);
+  display:inline-flex; align-items:center; gap:6px; transition:.18s; white-space:nowrap;
 }
-.icon-btn:hover { background: rgba(80,66,48,.06); }
-.txt-btn {
-  padding: 6px 12px; border-radius: var(--r-sm);
-  font-size: 13px; color: var(--ink-2); transition: background .16s;
-}
-.txt-btn:hover { background: rgba(80,66,48,.06); }
-.txt-btn.pri { background: var(--accent); color: #fff; }
-.txt-btn.pri:hover { background: #9d6134; }
+.tbtn:hover{color:var(--ink); border-color:var(--accent); background:var(--accent-soft)}
+.tbtn.primary{background:linear-gradient(135deg,#b9773f,#96572b); border-color:transparent; color:#fff; font-weight:600}
+.tbtn.primary:hover{filter:brightness(1.06); color:#fff}
+.tbtn.icon{width:36px; padding:0; justify-content:center; font-size:15px}
 
-/* ---------- 视图容器 ---------- */
-#app { height: 100%; display: flex; flex-direction: column; }
-.view { display: none; flex: 1; min-height: 0; flex-direction: column; }
-.view.on { display: flex; }
+/* ---------- 视图 ---------- */
+.wrap{max-width:1080px; margin:0 auto; padding:22px 20px 60px}
+.view{display:none}
+.view.on{display:block; animation:fade .22s ease}
+@keyframes fade{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:none}}
+.page-head{display:flex; align-items:flex-end; justify-content:space-between; gap:12px; margin:4px 0 16px}
+.page-head h2{margin:0; font-size:19px; font-weight:700; letter-spacing:.5px}
+.page-head .sub{margin:2px 0 0; font-size:12.5px; color:var(--ink-3)}
 
-/* ---------- 书架 ---------- */
-.shelf { overflow-y: auto; padding: 20px 16px 40px; }
-.wrap { max-width: 1080px; margin: 0 auto; }
-.sec-h {
-  font-size: 12px; color: var(--ink-3); letter-spacing: .08em;
-  margin: 0 0 10px; text-transform: uppercase;
+/* ---------- 空状态 ---------- */
+.empty{
+  border:1px dashed var(--rule); border-radius:var(--r); background:var(--card-2);
+  padding:34px 22px; text-align:center; color:var(--ink-2);
 }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px,1fr)); gap: 16px; }
-.bk {
-  background: var(--card); border: 1px solid var(--rule);
-  border-radius: var(--r); padding: 11px 11px 12px; text-align: left;
-  transition: transform .18s var(--ease), box-shadow .18s var(--ease);
-}
-.bk:hover { transform: translateY(-2px); box-shadow: 0 8px 20px -8px rgba(80,66,48,.22); }
-.bk .cov {
-  height: 108px; border-radius: var(--r-sm); margin-bottom: 10px;
-  background: linear-gradient(140deg, #d6cbb8, #bfb19a);
-  display: grid; place-items: center;
-  font-size: 20px; font-weight: 500; color: rgba(255,255,255,.92);
-  overflow: hidden;
-}
-.bk .cov img { width: 100%; height: 100%; object-fit: cover; }
-.bk .t { font-size: 13px; font-weight: 500; line-height: 1.45; margin-bottom: 3px;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.bk .a { font-size: 11px; color: var(--ink-3); margin-bottom: 7px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bar-prog { height: 3px; border-radius: 2px; background: rgba(80,66,48,.1); overflow: hidden; margin-top: 8px; }
-.bar-prog i { display: block; height: 100%; min-width: 2px; background: var(--accent); border-radius: 2px; }
-.bk .p { font-size: 10.5px; color: var(--ink-3); margin-top: 6px; letter-spacing: .01em; }
-.bk-add {
-  border: 1px dashed rgba(80,66,48,.22); background: transparent;
-  display: grid; place-items: center; gap: 6px; color: var(--ink-3); font-size: 12px;
-}
-.bk-add:hover { border-color: var(--accent); color: var(--accent); }
+.empty .big{font-size:30px; margin-bottom:10px; opacity:.8}
+.empty h3{margin:0 0 6px; font-size:15px; color:var(--ink)}
+.empty p{margin:0 0 16px; font-size:13px; color:var(--ink-3); line-height:1.8}
+.empty .acts{display:flex; gap:9px; justify-content:center; flex-wrap:wrap}
 
-/* ---------- 搜索 ---------- */
-.search { flex: 1; overflow-y: auto; padding: 20px 16px 40px; }
-.field {
-  display: flex; align-items: center; gap: 9px;
-  background: var(--card); border: 1px solid var(--rule);
-  border-radius: var(--r); padding: 0 13px; height: 42px; margin-bottom: 12px;
+/* ---------- 书架网格 ---------- */
+.shelf{display:grid; grid-template-columns:repeat(auto-fill, minmax(168px,1fr)); gap:16px}
+.bk{
+  text-align:left; padding:0; border:1px solid var(--rule-2); background:var(--card);
+  border-radius:var(--r); overflow:hidden; color:var(--ink); transition:.18s; box-shadow:var(--shadow);
 }
-.field:focus-within { border-color: var(--accent); }
-.field input { flex: 1; border: none; outline: none; background: none; font-size: 14px; }
-.field input::placeholder { color: var(--ink-3); }
-.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
-.chip {
-  padding: 5px 12px; border-radius: 999px; font-size: 12px;
-  border: 1px solid var(--rule); background: var(--card); color: var(--ink-2);
+.bk:hover{transform:translateY(-2px); border-color:var(--accent)}
+.bk .cover{
+  aspect-ratio:3/4; background:linear-gradient(150deg,#e8d8bd,#d8c3a0);
+  display:flex; align-items:center; justify-content:center; color:#fff; font-size:34px; font-weight:700;
+  text-shadow:0 2px 10px rgba(0,0,0,.25); overflow:hidden;
 }
-.chip.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.bk .cover img{width:100%; height:100%; object-fit:cover; display:block}
+.bk .bd{padding:10px 12px 12px}
+.bk .t{font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.bk .a{font-size:12px; color:var(--ink-3); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.bk .prog{margin-top:9px; height:3px; border-radius:999px; background:var(--rule); overflow:hidden}
+.bk .prog i{display:block; height:100%; background:var(--accent); border-radius:999px}
+.bk .pct{font-size:11px; color:var(--ink-3); margin-top:5px}
 
-/* 搜索结果用两列网格：大部分书源没有简介字段，单列拉满会显得空荡。
-   窄屏时 minmax 自动降为一列。 */
-#results {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-  gap: 8px;
-  align-content: start;
+/* ---------- 搜索结果 ---------- */
+.results{display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:12px}
+.res{
+  display:flex; gap:12px; align-items:stretch; text-align:left; padding:12px;
+  border:1px solid var(--rule-2); background:var(--card); border-radius:var(--r); color:var(--ink);
+  transition:.18s; box-shadow:var(--shadow);
 }
-#results > p, #results > .empty { grid-column: 1 / -1; }
-
-.res {
-  /* width:100% 不能省：这些卡片是 <button>，即使 display:flex 也是 shrink-to-fit，
-     不加宽度就只占内容那么宽，右边留一大片空白（浏览器实测踩到） */
-  width: 100%;
-  background: var(--card); border: 1px solid var(--rule);
-  border-radius: var(--r); padding: 11px 13px;
-  display: flex; gap: 12px;
-  /* 垂直居中而不是顶对齐：不少书源没有简介字段，
-     顶对齐会让卡片下半截空着，看着很散 */
-  align-items: center;
-  text-align: left;
-  transition: border-color .15s, background .15s;
+.res:hover{border-color:var(--accent); transform:translateY(-1px)}
+.res .cov{
+  width:62px; flex-shrink:0; aspect-ratio:3/4; border-radius:8px; overflow:hidden;
+  background:linear-gradient(150deg,#e8d8bd,#d8c3a0); display:flex; align-items:center; justify-content:center;
+  color:#fff; font-size:22px; font-weight:700;
 }
-.res:hover { border-color: rgba(176,113,63,.4); }
-.res .cov {
-  width: 46px; height: 60px; border-radius: 6px; flex: none;
-  background: linear-gradient(140deg,#d6cbb8,#bfb19a); overflow: hidden;
-  display: grid; place-items: center; color: rgba(255,255,255,.9); font-size: 14px;
-}
-.res .cov img { width: 100%; height: 100%; object-fit: cover; }
-.res .info { flex: 1; min-width: 0; }
-.res .t { font-size: 14px; font-weight: 500; margin-bottom: 3px; }
-.res .a { font-size: 12px; color: var(--ink-2); margin-bottom: 5px; }
-.res .d { font-size: 12px; color: var(--ink-3); line-height: 1.55;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.res .src { font-size: 10px; color: var(--ink-3); margin-top: 6px;
-  display: inline-flex; align-items: center; gap: 4px; }
-.dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex: none; }
+.res .cov img{width:100%; height:100%; object-fit:cover; display:block}
+.res .info{min-width:0; display:flex; flex-direction:column; gap:3px}
+.res .t{font-size:14px; font-weight:600; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical}
+.res .a{font-size:12px; color:var(--ink-3)}
+.res .d{font-size:12px; color:var(--ink-2); overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height:1.6}
+.res .src{margin-top:auto; font-size:11px; color:var(--accent); display:flex; align-items:center; gap:5px}
+.res .src .dot{width:5px; height:5px; border-radius:50%; background:var(--accent)}
+.errs{margin-top:14px; font-size:12px; color:var(--ink-3); line-height:1.8}
+.errs b{color:var(--bad); font-weight:600}
+.loading{display:flex; align-items:center; gap:9px; color:var(--ink-3); font-size:13px; padding:26px 0}
+.spin{width:14px; height:14px; border:2px solid var(--rule); border-top-color:var(--accent); border-radius:50%; animation:sp .8s linear infinite; display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
 
 /* ---------- 目录 ---------- */
-.toc { flex: 1; overflow-y: auto; padding: 0 16px 40px; }
-.toc-l { display: flex; flex-direction: column; }
-.toc-i {
-  padding: 12px 13px; border-bottom: 1px solid var(--rule);
-  display: flex; align-items: center; gap: 9px; text-align: left; width: 100%;
+.book-head{
+  display:flex; gap:16px; padding:16px; border:1px solid var(--rule-2); border-radius:var(--r);
+  background:var(--card); box-shadow:var(--shadow); margin-bottom:16px;
 }
-.toc-i:hover { background: rgba(176,113,63,.05); }
-.toc-i.now { background: rgba(176,113,63,.1); }
-.toc-i .n { flex: 1; font-size: 13.5px; min-width: 0; }
-.toc-i.now .n { color: var(--accent); font-weight: 500; }
-.toc-i .badge { font-size: 10px; color: var(--accent); flex: none; }
+.book-head .cover{width:86px; aspect-ratio:3/4; border-radius:10px; overflow:hidden; flex-shrink:0; background:linear-gradient(150deg,#e8d8bd,#d8c3a0); display:flex; align-items:center; justify-content:center; color:#fff; font-size:28px; font-weight:700}
+.book-head .cover img{width:100%; height:100%; object-fit:cover}
+.book-head .meta{min-width:0; display:flex; flex-direction:column; gap:5px}
+.book-head h2{margin:0; font-size:18px}
+.book-head .who{font-size:12.5px; color:var(--ink-3)}
+.book-head .acts{margin-top:auto; display:flex; gap:8px; flex-wrap:wrap}
+.toc-tools{display:flex; gap:10px; align-items:center; margin-bottom:10px}
+.toc-tools input{flex:1; min-width:0; height:34px; padding:0 12px; border:1px solid var(--rule); border-radius:9px; background:var(--card); color:var(--ink); font-size:12.5px; outline:none}
+.toc-tools input:focus{border-color:var(--accent)}
+.toc-count{font-size:11.5px; color:var(--ink-3); white-space:nowrap}
+.toc{display:grid; grid-template-columns:repeat(auto-fill, minmax(210px,1fr)); gap:6px}
+.toc-i{
+  display:flex; align-items:center; gap:8px; text-align:left; padding:9px 11px;
+  border:1px solid transparent; border-radius:9px; background:var(--card-2); color:var(--ink-2);
+  font-size:12.5px; transition:.15s; min-height:38px;
+}
+.toc-i:hover{border-color:var(--accent); color:var(--ink); background:var(--card)}
+.toc-i.now{border-color:var(--accent); color:var(--accent); background:var(--accent-soft); font-weight:600}
+.toc-i .n{overflow:hidden; display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical}
+.toc-i .badge{margin-left:auto; font-size:10px; padding:1px 6px; border-radius:999px; background:var(--accent); color:#fff; flex-shrink:0}
 
 /* ---------- 阅读 ---------- */
-.rd {
-  flex: 1; display: flex; flex-direction: column;
-  background: var(--paper); position: relative; overflow: hidden;
+.read-bar{
+  position:sticky; top:53px; z-index:20; display:flex; align-items:center; gap:10px;
+  padding:9px 0; margin-bottom:6px; border-bottom:1px solid var(--rule-2); background:var(--paper);
 }
-.rd::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(120% 60% at 50% 0%, rgba(255,255,255,.42), transparent 62%);
+@supports (backdrop-filter: blur(1px)) { .read-bar{ background:color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter:blur(10px) } }
+.read-bar .ch{flex:1; min-width:0; font-size:13px; color:var(--ink-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.read-bar .grp{display:flex; gap:4px; align-items:center}
+.rb{
+  height:32px; min-width:32px; padding:0 8px; border:1px solid var(--rule); border-radius:8px;
+  background:var(--card); color:var(--ink-2); font-size:12.5px; display:inline-flex; align-items:center; justify-content:center; transition:.15s;
 }
-.rd-top {
-  flex: none; height: 40px; display: flex; align-items: center;
-  gap: 10px; padding: 0 12px; position: relative; z-index: 3;
-  font-size: 12px; color: var(--ink-2);
-  opacity: 0; transition: opacity .2s; pointer-events: none;
+.rb:hover{color:var(--ink); border-color:var(--accent); background:var(--accent-soft)}
+.read-prog{height:2px; background:var(--rule-2); border-radius:999px; margin-bottom:18px; overflow:hidden}
+.read-prog i{display:block; height:100%; width:0; background:var(--accent); transition:width .25s}
+#rd-txt{
+  width:min(var(--read-w), 100%); margin:0 auto;
+  font-family:var(--font-read); font-size:var(--fs,18px); line-height:1.95;
+  color:var(--ink); letter-spacing:.2px;
 }
-.rd.show-ui .rd-top { opacity: 1; pointer-events: auto; }
-.rd-top .pg { flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#rd-txt p{margin:0 0 1.05em; text-indent:2em}
+#rd-txt p.no-ind{text-indent:0}
+#rd-txt .hint{text-indent:0; color:var(--ink-3); font-family:var(--font-ui); font-size:13px}
+.read-foot{display:flex; align-items:center; justify-content:center; gap:10px; margin:34px 0 10px}
+.read-foot .nav{height:38px; padding:0 20px; border:1px solid var(--rule); border-radius:999px; background:var(--card); color:var(--ink-2); font-size:13px}
+.read-foot .nav:hover{border-color:var(--accent); color:var(--accent)}
+.read-foot .pos{font-size:12px; color:var(--ink-3)}
 
-.rd-body { flex: 1; overflow: hidden; position: relative; z-index: 2; }
-.rd-scroll {
-  height: 100%; overflow-y: auto;
-  padding: 8px 0 60px;
-  -webkit-overflow-scrolling: touch;
+/* ---------- 书源弹窗 ---------- */
+.mask{position:fixed; inset:0; background:rgba(30,24,18,.5); display:none; align-items:center; justify-content:center; padding:20px; z-index:60}
+.mask.on{display:flex}
+.modal{
+  width:min(720px,100%); max-height:min(84vh,760px); overflow:auto; background:var(--card);
+  border:1px solid var(--rule); border-radius:18px; box-shadow:0 30px 80px -30px rgba(0,0,0,.5); padding:22px;
 }
-.rd-scroll::-webkit-scrollbar { width: 0; }
-.rd-txt {
-  max-width: 34em; margin: 0 auto; padding: 0 22px;
-  font-size: var(--fs, 18px);
-  line-height: var(--lh, 2);
-  letter-spacing: .02em;
-  color: var(--ink);
-  word-break: break-word;
-  transition: font-size .2s, line-height .2s;
+.modal h3{margin:0 0 4px; font-size:17px}
+.modal .sub{margin:0 0 14px; font-size:12.5px; color:var(--ink-3); line-height:1.7}
+.srcs{display:flex; flex-direction:column; gap:7px; margin-bottom:14px; max-height:200px; overflow:auto}
+.src-i{display:flex; align-items:center; gap:9px; padding:9px 11px; border:1px solid var(--rule-2); border-radius:10px; background:var(--card-2)}
+.src-i .n{font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:40%}
+.src-i .u{font-size:11.5px; color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1}
+.src-i .tag{font-size:11px; padding:2px 8px; border-radius:999px; white-space:nowrap}
+.src-i .tag.ok{background:rgba(74,124,89,.14); color:var(--ok)}
+.src-i .tag.no{background:rgba(168,64,44,.1); color:var(--bad); max-width:200px; overflow:hidden; text-overflow:ellipsis}
+.src-i .del{margin-left:auto; border:0; background:transparent; color:var(--ink-3); font-size:15px; padding:0 2px}
+.src-i .del:hover{color:var(--bad)}
+textarea#src-input, input#src-url{
+  width:100%; border:1px solid var(--rule); border-radius:10px; background:var(--card-2); color:var(--ink);
+  font-size:12.5px; padding:10px 12px; outline:none; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
 }
-.rd-txt p { margin: 0 0 1.05em; text-indent: 2em; }
-.rd-txt p.no-ind { text-indent: 0; }
+textarea#src-input{height:110px; resize:vertical; line-height:1.6}
+input#src-url{height:40px; font-family:var(--font-ui)}
+textarea#src-input:focus, input#src-url:focus{border-color:var(--accent)}
+.link-row{display:flex; gap:8px; margin:10px 0 4px}
+.link-row input{flex:1; min-width:0}
+.modal-acts{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; align-items:center}
+.modal-acts .grow{flex:1}
+.btn{
+  height:36px; padding:0 14px; border-radius:9px; border:1px solid var(--rule);
+  background:var(--card); color:var(--ink-2); font-size:13px; transition:.15s;
+}
+.btn:hover{border-color:var(--accent); color:var(--ink); background:var(--accent-soft)}
+.btn.pri{background:linear-gradient(135deg,#b9773f,#96572b); border-color:transparent; color:#fff; font-weight:600}
+.btn.pri:hover{filter:brightness(1.06); color:#fff}
+.btn:disabled{opacity:.5; cursor:not-allowed}
 
-.rd-nav {
-  position: absolute; top: 0; bottom: 0; width: 22%; z-index: 4;
-  display: grid; place-items: center; opacity: 0; transition: opacity .18s;
+/* ---------- toast ---------- */
+.toast{
+  position:fixed; left:50%; bottom:26px; transform:translate(-50%, 16px); z-index:80;
+  padding:10px 18px; border-radius:999px; background:#2b2621; color:#f6f0e4; font-size:13px;
+  box-shadow:0 12px 30px -12px rgba(0,0,0,.5); opacity:0; pointer-events:none; transition:.22s;
+  max-width:86vw; text-align:center;
 }
-.rd-nav:hover { opacity: 1; }
-.rd-nav.prev { left: 0; }
-.rd-nav.next { right: 0; }
-.rd-nav span {
-  width: 34px; height: 34px; border-radius: 50%;
-  background: rgba(255,255,255,.82); color: var(--ink-2);
-  display: grid; place-items: center; font-size: 15px;
-  box-shadow: 0 2px 10px rgba(80,66,48,.14);
-}
+.toast.on{opacity:1; transform:translate(-50%, 0)}
+.toast.err{background:#8f3622}
 
-.rd-bot {
-  flex: none; height: 34px; position: relative; z-index: 3;
-  display: flex; align-items: center; padding: 0 18px;
-  opacity: 0; transition: opacity .2s; pointer-events: none;
-}
-.rd.show-ui .rd-bot { opacity: 1; pointer-events: auto; }
-.prog { flex: 1; height: 2px; background: rgba(80,66,48,.13); border-radius: 2px; }
-.prog i { display: block; height: 100%; background: var(--accent); border-radius: 2px; transition: width .2s; }
-
-/* 设置面板 */
-.panel {
-  position: absolute; left: 50%; bottom: 52px; transform: translateX(-50%) translateY(8px);
-  background: var(--card); border: 1px solid var(--rule); border-radius: var(--r);
-  padding: 14px 16px; z-index: 12; width: min(340px, calc(100vw - 32px));
-  box-shadow: 0 16px 40px -12px rgba(80,66,48,.3);
-  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s var(--ease);
-}
-.panel.on { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
-.p-row { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
-.p-row:last-child { margin-bottom: 0; }
-.p-row label { font-size: 12px; color: var(--ink-2); width: 46px; flex: none; }
-.p-row input[type=range] { flex: 1; accent-color: var(--accent); }
-.p-row .v { font-size: 12px; color: var(--ink-3); width: 34px; text-align: right; flex: none; }
-.sw { display: flex; gap: 6px; flex: 1; }
-.sw button { width: 30px; height: 24px; border-radius: 5px; border: 1px solid var(--rule); }
-.sw button.on { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(176,113,63,.18); }
-/* 字体按钮：宽度随内容。用 .sw button.fbtn（0,2,1）压过 .sw button（0,1,1），
-   不需要 !important —— 这个项目里已经有 60 处 !important 了，不必再添一处 */
-.sw button.fbtn {
-  width: auto; height: 26px; padding: 0 11px;
-  border-radius: 6px; font-size: 12px;
-  background: var(--paper-2); border: 1px solid var(--rule); color: var(--ink-2);
-}
-.fbtn-serif { font-family: Georgia, 'Songti SC', 'STSong', serif; }
-.fbtn-sans  { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
-
-/* 纸色主题 */
-body[data-paper="yellow"] .rd { background: #f2ead9; }
-body[data-paper="green"]  .rd { background: #d8e4cf; --ink: #2c3529; }
-body[data-paper="gray"]   .rd { background: #e6e4e0; --ink: #33322f; }
-body[data-paper="white"]  .rd { background: #fff; --ink: #24231f; }
-body[data-paper="dark"]   .rd { background: #191817; --ink: #cfc9c0; --accent: #d08c5a; }
-body[data-paper="dark"] .rd::before { background: radial-gradient(120% 60% at 50% 0%, rgba(255,255,255,.05), transparent 62%); }
-body[data-paper="dark"] .prog { background: rgba(255,255,255,.12); }
-body[data-paper="dark"] .rd-nav span { background: rgba(40,38,36,.9); color: #cfc9c0; }
-/* 深色纸色下，设置面板也得跟着变深 —— 否则晚上调到黑底再点开设置，
-   会弹出一整块白板，比正文刺眼得多 */
-body[data-paper="dark"] .panel {
-  background: #24221f;
-  border-color: #3a3835;
-  color: #cfc9c0;
-}
-body[data-paper="dark"] .panel .p-row label { color: #9a938c; }
-body[data-paper="dark"] .panel .p-row .v { color: #7d766e; }
-body[data-paper="dark"] .sw button.fbtn { background: #322f2b; border-color: #47433d; color: #cfc9c0; }
-/* 深色下「黑纸」色块和面板底色接近，不加亮边框就基本看不见 */
-body[data-paper="dark"] .sw button[data-p="dark"] { border-color: #6f665c; }
-body[data-paper="dark"] .sw button[data-p="white"] { border-color: #5a544c; }
-
-/* ---------- 弹层 ---------- */
-.mask {
-  position: fixed; inset: 0; background: rgba(40,34,28,.42);
-  z-index: 60; display: none; align-items: center; justify-content: center; padding: 20px;
-  backdrop-filter: blur(3px);
-}
-.mask.on { display: flex; }
-.modal {
-  background: var(--card); border-radius: 18px; padding: 20px;
-  width: min(560px, 100%); max-height: 84vh; display: flex; flex-direction: column;
-  box-shadow: 0 24px 60px -16px rgba(60,48,36,.4);
-}
-.modal h3 { font-size: 15px; font-weight: 500; margin: 0 0 4px; }
-.modal .sub { font-size: 12px; color: var(--ink-3); margin-bottom: 14px; line-height: 1.6; }
-.modal textarea {
-  width: 100%; flex: 1; min-height: 180px; resize: vertical;
-  border: 1px solid var(--rule); border-radius: var(--r-sm); padding: 11px;
-  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
-  line-height: 1.6; outline: none; background: #fff;
-}
-.modal textarea:focus { border-color: var(--accent); }
-.modal-acts { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
-.btn {
-  padding: 8px 15px; border-radius: var(--r-sm); font-size: 13px;
-  border: 1px solid var(--rule); background: var(--card); color: var(--ink-2);
-}
-.btn:hover { border-color: var(--ink-3); }
-.btn.pri { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-
-.srcs { display: flex; flex-direction: column; gap: 1px; overflow-y: auto; flex: 1; margin-bottom: 12px; }
-.src-i {
-  display: flex; align-items: center; gap: 9px; padding: 10px 2px;
-  border-bottom: 1px solid var(--rule);
-}
-.src-i .n { flex: 1; min-width: 0; font-size: 13px; }
-.src-i .u { font-size: 11px; color: var(--ink-3); white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
-.tag { font-size: 10px; padding: 2px 7px; border-radius: 4px; flex: none; }
-.tag.ok { background: rgba(31,169,122,.13); color: #1d7d5a; }
-.tag.no { background: rgba(160,150,138,.16); color: var(--ink-3); }
-
-.empty { text-align: center; padding: 60px 20px; color: var(--ink-3); }
-.empty h4 { font-size: 14px; font-weight: 500; color: var(--ink-2); margin: 0 0 7px; }
-.empty p { font-size: 12.5px; line-height: 1.7; margin: 0 0 16px; }
-
-.toast {
-  position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%) translateY(14px);
-  background: var(--ink); color: var(--paper); font-size: 13px;
-  padding: 9px 17px; border-radius: 999px; z-index: 90;
-  opacity: 0; pointer-events: none; transition: opacity .22s, transform .22s var(--ease);
-  max-width: calc(100vw - 40px); text-align: center;
-}
-.toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
-.toast.err { background: #a8402c; }
-
-.load { display: inline-block; width: 13px; height: 13px; border-radius: 50%;
-  border: 1.5px solid rgba(176,113,63,.28); border-top-color: var(--accent);
-  animation: sp .7s linear infinite; vertical-align: -2px; }
-@keyframes sp { to { transform: rotate(360deg); } }
-
-@media (max-width: 560px) {
-  .grid { grid-template-columns: repeat(auto-fill, minmax(96px,1fr)); gap: 11px; }
-  .rd-txt { padding: 0 18px; }
+/* ---------- 手机 ---------- */
+@media (max-width:720px){
+  .top{flex-wrap:wrap; gap:9px; padding:10px 14px}
+  .brand h1{font-size:16px}
+  .searchbar{order:3; flex-basis:100%}
+  .top-acts{margin-left:auto}
+  .wrap{padding:14px 14px 80px}
+  .shelf{grid-template-columns:repeat(auto-fill, minmax(140px,1fr)); gap:11px}
+  .results{grid-template-columns:1fr}
+  .book-head{padding:12px; gap:12px}
+  .book-head .cover{width:70px}
+  #rd-txt{font-size:17px; padding:0 2px}
+  .read-bar{top:0}
+  .read-foot{position:fixed; left:0; right:0; bottom:0; margin:0; padding:10px 14px calc(10px + env(safe-area-inset-bottom, 0px)); background:var(--card); border-top:1px solid var(--rule-2); z-index:25}
+  .read-foot .nav{flex:1}
+  .read-foot .pos{display:none}
+  .toc{grid-template-columns:1fr}
+  .modal{padding:16px; border-radius:14px}
+  .src-i .u{display:none}
 }
 </style>
 </head>
-<body data-paper="yellow">
-<div id="app">
+<body>
+
+<header class="top">
+  <div class="brand"><span class="mark">静</span><h1>静读</h1></div>
+  <div class="searchbar">
+    <input id="q" placeholder="搜书名或作者，回车搜索" autocomplete="off" />
+    <button class="tbtn primary" id="btn-q">搜索</button>
+  </div>
+  <div class="top-acts">
+    <button class="tbtn" id="btn-shelf">书架</button>
+    <button class="tbtn" id="btn-src">书源</button>
+    <button class="tbtn icon" id="btn-theme" title="切换纸感/夜间">◐</button>
+  </div>
+</header>
+
+<main class="wrap">
 
   <!-- ========== 书架 ========== -->
   <section class="view on" id="v-shelf">
-    <header class="bar">
-      <h1>静读</h1>
-      <div class="sp"></div>
-      <button class="txt-btn" id="btn-src">书源</button>
-      <button class="txt-btn pri" id="btn-go-search">搜书</button>
-    </header>
-    <div class="shelf"><div class="wrap">
-      <p class="sec-h">在读</p>
-      <div class="grid" id="shelf-grid"></div>
-    </div></div>
+    <div class="page-head">
+      <div><h2>书架</h2><p class="sub" id="shelf-sub">导入书源后就能搜书了</p></div>
+      <button class="tbtn" id="btn-shelf-src">管理书源</button>
+    </div>
+    <div id="shelf"></div>
   </section>
 
-  <!-- ========== 搜索 ========== -->
+  <!-- ========== 搜索结果 ========== -->
   <section class="view" id="v-search">
-    <header class="bar">
-      <button class="icon-btn" id="btn-s-back">←</button>
-      <h1>找书</h1>
-    </header>
-    <div class="search"><div class="wrap">
-      <div class="field">
-        <input id="q" placeholder="输入书名或作者" autocomplete="off" />
-        <button class="txt-btn pri" id="btn-q">搜索</button>
-      </div>
-      <div class="row" id="src-filter"></div>
-      <div id="results"></div>
-    </div></div>
+    <div class="page-head">
+      <div><h2 id="search-title">搜索</h2><p class="sub" id="search-sub">输入书名或作者，在可用书源里搜</p></div>
+      <button class="tbtn" id="btn-back-shelf">← 书架</button>
+    </div>
+    <div id="results" class="results"></div>
+    <div class="errs" id="search-errs"></div>
   </section>
 
   <!-- ========== 目录 ========== -->
   <section class="view" id="v-toc">
-    <header class="bar">
-      <button class="icon-btn" id="btn-t-back">←</button>
-      <h1 id="toc-title">目录</h1>
-    </header>
-    <div class="toc"><div class="wrap">
-      <div class="field" style="margin-top:16px">
-        <input id="toc-q" placeholder="筛选章节" />
+    <div class="page-head">
+      <div><h2 id="toc-title">目录</h2><p class="sub" id="toc-sub"></p></div>
+      <button class="tbtn" id="btn-toc-back">← 书架</button>
+    </div>
+    <div class="book-head" id="book-head" style="display:none">
+      <div class="cover" id="bh-cover"></div>
+      <div class="meta">
+        <h2 id="bh-title"></h2>
+        <div class="who" id="bh-who"></div>
+        <div class="acts"><button class="tbtn primary" id="btn-continue">继续阅读</button></div>
       </div>
-      <div class="toc-l" id="toc-list"></div>
-    </div></div>
+    </div>
+    <div class="toc-tools">
+      <input id="toc-q" placeholder="筛选章节…" />
+      <span class="toc-count" id="toc-count"></span>
+    </div>
+    <div class="toc" id="toc-list"></div>
   </section>
 
   <!-- ========== 阅读 ========== -->
   <section class="view" id="v-read">
-    <div class="rd" id="rd">
-      <div class="rd-top">
-        <button class="icon-btn" id="btn-r-back">←</button>
-        <span class="pg" id="rd-title">—</span>
-        <button class="icon-btn" id="btn-r-set" title="阅读设置">Aa</button>
-      </div>
-      <div class="rd-body">
-        <div class="rd-scroll" id="rd-scroll">
-          <div class="rd-txt" id="rd-txt"></div>
-        </div>
-        <div class="rd-nav prev" id="nav-prev"><span>‹</span></div>
-        <div class="rd-nav next" id="nav-next"><span>›</span></div>
-      </div>
-      <div class="rd-bot">
-        <div class="prog"><i id="rd-prog"></i></div>
-      </div>
-      <div class="panel" id="rd-panel">
-        <div class="p-row">
-          <label>字号</label>
-          <input type="range" id="set-fs" min="14" max="26" step="1" />
-          <span class="v" id="v-fs">18</span>
-        </div>
-        <div class="p-row">
-          <label>行距</label>
-          <input type="range" id="set-lh" min="15" max="26" step="1" />
-          <span class="v" id="v-lh">2.0</span>
-        </div>
-        <div class="p-row">
-          <label>页边</label>
-          <input type="range" id="set-pw" min="14" max="40" step="2" />
-          <span class="v" id="v-pw">22</span>
-        </div>
-        <div class="p-row">
-          <label>纸色</label>
-          <div class="sw" id="set-paper">
-            <button data-p="yellow" style="background:#f2ead9" title="米黄"></button>
-            <button data-p="green"  style="background:#d8e4cf" title="护眼"></button>
-            <button data-p="gray"   style="background:#e6e4e0" title="灰"></button>
-            <button data-p="white"  style="background:#ffffff" title="白"></button>
-            <button data-p="dark"   style="background:#191817" title="黑"></button>
-          </div>
-        </div>
-        <div class="p-row">
-          <label>字体</label>
-          <div class="sw" style="gap:4px">
-            <button data-f="serif" class="fbtn fbtn-serif">宋体</button>
-            <button data-f="sans"  class="fbtn fbtn-sans">黑体</button>
-          </div>
-        </div>
+    <div class="read-bar">
+      <button class="rb" id="btn-read-back" title="目录">☰ 目录</button>
+      <span class="ch" id="rd-title"></span>
+      <div class="grp">
+        <button class="rb" id="btn-fs-down" title="字号减小">A-</button>
+        <button class="rb" id="btn-fs-up" title="字号增大">A+</button>
+        <button class="rb" id="btn-font" title="衬线/无衬线">衬</button>
       </div>
     </div>
+    <div class="read-prog"><i id="rd-prog"></i></div>
+    <article id="rd-txt"></article>
+    <div class="read-foot">
+      <button class="nav" id="btn-prev">上一章</button>
+      <span class="pos" id="rd-pos"></span>
+      <button class="nav" id="btn-next">下一章</button>
+    </div>
   </section>
+</main>
 
-</div>
-
-<!-- 书源管理 -->
+<!-- ========== 书源弹窗 ========== -->
 <div class="mask" id="m-src">
   <div class="modal">
     <h3>书源管理</h3>
-    <p class="sub">粘贴 Legado / 阅读格式的书源 JSON（单个对象或数组均可）。也可以粘贴书源链接由服务器代抓。导入后自动检测哪些可用。</p>
+    <p class="sub">粘贴「阅读」格式的书源 JSON（单个对象或数组），或贴书源分享链接由服务器代抓。导入后自动检测哪些可用。</p>
     <div class="srcs" id="src-list"></div>
     <textarea id="src-input" placeholder='[{"bookSourceName":"...","bookSourceUrl":"https://...","searchUrl":"...","ruleSearch":{...}}]'></textarea>
-    <div style="display:flex;gap:8px;margin:10px 0 2px">
-      <input id="src-url" placeholder="或者粘贴书源链接（.json 文件 / 书源分享页，由服务器代抓）"
-             style="flex:1;min-width:0;padding:10px 12px;border:1px solid var(--rule);border-radius:var(--r-sm);background:var(--card);color:var(--ink);font-size:13px" />
-      <button class="btn pri" id="btn-src-url">从链接导入</button>
+    <div class="link-row">
+      <input id="src-url" placeholder="书源链接（.json 或分享页，服务器代抓）" />
+      <button class="btn" id="btn-src-url">从链接导入</button>
     </div>
     <div class="modal-acts">
       <button class="btn" id="btn-src-demo">载入示例</button>
       <button class="btn" id="btn-src-file">从文件读</button>
-      <button class="btn" id="btn-src-clear">清空</button>
+      <button class="btn" id="btn-src-clear">清空输入</button>
+      <span class="grow"></span>
       <button class="btn pri" id="btn-src-ok">导入</button>
+      <button class="btn" id="btn-src-close">关闭</button>
     </div>
     <input type="file" id="src-file" accept=".json,.txt,application/json" hidden />
   </div>
@@ -483,48 +363,36 @@ body[data-paper="dark"] .sw button[data-p="white"] { border-color: #5a544c; }
 
 <script>
 /* ============================================================
-   状态与存储
+   状态
    ============================================================ */
-const LS_SRC = 'jingdu_sources';
-const LS_BKS = 'jingdu_books';
-const LS_CFG = 'jingdu_config';
-
+const LS = { src: 'jingdu_sources', books: 'jingdu_books', cfg: 'jingdu_config' };
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
 const store = {
-  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  get(k, def) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? def : v; } catch { return def; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } },
 };
 
-let SOURCES = store.get(LS_SRC, []);          // 书源（完整规则）
-let BOOKS = store.get(LS_BKS, []);            // 书架
-let CFG = Object.assign(
-  { fs: 18, lh: 2.0, pw: 22, paper: 'yellow', font: 'serif' },
-  store.get(LS_CFG, {})
-);
-let CAP = {};                                  // 书源能力：name -> {usable, reason}
-
-/* 当前会话 */
-let curBook = null;    // {title,author,cover,source,sourceName,bookUrl,toc[]}
+let SOURCES = store.get(LS.src, []);
+let CAP = {};
+let BOOKS = store.get(LS.books, []);
+let CFG = Object.assign({ font: 'serif', size: 18, theme: 'paper' }, store.get(LS.cfg, {}));
+let curBook = null;
 let curIdx = 0;
-let curText = '';
 
-/* ============================================================
-   工具
-   ============================================================ */
-const $ = (s) => document.querySelector(s);
-const $$ = (s) => Array.from(document.querySelectorAll(s));
-const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-let toastTimer;
 function toast(msg, isErr) {
   const t = $('#toast');
   t.textContent = msg;
   t.className = 'toast on' + (isErr ? ' err' : '');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.className = 'toast'; }, 2600);
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { t.className = 'toast'; }, 2600);
 }
 
 function view(name) {
-  $$('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + name));
+  $$('.view').forEach((v) => v.classList.toggle('on', v.id === 'v-' + name));
+  window.scrollTo(0, 0);
 }
 
 async function api(path, body) {
@@ -539,39 +407,41 @@ async function api(path, body) {
 }
 
 /* ============================================================
+   配置 / 主题 / 字号
+   ============================================================ */
+function applyCfg() {
+  document.documentElement.dataset.theme = CFG.theme;
+  document.documentElement.style.setProperty('--fs', CFG.size + 'px');
+  store.set(LS.cfg, CFG);
+}
+applyCfg();
+
+$('#btn-theme').onclick = () => { CFG.theme = CFG.theme === 'paper' ? 'night' : 'paper'; applyCfg(); };
+$('#btn-fs-up').onclick = () => { CFG.size = Math.min(26, CFG.size + 1); applyCfg(); };
+$('#btn-fs-down').onclick = () => { CFG.size = Math.max(15, CFG.size - 1); applyCfg(); };
+$('#btn-font').onclick = () => { CFG.font = CFG.font === 'serif' ? 'sans' : 'serif'; applyCfg(); renderChapter(); };
+
+/* ============================================================
    书源
    ============================================================ */
-function usableSources() {
-  return SOURCES.filter(s => CAP[s.bookSourceName]?.usable);
-}
+function usableSources() { return SOURCES.filter((s) => CAP[s.bookSourceName]?.usable); }
 
 async function importSources(text) {
   let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch (e) {
-    throw new Error('JSON 格式有误：' + e.message.slice(0, 60));
-  }
+  try { parsed = JSON.parse(text); } catch (e) { throw new Error('JSON 格式有误：' + String(e.message).slice(0, 60)); }
   const list = Array.isArray(parsed) ? parsed : [parsed];
-  const valid = list.filter(s => s && (s.bookSourceUrl || s.bookSourceName));
+  const valid = list.filter((s) => s && (s.bookSourceUrl || s.bookSourceName));
   if (!valid.length) throw new Error('没识别到书源（需要 bookSourceUrl 字段）');
-
-  // 合并：同名覆盖
-  const byName = new Map(SOURCES.map(s => [s.bookSourceName, s]));
+  const byName = new Map(SOURCES.map((s) => [s.bookSourceName, s]));
   for (const s of valid) byName.set(s.bookSourceName || s.bookSourceUrl, s);
-  SOURCES = Array.from(byName.values());
-  store.set(LS_SRC, SOURCES);
-
-  // 能力自检
+  SOURCES = [...byName.values()];
+  store.set(LS.src, SOURCES);
   try {
     const r = await api('/inspect', { sources: SOURCES });
     CAP = {};
     for (const s of r.sources) CAP[s.name] = { usable: s.usable, reason: s.reason };
-    // 同步到服务端，供搜索接口查表
     await fetch('/api/novel/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sources: SOURCES }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sources: SOURCES }),
     });
     return r;
   } catch {
@@ -582,284 +452,59 @@ async function importSources(text) {
 function renderSourceList() {
   const box = $('#src-list');
   if (!SOURCES.length) {
-    box.innerHTML = '<p style="font-size:12px;color:var(--ink-3);padding:14px 2px">还没有书源。粘贴 JSON 后点「导入」。</p>';
+    box.innerHTML = '<p style="font-size:12.5px;color:var(--ink-3);padding:10px 2px">还没有书源。粘贴 JSON 或贴链接，然后点「导入」。</p>';
     return;
   }
-  box.innerHTML = SOURCES.map(s => {
+  box.innerHTML = SOURCES.map((s, i) => {
     const c = CAP[s.bookSourceName];
-    const ok = c?.usable;
     const tag = !c ? '<span class="tag no">未检测</span>'
-      : ok ? '<span class="tag ok">可用</span>'
+      : c.usable ? '<span class="tag ok">可用</span>'
       : `<span class="tag no" title="${esc(c.reason)}">${esc(c.reason)}</span>`;
     return `<div class="src-i">
       <div class="n">${esc(s.bookSourceName || '(未命名)')}</div>
       <div class="u">${esc(s.bookSourceUrl || '')}</div>
       ${tag}
+      <button class="del" data-i="${i}" title="删除">×</button>
     </div>`;
   }).join('');
-}
-
-/* ============================================================
-   书架
-   ============================================================ */
-function renderShelf() {
-  const g = $('#shelf-grid');
-  if (!BOOKS.length) {
-    g.innerHTML = `
-      <button class="bk bk-add" id="empty-add" style="grid-column:1/-1;min-height:150px">
-        <div style="width:26px;height:26px;border-radius:7px;border:1px solid currentColor;opacity:.5"></div>
-        <span>还没有书，点这里去搜</span>
-      </button>`;
-    $('#empty-add').onclick = () => view('search');
-    return;
-  }
-  g.innerHTML = BOOKS.map((b, i) => {
-    const pct = b.total ? Math.round(((b.idx || 0) + 1) / b.total * 100) : 0;
-    const cov = b.cover
-      ? `<img src="${esc(b.cover)}" onerror="this.parentNode.textContent='${esc((b.title||'书')[0])}'" />`
-      : esc((b.title || '书')[0]);
-    return `<button class="bk" data-i="${i}">
-      <div class="cov">${cov}</div>
-      <div class="t">${esc(b.title)}</div>
-      <div class="a">${esc(b.author || '佚名')}</div>
-      <div class="bar-prog"><i style="width:${pct}%"></i></div>
-      <div class="p">${pct ? pct + '%' : '未开始'}</div>
-    </button>`;
-  }).join('');
-  g.querySelectorAll('.bk[data-i]').forEach(el => {
-    el.onclick = () => openBook(BOOKS[+el.dataset.i]);
-  });
-}
-
-function saveBooks() { store.set(LS_BKS, BOOKS); }
-
-/* ============================================================
-   搜索
-   ============================================================ */
-function renderSrcFilter() {
-  const box = $('#src-filter');
-  const usable = usableSources();
-  if (!SOURCES.length) {
-    box.innerHTML = `<span style="font-size:12px;color:var(--ink-3)">还没有书源，先到「书源」里导入</span>`;
-    return;
-  }
-  if (!usable.length) {
-    box.innerHTML = `<span style="font-size:12px;color:var(--ink-3)">已导入 ${SOURCES.length} 个，但没有一个通过检测（多为 @js 规则或源站已失效）</span>`;
-    return;
-  }
-  box.innerHTML = `<span style="font-size:12px;color:var(--ink-3);margin-right:4px">将搜索 ${usable.length} 个可用源</span>`;
-}
-
-async function doSearch() {
-  const kw = $('#q').value.trim();
-  if (!kw) return toast('请输入书名或作者', true);
-  const usable = usableSources();
-  if (!usable.length) return toast('没有可用书源，请先导入', true);
-
-  const box = $('#results');
-  box.innerHTML = `<p style="padding:24px 0;color:var(--ink-3);font-size:13px"><span class="load"></span> 正在搜索 ${usable.length} 个书源…</p>`;
-  try {
-    const r = await api('/search', { keyword: kw, sources: usable.map(s => ({ bookSourceName: s.bookSourceName })) });
-    if (!r.results?.length) {
-      box.innerHTML = `<div class="empty">
-        <h4>没有搜到结果</h4>
-        <p>${esc((r.errors || []).map(e => `${e.name}：${e.error}`).join('；') || '书源都没返回数据，可能规则已变更或源站限制了访问。')}</p>
-      </div>`;
-      return;
-    }
-    box.innerHTML = r.results.map((x, i) => `
-      <button class="res" data-i="${i}">
-        <div class="cov">${x.cover ? `<img src="${esc(x.cover)}" onerror="this.parentNode.textContent='${esc(x.title[0])}'" />` : esc(x.title[0])}</div>
-        <div class="info">
-          <div class="t">${esc(x.title)}</div>
-          <div class="a">${esc(x.author || '佚名')}</div>
-          ${x.intro ? `<div class="d">${esc(x.intro)}</div>` : ''}
-          <div class="src"><span class="dot"></span>${esc(x.source)}</div>
-        </div>
-      </button>`).join('');
-    box.querySelectorAll('.res').forEach(el => {
-      el.onclick = () => openBook(r.results[+el.dataset.i]);
-    });
-  } catch (e) {
-    box.innerHTML = `<div class="empty"><h4>搜索失败</h4><p>${esc(e.message)}</p></div>`;
-  }
-}
-
-/* ============================================================
-   目录 + 正文
-   ============================================================ */
-function renderToc() {
-  const box = $('#toc-list');
-  const filter = $('#toc-q').value.trim().toLowerCase();
-  const items = curBook.toc.filter(x => !filter || x.name.toLowerCase().includes(filter));
-  if (!items.length) {
-    box.innerHTML = '<p style="padding:20px 2px;color:var(--ink-3);font-size:13px">没有匹配的章节</p>';
-    return;
-  }
-  box.innerHTML = items.map(x => {
-    const i = curBook.toc.indexOf(x);
-    const now = i === curIdx;
-    return `<button class="toc-i${now ? ' now' : ''}" data-i="${i}">
-      <span class="n">${esc(x.name)}</span>
-      ${now ? '<span class="badge">读到这</span>' : ''}
-    </button>`;
-  }).join('');
-  box.querySelectorAll('.toc-i').forEach(el => {
-    el.onclick = () => { curIdx = +el.dataset.i; view('read'); loadChapter(); };
-  });
-  const now = box.querySelector('.toc-i.now');
-  if (now) now.scrollIntoView({ block: 'center' });
-}
-
-async function openBook(result) {
-  view('toc');
-  $('#toc-title').textContent = '加载中…';
-  $('#toc-list').innerHTML = '<p style="padding:20px 2px;color:var(--ink-3);font-size:13px"><span class="load"></span> 正在抓取目录…</p>';
-  try {
-    const r = await api('/toc', {
-      source: { bookSourceName: result.source },
-      bookUrl: result.url,
-    });
-    if (!r.toc?.length) throw new Error('目录为空');
-    curBook = {
-      title: r.info?.name || result.title,
-      author: r.info?.author || result.author,
-      cover: r.info?.cover || result.cover,
-      source: result.source,
-      bookUrl: result.url,
-      toc: r.toc,
-      idx: 0,
+  box.querySelectorAll('.del').forEach((b) => {
+    b.onclick = () => {
+      SOURCES.splice(+b.dataset.i, 1);
+      store.set(LS.src, SOURCES);
+      renderSourceList();
+      renderShelf();
+      toast('已删除该源');
     };
-    curIdx = 0;
-    $('#toc-title').textContent = curBook.title;
-
-    // 书架里已有就接着上次读
-    const exist = BOOKS.findIndex(b => b.bookUrl === curBook.bookUrl && b.source === curBook.source);
-    if (exist >= 0) {
-      curIdx = Math.min(BOOKS[exist].idx || 0, curBook.toc.length - 1);
-      BOOKS[exist] = { ...BOOKS[exist], ...curBook };
-    } else {
-      if (BOOKS.length >= 60) BOOKS.shift();
-      BOOKS.push({ ...curBook });
-    }
-    saveBooks();
-    renderShelf();
-    renderToc();
-  } catch (e) {
-    $('#toc-title').textContent = '加载失败';
-    $('#toc-list').innerHTML = `<div class="empty"><h4>抓不到目录</h4><p>${esc(e.message)}</p><p style="font-size:12px">可以换个书源再搜一次。</p></div>`;
-  }
+  });
 }
-
-async function loadChapter() {
-  if (!curBook?.toc?.length) return;
-  const ch = curBook.toc[curIdx];
-  $('#rd-title').textContent = ch.name;
-  $('#rd-txt').innerHTML = '<p style="text-indent:0;color:var(--ink-3)"><span class="load"></span></p>';
-  $('#rd-scroll').scrollTop = 0;
-  try {
-    const r = await api('/content', {
-      source: { bookSourceName: curBook.source },
-      chapterUrl: ch.url,
-    });
-    curText = r.content || '';
-    const paras = curText.split(/\n{1,}/).map(s => s.trim()).filter(Boolean);
-    const serif = CFG.font === 'serif';
-    $('#rd-txt').innerHTML = paras.map(p =>
-      `<p${serif ? '' : ' class="no-ind"'}>${esc(p)}</p>`).join('') ||
-      '<p style="text-indent:0;color:var(--ink-3)">这一章没有内容</p>';
-
-    // 记忆进度
-    const i = BOOKS.findIndex(b => b.bookUrl === curBook.bookUrl && b.source === curBook.source);
-    if (i >= 0) { BOOKS[i].idx = curIdx; BOOKS[i].total = curBook.toc.length; saveBooks(); renderShelf(); }
-    updateProg();
-  } catch (e) {
-    $('#rd-txt').innerHTML = `<p style="text-indent:0;color:#a8402c">${esc(e.message)}</p>`;
-  }
-}
-
-function updateProg() {
-  const total = curBook?.toc?.length || 1;
-  const pct = Math.round((curIdx + 1) / total * 100);
-  $('#rd-prog').style.width = pct + '%';
-}
-
-function goChapter(delta) {
-  if (!curBook?.toc?.length) return;
-  const n = curIdx + delta;
-  if (n < 0) return toast('已经是第一章了');
-  if (n >= curBook.toc.length) return toast('已经是最后一章了');
-  curIdx = n;
-  $('#rd-title').textContent = curBook.toc[n].name;
-  loadChapter();
-  renderToc();
-}
-
-/* ============================================================
-   阅读设置
-   ============================================================ */
-function applyCfg() {
-  document.body.dataset.paper = CFG.paper;
-  const t = $('#rd-txt');
-  t.style.setProperty('--fs', CFG.fs + 'px');
-  t.style.setProperty('--lh', CFG.lh);
-  t.style.padding = `0 ${CFG.pw}px`;
-  t.style.fontFamily = CFG.font === 'serif'
-    ? "Georgia, 'Songti SC', 'STSong', serif"
-    : "-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif";
-  $('#v-fs').textContent = CFG.fs;
-  $('#v-lh').textContent = CFG.lh.toFixed(1);
-  $('#v-pw').textContent = CFG.pw;
-  $('#set-fs').value = CFG.fs;
-  $('#set-lh').value = Math.round(CFG.lh * 10);
-  $('#set-pw').value = CFG.pw;
-  $$('#set-paper button').forEach(b => b.classList.toggle('on', b.dataset.p === CFG.paper));
-  $$('.sw button[data-f]').forEach(b => b.classList.toggle('on', b.dataset.f === CFG.font));
-  store.set(LS_CFG, CFG);
-}
-
-function toggleUI() {
-  $('#rd').classList.toggle('show-ui');
-  if (!$('#rd').classList.contains('show-ui')) $('#rd-panel').classList.remove('on');
-}
-
-/* ============================================================
-   事件绑定
-   ============================================================ */
-$('#btn-go-search').onclick = () => { view('search'); renderSrcFilter(); $('#q').focus(); };
-$('#btn-s-back').onclick = () => view('shelf');
-$('#btn-q').onclick = doSearch;
-$('#q').onkeydown = (e) => { if (e.key === 'Enter') doSearch(); };
-$('#toc-q').oninput = renderToc;
 
 $('#btn-src').onclick = () => { renderSourceList(); $('#m-src').classList.add('on'); };
-
-// 打开设置面板：面板在 .rd 内，点它自己不该被「点空白呼出 UI」抢走
-$('#btn-r-set').onclick = (e) => {
-  e.stopPropagation();
-  $('#rd').classList.add('show-ui');
-  $('#rd-panel').classList.toggle('on');
-};
-$('#rd-panel').addEventListener('click', (e) => e.stopPropagation());
+$('#btn-shelf-src').onclick = () => { renderSourceList(); $('#m-src').classList.add('on'); };
+$('#btn-src-close').onclick = () => $('#m-src').classList.remove('on');
 $('#m-src').onclick = (e) => { if (e.target.id === 'm-src') $('#m-src').classList.remove('on'); };
 
 $('#btn-src-ok').onclick = async () => {
   const text = $('#src-input').value.trim();
-  if (!text) return toast('请先粘贴书源 JSON', true);
+  if (!text) return toast('先粘贴书源 JSON', true);
   try {
     const r = await importSources(text);
     $('#src-input').value = '';
     renderSourceList();
-    renderSrcFilter();
+    renderShelf();
     toast(`导入 ${r.total} 个书源，${r.usable} 个可用`);
-  } catch (e) {
-    toast(e.message, true);
-  }
+  } catch (e) { toast(e.message, true); }
 };
 
 $('#btn-src-file').onclick = () => $('#src-file').click();
+$('#src-file').onchange = (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const fr = new FileReader();
+  fr.onload = () => { $('#src-input').value = fr.result; toast('已读入文件，点「导入」确认'); };
+  fr.readAsText(f, 'utf-8');
+  e.target.value = '';
+};
 
-/* 从链接导入：交给服务器抓（浏览器直连会有 CORS / 防盗链问题） */
 $('#btn-src-url').onclick = async () => {
   const input = $('#src-url');
   const u = (input.value || '').trim();
@@ -876,128 +521,262 @@ $('#btn-src-url').onclick = async () => {
     input.value = '';
     $('#src-input').value = '';
     renderSourceList();
-    renderSrcFilter();
+    renderShelf();
     toast(`从链接导入 ${r.count} 个书源，${res.usable || 0} 个可用`);
-  } catch (e) {
-    toast(e.message, true);
-  } finally {
-    btn.disabled = false; btn.textContent = label;
-  }
+  } catch (e) { toast(e.message, true); }
+  finally { btn.disabled = false; btn.textContent = label; }
 };
 
-/**
- * 示例书源：格格党（qodown.com）。
- *
- * 这条规则是 2026-10-19 逐个字段对着真实页面写、并跑通全链路的
- * （搜索 11 条结果 → 62 章目录 → 正文抓取成功），
- * 不是从别处抄来的模板 —— 你给的那份书源里大部分站点已宕机或返回 403，
- * 留一个确定能用的源，至少打开就能验证「这阅读器是活的」。
- */
+/** 示例书源：格格党（qodown.com），字段对着真实页面写的 */
 const DEMO_SOURCE = {
   bookSourceName: '格格党',
   bookSourceUrl: 'http://www.qodown.com',
   searchUrl: 'http://www.qodown.com/search/,\n{\n  "body": "searchkey={{key}}&Submit=搜索",\n  "method": "POST"\n}',
-  ruleSearch: {
-    bookList: '.txt-list li',
-    name: '.s2 a::text',
-    author: '.s4::text',
-    bookUrl: '.s2 a[href]',
-  },
-  ruleToc: {
-    // 详情页有两个列表：前面「最新章节」倒序、后面「完整目录」正序。
-    // 服务端会按 URL 去重、再按「第 N 章」升序重排，这里只管抓。
-    chapterList: '.section-list li a',
-    chapterName: 'text',
-    chapterUrl: 'href',
-  },
+  ruleSearch: { bookList: '.txt-list li', name: '.s2 a::text', author: '.s4::text', bookUrl: '.s2 a[href]' },
+  ruleToc: { chapterList: '.section-list li a', chapterName: 'text', chapterUrl: 'href' },
   ruleContent: { content: '#content' },
 };
+$('#btn-src-demo').onclick = () => { $('#src-input').value = JSON.stringify([DEMO_SOURCE], null, 2); toast('已填入示例书源，点「导入」确认'); };
+$('#btn-src-clear').onclick = () => { $('#src-input').value = ''; $('#src-url').value = ''; };
 
-$('#btn-src-demo').onclick = () => {
-  $('#src-input').value = JSON.stringify([DEMO_SOURCE], null, 2);
-  toast('已填入示例书源，点「导入」确认');
-};
-$('#src-file').onchange = (e) => {
-  const f = e.target.files[0];
-  if (!f) return;
-  const fr = new FileReader();
-  fr.onload = () => { $('#src-input').value = fr.result; toast('已读入文件，点「导入」确认'); };
-  fr.readAsText(f, 'utf-8');
-  e.target.value = '';
-};
-
-$('#btn-src-clear').onclick = async () => {
-  if (!SOURCES.length) return;
-  if (!confirm('清空全部书源？书架里的书不受影响。')) return;
-  SOURCES = []; CAP = {};
-  store.set(LS_SRC, SOURCES);
-  renderSourceList(); renderSrcFilter();
-  toast('已清空');
-};
-
-$('#btn-t-back').onclick = () => view(curBook ? 'read' : 'shelf');
-$('#btn-r-back').onclick = () => view('toc');
-
-$('#nav-prev').onclick = () => goChapter(-1);
-$('#nav-next').onclick = () => goChapter(1);
-
-$('#rd-scroll').addEventListener('scroll', () => {
-  const el = $('#rd-scroll');
-  const pct = el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight);
-  const total = curBook?.toc?.length || 1;
-  const inner = (curIdx + pct) / total;
-  $('#rd-prog').style.width = Math.min(100, Math.round(inner * 100)) + '%';
-});
-
-// 正文区点击：空白处呼出 UI；两侧翻页由 .rd-nav 自己接管（它们是独立元素）
-$('#v-read .rd-body').addEventListener('click', (e) => {
-  if (e.target.closest('.rd-nav')) return;
-  toggleUI();
-});
-
-
-$('#set-fs').oninput = (e) => { CFG.fs = +e.target.value; applyCfg(); };
-$('#set-lh').oninput = (e) => { CFG.lh = +e.target.value / 10; applyCfg(); };
-$('#set-pw').oninput = (e) => { CFG.pw = +e.target.value; applyCfg(); };
-$$('#set-paper button').forEach(b => b.onclick = () => { CFG.paper = b.dataset.p; applyCfg(); });
-$$('.sw button[data-f]').forEach(b => b.onclick = () => { CFG.font = b.dataset.f; applyCfg(); });
-
-/* 键盘：← → 翻页，Esc 回目录 */
-document.addEventListener('keydown', (e) => {
-  if ($('#v-read').classList.contains('on')) {
-    if (e.key === 'ArrowLeft') goChapter(-1);
-    else if (e.key === 'ArrowRight') goChapter(1);
-    else if (e.key === 'Escape') view('toc');
+/* ============================================================
+   书架
+   ============================================================ */
+function renderShelf() {
+  const box = $('#shelf');
+  const usable = usableSources().length;
+  $('#shelf-sub').textContent = SOURCES.length
+    ? `${SOURCES.length} 个书源，${usable} 个可用 · 搜索后点书加入书架`
+    : '还没有书源：点「管理书源」粘贴 JSON 或贴链接导入';
+  if (!BOOKS.length) {
+    box.innerHTML = `<div class="empty">
+      <div class="big">📖</div>
+      <h3>书架还是空的</h3>
+      <p>导入书源 → 搜索书名 → 点开一本书，它就会出现在这里，并记住你读到哪一章。</p>
+      <div class="acts">
+        <button class="tbtn primary" id="e-src">导入书源</button>
+        <button class="tbtn" id="e-searc">去搜书</button>
+      </div>
+    </div>`;
+    $('#e-src').onclick = () => { renderSourceList(); $('#m-src').classList.add('on'); };
+    $('#e-searc').onclick = () => { view('search'); $('#q').focus(); };
+    return;
   }
+  box.innerHTML = `<div class="shelf">${BOOKS.map((b, i) => {
+    const pct = Math.round(((b.idx || 0) + 1) / Math.max(1, b.total || (b.toc ? b.toc.length : 1)) * 100);
+    return `<button class="bk" data-i="${i}">
+      <div class="cover">${b.cover ? `<img src="${esc(b.cover)}" alt="" onerror="this.remove()" />` : esc((b.title || '书')[0])}</div>
+      <div class="bd">
+        <div class="t">${esc(b.title || '未命名')}</div>
+        <div class="a">${esc(b.author || '佚名')}</div>
+        <div class="prog"><i style="width:${pct}%"></i></div>
+        <div class="pct">读到第 ${(b.idx || 0) + 1} / ${b.total || (b.toc ? b.toc.length : '?')} 章</div>
+      </div>
+    </button>`;
+  }).join('')}</div>`;
+  box.querySelectorAll('.bk').forEach((el) => {
+    el.onclick = () => {
+      const b = BOOKS[+el.dataset.i];
+      if (!b || !b.toc || !b.toc.length) return toast('这本书的目录丢了，重新搜一次', true);
+      curBook = b; curIdx = Math.min(b.idx || 0, b.toc.length - 1);
+      $('#toc-title').textContent = b.title || '目录';
+      $('#toc-sub').textContent = [b.author, b.source, `${b.toc.length} 章`].filter(Boolean).join(' · ');
+      renderBookHead();
+      renderToc();
+      view('toc');
+    };
+  });
+}
+
+/* ============================================================
+   搜索
+   ============================================================ */
+async function doSearch() {
+  const kw = $('#q').value.trim();
+  if (!kw) { view('search'); $('#q').focus(); return toast('输入书名或作者', true); }
+  const usable = usableSources();
+  if (!usable.length) {
+    renderSourceList(); $('#m-src').classList.add('on');
+    return toast('还没有可用书源，先导入一个', true);
+  }
+  view('search');
+  $('#search-title').textContent = `搜索「${kw}」`;
+  $('#search-sub').textContent = `正在 ${usable.length} 个书源里查找…`;
+  $('#search-errs').textContent = '';
+  const box = $('#results');
+  box.innerHTML = '<div class="loading" style="grid-column:1/-1"><span class="spin"></span> 搜索中，书源多时可能要十几秒…</div>';
+  try {
+    const r = await api('/search', { keyword: kw, sources: usable.map((s) => ({ bookSourceName: s.bookSourceName })) });
+    if (!r.results || !r.results.length) {
+      box.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="big">🔍</div><h3>没有搜到结果</h3><p>书源都没返回数据，可能规则已变更或源站限制了访问。试试换关键词或换书源。</p></div>`;
+      return;
+    }
+    $('#search-sub').textContent = `找到 ${r.results.length} 个结果`;
+    box.innerHTML = r.results.map((x, i) => `
+      <button class="res" data-i="${i}">
+        <div class="cov">${x.cover ? `<img src="${esc(x.cover)}" alt="" onerror="this.parentNode.textContent='${esc((x.title || '书')[0])}'" />` : esc((x.title || '书')[0])}</div>
+        <div class="info">
+          <div class="t">${esc(x.title || '未命名')}</div>
+          <div class="a">${esc(x.author || '佚名')}</div>
+          ${x.intro ? `<div class="d">${esc(x.intro)}</div>` : ''}
+          <div class="src"><span class="dot"></span>${esc(x.source || '')}</div>
+        </div>
+      </button>`).join('');
+    box.querySelectorAll('.res').forEach((el) => { el.onclick = () => openBook(r.results[+el.dataset.i]); });
+    if (r.errors && r.errors.length) {
+      $('#search-errs').innerHTML = '部分书源失败：' + r.errors.map((e) => `<b>${esc(e.name)}</b> ${esc(e.error)}`).join('；');
+    }
+  } catch (e) {
+    box.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="big">⚠️</div><h3>搜索失败</h3><p>${esc(e.message)}</p></div>`;
+  }
+}
+$('#btn-q').onclick = doSearch;
+$('#q').addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+$('#btn-shelf').onclick = () => { renderShelf(); view('shelf'); };
+$('#btn-back-shelf').onclick = () => { renderShelf(); view('shelf'); };
+$('#btn-toc-back').onclick = () => { renderShelf(); view('shelf'); };
+
+/* ============================================================
+   目录
+   ============================================================ */
+async function openBook(result) {
+  view('toc');
+  $('#toc-title').textContent = result.title || '目录';
+  $('#toc-sub').textContent = '正在抓取目录…';
+  $('#book-head').style.display = 'none';
+  $('#toc-list').innerHTML = '<div class="loading" style="grid-column:1/-1"><span class="spin"></span> 抓取目录中…</div>';
+  try {
+    const r = await api('/toc', { source: { bookSourceName: result.source }, bookUrl: result.url });
+    if (!r.toc || !r.toc.length) throw new Error('目录为空');
+    const book = {
+      title: (r.info && r.info.name) || result.title, author: (r.info && r.info.author) || result.author,
+      cover: (r.info && r.info.cover) || result.cover, source: result.source, bookUrl: result.url,
+      toc: r.toc, idx: 0, total: r.toc.length,
+    };
+    const exist = BOOKS.findIndex((b) => b.bookUrl === book.bookUrl && b.source === book.source);
+    if (exist >= 0) { book.idx = Math.min(BOOKS[exist].idx || 0, r.toc.length - 1); BOOKS[exist] = book; }
+    else { if (BOOKS.length >= 60) BOOKS.shift(); BOOKS.push(book); }
+    store.set(LS.books, BOOKS);
+    curBook = book; curIdx = book.idx;
+    $('#toc-title').textContent = book.title;
+    $('#toc-sub').textContent = `${book.author || '佚名'} · 共 ${book.toc.length} 章`;
+    renderBookHead();
+    renderToc();
+  } catch (e) {
+    $('#toc-sub').textContent = '抓取失败';
+    $('#toc-list').innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="big">📕</div><h3>抓不到目录</h3><p>${esc(e.message)}</p><p style="font-size:12px">换个书源再搜一次试试。</p></div>`;
+  }
+}
+
+function renderBookHead() {
+  if (!curBook) return;
+  $('#book-head').style.display = '';
+  $('#bh-title').textContent = curBook.title;
+  $('#bh-who').textContent = [curBook.author, curBook.source, `${curBook.toc.length} 章`].filter(Boolean).join(' · ');
+  const cov = $('#bh-cover');
+  cov.innerHTML = curBook.cover ? `<img src="${esc(curBook.cover)}" alt="" onerror="this.parentNode.textContent='${esc(curBook.title[0])}'" />` : esc(curBook.title[0]);
+  $('#btn-continue').onclick = () => { curIdx = curBook.idx || 0; view('read'); loadChapter(); };
+}
+
+function renderToc() {
+  if (!curBook) return;
+  const filter = ($('#toc-q').value || '').trim().toLowerCase();
+  const items = curBook.toc.map((x, i) => ({ name: x.name || '', url: x.url, i })).filter((x) => !filter || x.name.toLowerCase().includes(filter));
+  $('#toc-count').textContent = filter ? `${items.length} / ${curBook.toc.length} 章` : `${curBook.toc.length} 章`;
+  if (!items.length) {
+    $('#toc-list').innerHTML = '<p style="padding:20px 2px;color:var(--ink-3);font-size:13px">没有匹配的章节</p>';
+    return;
+  }
+  $('#toc-list').innerHTML = items.map((x) => `<button class="toc-i${x.i === curIdx ? ' now' : ''}" data-i="${x.i}">
+    <span class="n">${esc(x.name)}</span>${x.i === curIdx ? '<span class="badge">读到这</span>' : ''}
+  </button>`).join('');
+  $('#toc-list').querySelectorAll('.toc-i').forEach((el) => {
+    el.onclick = () => { curIdx = +el.dataset.i; view('read'); loadChapter(); };
+  });
+  const now = $('#toc-list').querySelector('.toc-i.now');
+  if (now && now.scrollIntoView) now.scrollIntoView({ block: 'center' });
+}
+$('#toc-q').addEventListener('input', renderToc);
+
+/* ============================================================
+   阅读
+   ============================================================ */
+let curText = '';
+
+function renderChapter() {
+  const box = $('#rd-txt');
+  if (!curText) { box.innerHTML = '<p class="hint">这一章没有内容</p>'; return; }
+  const paras = curText.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+  const noInd = CFG.font !== 'serif';
+  box.style.fontFamily = CFG.font === 'serif' ? 'var(--font-read)' : 'var(--font-ui)';
+  box.innerHTML = paras.map((p) => `<p${noInd ? ' class="no-ind"' : ''}>${esc(p)}</p>`).join('');
+}
+
+async function loadChapter() {
+  if (!curBook || !curBook.toc || !curBook.toc.length) return;
+  const ch = curBook.toc[curIdx];
+  $('#rd-title').textContent = ch.name || `第 ${curIdx + 1} 章`;
+  $('#rd-txt').innerHTML = '<div class="loading"><span class="spin"></span> 正在加载正文…</div>';
+  window.scrollTo(0, 0);
+  try {
+    const r = await api('/content', { source: { bookSourceName: curBook.source }, chapterUrl: ch.url });
+    curText = r.content || '';
+    renderChapter();
+    curBook.idx = curIdx;
+    const i = BOOKS.findIndex((b) => b.bookUrl === curBook.bookUrl && b.source === curBook.source);
+    if (i >= 0) { BOOKS[i].idx = curIdx; BOOKS[i].total = curBook.toc.length; store.set(LS.books, BOOKS); }
+    updateProg();
+  } catch (e) {
+    curText = '';
+    $('#rd-txt').innerHTML = `<p class="hint" style="color:var(--bad)">${esc(e.message)}</p>`;
+  }
+}
+
+function updateProg() {
+  const total = (curBook && curBook.toc && curBook.toc.length) || 1;
+  const pct = Math.round((curIdx + 1) / total * 100);
+  $('#rd-prog').style.width = pct + '%';
+  $('#rd-pos').textContent = `${curIdx + 1} / ${total} 章 · ${pct}%`;
+}
+
+function goChapter(delta) {
+  if (!curBook || !curBook.toc || !curBook.toc.length) return;
+  const n = curIdx + delta;
+  if (n < 0) return toast('已经是第一章了');
+  if (n >= curBook.toc.length) return toast('已经是最后一章了');
+  curIdx = n;
+  renderToc();
+  loadChapter();
+}
+
+$('#btn-prev').onclick = () => goChapter(-1);
+$('#btn-next').onclick = () => goChapter(1);
+$('#btn-read-back').onclick = () => { renderToc(); view('toc'); };
+
+document.addEventListener('keydown', (e) => {
+  const readOn = document.getElementById('v-read').classList.contains('on');
+  if (!readOn) return;
+  if (e.target && /input|textarea/i.test(e.target.tagName)) return;
+  if (e.key === 'ArrowLeft') goChapter(-1);
+  else if (e.key === 'ArrowRight') goChapter(1);
 });
 
 /* ============================================================
    启动
    ============================================================ */
-(async function init() {
-  applyCfg();
+async function boot() {
   renderShelf();
-  renderSrcFilter();
-  renderSourceList();
-
-  // 书源在 localStorage 里，但服务端内存表重启即空 —— 每次打开都重新登记一次
   if (SOURCES.length) {
     try {
-      const r = await importSources(JSON.stringify(SOURCES));
-      if (r.usable) toast(`已恢复 ${r.total} 个书源，${r.usable} 个可用`);
-    } catch { /* 忽略 */ }
-    renderSourceList();
-    renderSrcFilter();
+      const r = await api('/inspect', { sources: SOURCES });
+      CAP = {};
+      for (const s of r.sources) CAP[s.name] = { usable: s.usable, reason: s.reason };
+      await fetch('/api/novel/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sources: SOURCES }) });
+      renderShelf();
+    } catch { /* ignore */ }
   }
-
-  // 直接进搜索页：?q=xxx
-  const kw = new URLSearchParams(location.search).get('q');
-  if (kw) {
-    view('search');
-    $('#q').value = kw;
-    setTimeout(doSearch, 260);
-  }
-})();
+}
+boot();
 </script>
 </body>
 </html>
