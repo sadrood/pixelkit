@@ -218,9 +218,21 @@ class App {
       });
     });
 
-    const pages = ['compose', 'convert', 'document', 'agent', 'ppt', 'docx-editor', 'timer', 'fileshare', 'counter', 'qr', 'tasks', 'lifesim', 'book'];
+    const pages = ['compose', 'convert', 'document', 'agent', 'ppt', 'docx-editor', 'timer', 'fileshare', 'counter', 'qr', 'tasks', 'lifesim', 'book', 'nightmarket'];
     for (const p of pages) {
       document.getElementById(`btn-back-${p}`).addEventListener('click', () => this.showPage('home'));
+    }
+
+    // 夜市小游戏全屏切换（包一层 wrap，全屏时保留整个游戏区域）
+    const nmFs = document.getElementById('btn-nightmarket-fullscreen');
+    if (nmFs) {
+      nmFs.addEventListener('click', async () => {
+        const wrap = document.querySelector('.nightmarket-wrap');
+        try {
+          if (!document.fullscreenElement) await (wrap || document.documentElement).requestFullscreen();
+          else await document.exitFullscreen();
+        } catch { /* 浏览器不支持就忽略 */ }
+      });
     }
 
     // 页内跳转（成长模拟器选中「人生之书 · 玩法加厚版」时切到 #page-book）
@@ -236,6 +248,11 @@ class App {
     const pageEl = document.getElementById(`page-${name}`);
     if (pageEl) pageEl.classList.add('active');
     this.currentPage = name;
+    // 夜市小游戏用 iframe 懒加载：只有第一次打开时才去加载那 2MB 静态资源
+    if (name === 'nightmarket') {
+      const f = document.getElementById('nightmarket-frame');
+      if (f && !f.getAttribute('src')) f.setAttribute('src', f.dataset.src);
+    }
 
     if (name === 'compose' && this._composeInited) {
       setTimeout(() => {

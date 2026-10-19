@@ -48,11 +48,11 @@
 
           <div class="home-hero-grid">
             <div class="home-hero-copy">
-              <span class="home-badge"><i></i>13 个在线工具 · 全部免费 · 免注册</span>
+              <span class="home-badge"><i></i>14 个在线工具 · 全部免费 · 免注册</span>
 
               <h1 class="home-headline">把琐碎的文件活<br>一次做完</h1>
 
-              <p class="home-lede">图片拼接、格式转换、文档转 PDF、二维码、计时计数……13 个工具全部在浏览器里运行，打开就能用，文件不送到第三方服务器。</p>
+              <p class="home-lede">图片拼接、格式转换、文档转 PDF、二维码、计时计数……14 个工具全部在浏览器里运行，打开就能用，文件不送到第三方服务器。</p>
 
               <ul class="home-trust">
                 <li><svg class="t-ok" width="16" height="16" aria-hidden="true"><use href="#i-ok"/></svg>浏览器本地处理</li>
@@ -102,7 +102,7 @@
         <section class="home-tools">
           <div class="home-tools-head">
             <span class="home-kicker">ALL TOOLS · 全部工具</span>
-            <h2>13 个工具，按你手头的活分组</h2>
+            <h2>14 个工具，按你手头的活分组</h2>
             <p>每个工具都独立可用、无需注册。图片与文档类工具全部在浏览器本地完成，不上传、不留存。</p>
           </div>
 
@@ -233,7 +233,7 @@
               <div class="tool-group-head">
                 <i></i>
                 <h3>AI 与实验</h3>
-                <span>2 个工具</span>
+                <span>3 个工具</span>
               </div>
               <div class="tool-cards">
                 <div class="home-card" data-page="agent" data-group="ai" style="--accent:#8b5cf6">
@@ -242,7 +242,12 @@
                   <p>智能服务器管理助手，可查看服务器状态、端口、文件，配置 AI 后可进行自然语言对话</p>
                   <span class="card-arrow">进入 →</span>
                 </div>
-                <div class="home-card" data-page="lifesim" data-group="ai" style="--accent:#e85c7d">
+                <div class="home-card" data-page="nightmarket" data-group="ai" style="--accent:#f2a93b">
+                  <div class="card-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M12 2.6v1.8M8.5 4.4h7M9.2 4.4 8 10.6h8L14.8 4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.4 10.6h9.2L15.4 20H8.6L7.4 10.6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 13.2v3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+                  <h2>夜市：一百块</h2>
+                  <p>一个可以走进去的 3D 夜市：先逛、再猜自己花掉了多少。全程不显示余额，只在你「买够了」时结算，看预测和实际差多少</p>
+                  <span class="card-arrow">进入 →</span>
+                </div>                <div class="home-card" data-page="lifesim" data-group="ai" style="--accent:#e85c7d">
                   <div class="card-icon"><svg><use href="#i-life"/></svg></div>
                   <h2>成长模拟器</h2>
                   <p>文字人生模拟平台：一套引擎、多套人生。出身随机、岁段推进、事件抉择 + 主动行动，终局结算与成就图鉴。含人生百态 / 重生之我是公务员 / 白手起家 / 人生之书，以及《人生之书》加厚版五条世界线</p>
@@ -255,7 +260,7 @@
 
           <div class="home-empty" id="home-empty">
             <strong>没有匹配的工具</strong>
-            <span>换个关键词试试，或者点「全部」看完整的 13 个。</span>
+            <span>换个关键词试试，或者点「全部」看完整的 14 个。</span>
           </div>
         </section>
 
@@ -689,6 +694,24 @@
       </main>
     </div>
     <!-- ==================== AI助手页面 ==================== -->
+    <!-- ==================== 夜市：一百块（独立静态页，iframe 嵌入）==================== -->
+    <div id="page-nightmarket" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-nightmarket" class="btn btn-back" title="返回主页">← 返回</button>
+          <span class="logo">夜市：一百块</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right">
+          <button id="btn-nightmarket-fullscreen" class="btn btn-sm" title="全屏游玩">⛶ 全屏</button>
+          <a class="btn btn-sm" href="/night-market/" target="_blank" rel="noopener" title="在新窗口打开">↗ 新窗口</a>
+        </div>
+      </header>
+      <main class="nightmarket-wrap">
+        <iframe id="nightmarket-frame" class="nightmarket-frame" title="夜市：一百块" allow="autoplay; fullscreen" data-src="/night-market/index.html"></iframe>
+        <p class="nightmarket-tip">WASD / 方向键走动，靠近摊位点单；手机上点按屏幕移动。买够了点「买够了」结算。</p>
+      </main>
+    </div>
     <div id="page-agent" class="page">
       <header class="toolbar">
         <div class="toolbar-left">

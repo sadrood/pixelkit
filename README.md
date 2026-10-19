@@ -1,6 +1,6 @@
 # PixelKit 在线工具箱
 
-一个自己搭的在线工具站：**图片、文档、PDF、二维码、计时计数、AI 助手**等 13 个工具，打开即用、无需注册。
+一个自己搭的在线工具站：**图片、文档、PDF、二维码、计时计数、AI 助手、3D 小游戏**等 14 个工具，打开即用、无需注册。
 图片与文档类工具**全部在浏览器本地完成**，不上传、不留存。
 
 - 在线地址：<http://139.9.176.191:8081/>
@@ -8,7 +8,7 @@
 
 ---
 
-## 功能一览（13 个工具，四组）
+## 功能一览（14 个工具，四组）
 
 | 分组 | 工具 | 说明 |
 | --- | --- | --- |
@@ -25,6 +25,7 @@
 | | 生长模拟器 | 投胎 → 天赋 → 行动 → 事件抉择 |
 | **AI 与实验** | AI 助手 | 流式对话、联网搜索、看图、画信息图、文件问答 |
 | | 人生之书 | 互动小说：序章 → 章节选择 → 灯谱结算 |
+| | 夜市：一百块 | Three.js 3D 夜市漫步小游戏：走进去逛、点单，最后猜自己花了多少；站内以 iframe 嵌入独立静态页（`public/night-market/`） |
 
 另有若干未在首页列出的实验页（如 3D 演示、小游戏），代码都在 `src/pages/` 下。
 
@@ -163,3 +164,13 @@ nginx 放在前面做反代（`/api/`、`/collab`、`/qr/`、`/fs/`、`/s/`）�
 
 代码以仓库根目录的 `LICENSE` 为准。
 `public/fonts/` 下的 Montserrat 字体遵循 SIL Open Font License，许可证文本见同目录 `Montserrat-OFL.txt`。
+
+---
+
+## 第三方与致谢
+
+- **夜市：一百块**（`public/night-market/`）整合自 [@KoriIku/night-market](https://github.com/KoriIku/night-market)，
+  版权归原作者所有。原仓库**未附开源许可证**；此处仅作个人站点整合与学习用途，如原作者要求可随时移除。
+  原始说明保留在 `public/night-market/ORIGINAL-README.md`。
+- AI 助手页面使用的 **Montserrat** 字体：SIL Open Font License（见 `public/fonts/Montserrat-OFL.txt`）。
+- `public/zhuzhiliao/` 等目录内含第三方库，版权归各自作者。
