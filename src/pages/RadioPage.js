@@ -413,7 +413,7 @@ export class RadioPage {
         const title = r && r.title;
         if (song) {
           song.textContent = title ? '正在播放：' + title : '';
-          song.style.display = title ? '' : 'none';
+          song.style.display = title ? 'block' : 'none';
         }
       } catch { /* ignore */ }
     };
