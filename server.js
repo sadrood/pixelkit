@@ -7294,6 +7294,73 @@ app.post('/api/novel/register', (req, res) => {
   res.json({ success: true, registered: added, total: novelSources.size });
 });
 
+/* 从链接导入书源：书源分享站多是 HTML 分享页，需要从页面里找 JSON 或二次下载。
+   只允许 http/https，拒绝内网地址（防 SSRF），限制 20s / 5MB。 */
+app.get('/api/novel/fetch-source', async (req, res) => {
+  const raw = String(req.query.url || '').trim();
+  let target;
+  try { target = new URL(raw); } catch { return res.status(400).json({ success: false, error: '链接格式不对' }); }
+  if (!/^https?:$/.test(target.protocol)) return res.status(400).json({ success: false, error: '只支持 http/https 链接' });
+  const host = target.hostname.toLowerCase();
+  const isPrivate = host === 'localhost' || host === '0.0.0.0'
+    || /^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)
+    || /^172\.(1[6-9]|2\d|3[01])\./.test(host) || /^169\.254\./.test(host) || host.endsWith('.local');
+  if (isPrivate) return res.status(400).json({ success: false, error: '不允许访问内网地址' });
+
+  const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+  const pickSources = (text) => {
+    try {
+      const j = JSON.parse(String(text).replace(/^\uFEFF/, ''));
+      const arr = Array.isArray(j) ? j : [j];
+      const out = arr.filter((s) => s && typeof s === 'object' && (s.bookSourceUrl || s.bookSourceName));
+      return out.length ? out : null;
+    } catch { return null; }
+  };
+  const fetchText = async (u) => {
+    const r = await fetch(u, {
+      headers: { 'User-Agent': UA, 'Accept': 'application/json, text/plain, text/html, */*', 'Accept-Language': 'zh-CN,zh;q=0.9' },
+      redirect: 'follow', signal: AbortSignal.timeout(20000),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 5 * 1024 * 1024) throw new Error('文件太大（超过 5MB）');
+    return buf.toString('utf8');
+  };
+
+  try {
+    const text = await fetchText(target.toString());
+    let sources = pickSources(text);
+    let via = 'json';
+    if (!sources) {
+      // HTML 分享页：先找内嵌 JSON（script 里），再找 .json/.txt 下载链接
+      const candidates = [];
+      for (const m of String(text).matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)) {
+        const body = m[1];
+        const j = body.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+        if (j) candidates.push(j[1]);
+      }
+      candidates.push(text);
+      for (const c of candidates) { const p = pickSources(c); if (p) { sources = p; via = 'html-json'; break; } }
+      if (!sources) {
+        const links = [...String(text).matchAll(/(?:href|src|data-url)\s*=\s*["']([^"']+\.(?:json|txt)(?:\?[^"']*)?)["']/gi)].map((m) => m[1]);
+        for (const link of [...new Set(links)].slice(0, 3)) {
+          try {
+            const u2 = new URL(link, target.toString()).toString();
+            const p = pickSources(await fetchText(u2));
+            if (p) { sources = p; via = 'link'; break; }
+          } catch { /* 试下一个 */ }
+        }
+      }
+    }
+    if (!sources || !sources.length) {
+      const gone = /地址不存在|页面不存在|已删除|已失效|not found/i.test(String(text).slice(0, 4000));
+      return res.status(422).json({ success: false, error: gone ? '这个分享链接已经失效（页面提示地址不存在）' : '页面里没有找到可用的书源 JSON' });
+    }
+    res.json({ success: true, via, count: sources.length, sources });
+  } catch (e) {
+    res.status(502).json({ success: false, error: '抓取失败：' + (e.message || e) });
+  }
+});
 const distDir = path.join(__dirname, 'dist');
 if (existsSync(distDir)) {
   app.use(express.static(distDir, { index: 'index.html' }));

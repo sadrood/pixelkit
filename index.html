@@ -48,11 +48,11 @@
 
           <div class="home-hero-grid">
             <div class="home-hero-copy">
-              <span class="home-badge"><i></i>15 个在线工具 · 全部免费 · 免注册</span>
+              <span class="home-badge"><i></i>16 个在线工具 · 全部免费 · 免注册</span>
 
               <h1 class="home-headline">把琐碎的文件活<br>一次做完</h1>
 
-              <p class="home-lede">图片拼接、格式转换、文档转 PDF、二维码、计时计数……15 个工具全部在浏览器里运行，打开就能用，文件不送到第三方服务器。</p>
+              <p class="home-lede">图片拼接、格式转换、文档转 PDF、二维码、计时计数……16 个工具全部在浏览器里运行，打开就能用，文件不送到第三方服务器。</p>
 
               <ul class="home-trust">
                 <li><svg class="t-ok" width="16" height="16" aria-hidden="true"><use href="#i-ok"/></svg>浏览器本地处理</li>
@@ -102,7 +102,7 @@
         <section class="home-tools">
           <div class="home-tools-head">
             <span class="home-kicker">ALL TOOLS · 全部工具</span>
-            <h2>15 个工具，按你手头的活分组</h2>
+            <h2>16 个工具，按你手头的活分组</h2>
             <p>每个工具都独立可用、无需注册。图片与文档类工具全部在浏览器本地完成，不上传、不留存。</p>
           </div>
 
@@ -233,7 +233,7 @@
               <div class="tool-group-head">
                 <i></i>
                 <h3>AI 与实验</h3>
-                <span>4 个工具</span>
+                <span>5 个工具</span>
               </div>
               <div class="tool-cards">
                 <div class="home-card" data-page="agent" data-group="ai" style="--accent:#8b5cf6">
@@ -246,6 +246,11 @@
                   <div class="card-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none"><circle cx="12" cy="12" r="8.4" stroke="currentColor" stroke-width="1.6"/><ellipse cx="12" cy="12" rx="3.6" ry="8.4" stroke="currentColor" stroke-width="1.3"/><path d="M3.8 9.2h16.4M3.8 14.8h16.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="18.6" cy="5.6" r="1.7" fill="currentColor"/></svg></div>
                   <h2>世界电台</h2>
                   <p>按国家或流派挑一个电台，或者点「下一站」随缘听：拉美电波、非洲鼓点、冰岛后摇……音频由本站服务器中转，不依赖你的网络能否直连</p>
+                  <span class="card-arrow">进入 →</span>
+                </div>                <div class="home-card" data-page="novel" data-group="ai" style="--accent:#8a6ad6">
+                  <div class="card-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M5 4.8h9.5a2.5 2.5 0 0 1 2.5 2.5v12H7.5A2.5 2.5 0 0 0 5 21V4.8Z" stroke="currentColor" stroke-width="1.6"/><path d="M5 17.8h12" stroke="currentColor" stroke-width="1.3"/><path d="M9 8.6h6M9 11.6h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></div>
+                  <h2>小说阅读</h2>
+                  <p>导入「阅读」书源后搜书、看目录、读正文；支持粘贴书源 JSON，或直接贴分享链接由服务器代抓。书架和阅读进度存在本机</p>
                   <span class="card-arrow">进入 →</span>
                 </div>                <div class="home-card" data-page="nightmarket" data-group="ai" style="--accent:#f2a93b">
                   <div class="card-icon"><svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M12 2.6v1.8M8.5 4.4h7M9.2 4.4 8 10.6h8L14.8 4.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.4 10.6h9.2L15.4 20H8.6L7.4 10.6Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 13.2v3.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
@@ -265,7 +270,7 @@
 
           <div class="home-empty" id="home-empty">
             <strong>没有匹配的工具</strong>
-            <span>换个关键词试试，或者点「全部」看完整的 15 个。</span>
+            <span>换个关键词试试，或者点「全部」看完整的 16 个。</span>
           </div>
         </section>
 
@@ -748,6 +753,23 @@
           </div>
           <div class="radio-list" id="radio-list"></div>
         </div>
+      </main>
+    </div>
+    <!-- ==================== 小说阅读（独立阅读器页，iframe 嵌入）==================== -->
+    <div id="page-novel" class="page">
+      <header class="toolbar">
+        <div class="toolbar-left">
+          <button id="btn-back-novel" class="btn btn-back" title="返回主页">← 返回</button>
+          <span class="logo">小说阅读</span>
+        </div>
+        <div class="toolbar-center"></div>
+        <div class="toolbar-right">
+          <button id="btn-novel-fullscreen" class="btn btn-sm" type="button">⛶ 全屏</button>
+          <a class="btn btn-sm" href="/novel/index.html" target="_blank" rel="noopener">↗ 新窗口</a>
+        </div>
+      </header>
+      <main class="nightmarket-wrap">
+        <iframe id="novel-frame" class="nightmarket-frame" data-src="/novel/index.html" title="小说阅读器" allow="autoplay; fullscreen" referrerpolicy="no-referrer"></iframe>
       </main>
     </div>
     <!-- ==================== 夜市：一百块（独立静态页，iframe 嵌入）==================== -->

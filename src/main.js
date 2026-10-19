@@ -218,7 +218,7 @@ class App {
       });
     });
 
-    const pages = ['compose', 'convert', 'document', 'agent', 'ppt', 'docx-editor', 'timer', 'fileshare', 'counter', 'qr', 'tasks', 'lifesim', 'book', 'nightmarket', 'radio'];
+    const pages = ['compose', 'convert', 'document', 'agent', 'ppt', 'docx-editor', 'timer', 'fileshare', 'counter', 'qr', 'tasks', 'lifesim', 'book', 'nightmarket', 'radio', 'novel'];
     for (const p of pages) {
       document.getElementById(`btn-back-${p}`).addEventListener('click', () => this.showPage('home'));
     }
@@ -228,6 +228,18 @@ class App {
     if (nmFs) {
       nmFs.addEventListener('click', async () => {
         const wrap = document.querySelector('.nightmarket-wrap');
+        try {
+          if (!document.fullscreenElement) await (wrap || document.documentElement).requestFullscreen();
+          else await document.exitFullscreen();
+        } catch { /* 浏览器不支持就忽略 */ }
+      });
+    }
+
+    // 小说阅读器全屏
+    const nvFs = document.getElementById('btn-novel-fullscreen');
+    if (nvFs) {
+      nvFs.addEventListener('click', async () => {
+        const wrap = document.querySelector('#page-novel .nightmarket-wrap');
         try {
           if (!document.fullscreenElement) await (wrap || document.documentElement).requestFullscreen();
           else await document.exitFullscreen();
@@ -260,6 +272,11 @@ class App {
     // 夜市小游戏用 iframe 懒加载：只有第一次打开时才去加载那 2MB 静态资源
     if (name === 'nightmarket') {
       const f = document.getElementById('nightmarket-frame');
+      if (f && !f.getAttribute('src')) f.setAttribute('src', f.dataset.src);
+    }
+    // 小说阅读器：同样是独立页，懒加载
+    if (name === 'novel') {
+      const f = document.getElementById('novel-frame');
       if (f && !f.getAttribute('src')) f.setAttribute('src', f.dataset.src);
     }
 

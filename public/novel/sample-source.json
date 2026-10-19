@@ -1,0 +1,19 @@
+[
+  {
+    "bookSourceName": "格格党",
+    "bookSourceUrl": "http://www.qodown.com",
+    "searchUrl": "http://www.qodown.com/search/,\n{\n  \"body\": \"searchkey={{key}}&Submit=搜索\",\n  \"method\": \"POST\"\n}",
+    "ruleSearch": {
+      "bookList": ".txt-list li",
+      "name": ".s2 a::text",
+      "author": ".s4::text",
+      "bookUrl": ".s2 a[href]"
+    },
+    "ruleToc": {
+      "chapterList": ".section-list li a",
+      "chapterName": "text",
+      "chapterUrl": "href"
+    },
+    "ruleContent": { "content": "#content" }
+  }
+]
