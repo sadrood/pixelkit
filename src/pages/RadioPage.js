@@ -56,6 +56,7 @@ export class RadioPage {
     }
 
     // 浏览面板
+    this.$('radio-auto')?.addEventListener('click', () => this.toggleAutoTour());
     this.$('radio-sheet-toggle')?.addEventListener('click', () => this.toggleSheet());
     this.$('radio-sheet-close')?.addEventListener('click', () => this.toggleSheet(false));
     this.$('radio-search')?.addEventListener('input', () => this.renderList());
@@ -107,7 +108,13 @@ export class RadioPage {
       const slider = this.$('radio-slider');
       if (slider) { slider.max = String(Math.max(0, this.geoStations.length - 1)); slider.disabled = false; }
       if (loading) loading.style.display = 'none';
-      this.setIndex(0, false);
+      // 恢复上次听的电台（没有就从第一个开始）
+      let startIdx = 0;
+      try {
+        const savedId = localStorage.getItem('pk_radio_station');
+        if (savedId) { const k = this.geoStations.findIndex((s) => s.id === savedId); if (k >= 0) startIdx = k; }
+      } catch { /* ignore */ }
+      this.setIndex(startIdx, false);
       // 抽屉先用地球数据集填满（目录接口可能不可用）
       if (!this.listStations.length) {
         this.listStations = this.geoStations.map((g) => ({ id: g.id, name: g.name, country: g.country, codec: g.codec, bitrate: g.bitrate, url: g.url }));
@@ -226,6 +233,24 @@ export class RadioPage {
     }, 700);
   }
 
+  /** 自动漫游：每 25 秒自动换一台，像收音机巡游 */
+  toggleAutoTour() {
+    const btn = this.$('radio-auto');
+    if (this.autoTour) {
+      this.autoTour = false;
+      if (this._autoTimer) { clearInterval(this._autoTimer); this._autoTimer = null; }
+      if (btn) { btn.classList.remove('active'); btn.textContent = '自动漫游'; }
+      this.setHint('已停止自动漫游');
+      return;
+    }
+    this.autoTour = true;
+    if (btn) { btn.classList.add('active'); btn.textContent = '漫游中…'; }
+    this.setHint('自动漫游：每 25 秒换一台');
+    if (this.index < 0) this.step(1);
+    this._autoTimer = setInterval(() => {
+      if (this.autoTour) this.step(1);
+    }, 25000);
+  }
   /* ==================== 浏览面板（国家 / 流派 / 搜索） ==================== */
   toggleSheet(force) {
     const sheet = this.$('radio-sheet');
