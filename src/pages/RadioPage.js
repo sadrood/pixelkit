@@ -68,6 +68,22 @@ export class RadioPage {
     document.addEventListener('click', () => { const fn = this._pendingPlay; if (fn) { this._pendingPlay = null; fn(); } });
     this.updateStatus('就绪');
 
+    // 搜索浮层开关（顶栏放大镜）
+    this.$('radio-q-btn')?.addEventListener('click', () => {
+      const box = this.$('radio-searchbox');
+      if (!box) return;
+      box.hidden = !box.hidden;
+      if (!box.hidden) this.$('radio-q')?.focus();
+    });
+    // 收藏（本机）
+    this.loadFavs();
+    this.$('radio-fav')?.addEventListener('click', () => this.toggleFav());
+    // 进入：确保正在播放当前台（或从当前开始播）
+    this.$('radio-enter')?.addEventListener('click', () => {
+      if (this.current) { this.audio.play().catch(() => {}); this.updateStatus('播放中'); }
+      else this.step(1);
+    });
+
     // 浏览面板
     this.$('radio-auto')?.addEventListener('click', () => this.toggleAutoTour());
     this.$('radio-sheet-toggle')?.addEventListener('click', () => this.toggleSheet());
@@ -83,7 +99,7 @@ export class RadioPage {
     this.audio?.addEventListener('error', () => this.onAudioError());
     this.audio?.addEventListener('stalled', () => { /* 等看门狗 */ });
 
-    // 键盘：← → 换台，空格播放/暂停（仅本页激活时）
+    // 键盘：← → 换台，空格暂停，F 收藏，Enter 进入，/ 搜索（仅本页激活时）
     document.addEventListener('keydown', (e) => {
       const page = this.$('page-radio');
       if (!page || !page.classList.contains('active')) return;
@@ -92,6 +108,14 @@ export class RadioPage {
       if (e.key === 'ArrowLeft') { e.preventDefault(); this.step(-1); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); this.step(1); }
       else if (e.key === ' ') { e.preventDefault(); this.togglePlay(); }
+      else if (e.key === 'F' || e.key === 'f') { this.toggleFav(); }
+      else if (e.key === 'Enter') { this.$('radio-enter')?.click(); }
+      else if (e.key === '/') {
+        e.preventDefault();
+        const box = this.$('radio-searchbox');
+        if (box) box.hidden = false;
+        this.$('radio-q')?.focus();
+      }
     });
 
     try { window.__pkRadio = this; } catch { /* 调试钩子 */ }
@@ -141,6 +165,8 @@ export class RadioPage {
         tooltipEl: this.$('radio-globe-tip'),
         onPick: (s) => this.onGlobePick(s),
       });
+      // 拖动停稳后：准星对准的最近电台自动收听（RoamDial 的核心交互）
+      try { this._globe.onSettle?.(() => this.autoTuneFromCrosshair()); } catch { /* ignore */ }
       const slider = this.$('radio-slider');
       if (slider) { slider.max = String(Math.max(0, this.geoStations.length - 1)); slider.disabled = false; }
       if (loading) loading.style.display = 'none';
@@ -343,6 +369,45 @@ export class RadioPage {
     const Hls = await this._hlsLoading;
     this._hlsLoading = null;
     return Hls;
+  }
+  /* ==================== 准星自动收听 / 收藏 ==================== */
+  autoTuneFromCrosshair() {
+    if (!this._globe || !this.geoStations.length) return;
+    const i = this._globe.pickCenter ? this._globe.pickCenter() : -1;
+    if (i < 0) { this.setHint('准星没对准电台，再拖一点'); return; }
+    if (i === this.index) { this.setHint('已锁定 · ' + this.geoStations[i].name); return; }
+    this.setIndex(i, true);
+    this.updateStatus('已锁定');
+    this.setHint('准星锁定 · 自动收听');
+  }
+
+  loadFavs() {
+    try { this.favs = new Set(JSON.parse(localStorage.getItem('pk_radio_favs') || '[]')); }
+    catch { this.favs = new Set(); }
+    this.updateFavUI();
+  }
+
+  isFav(id) { return !!(this.favs && this.favs.has(String(id))); }
+
+  toggleFav() {
+    const s = this.current || this.geoStations[this.index];
+    if (!s) return;
+    if (!this.favs) this.loadFavs();
+    const id = String(s.id);
+    if (this.favs.has(id)) this.favs.delete(id);
+    else this.favs.add(id);
+    try { localStorage.setItem('pk_radio_favs', JSON.stringify([...this.favs])); } catch { /* ignore */ }
+    this.updateFavUI();
+    this.toast?.show?.(this.favs.has(id) ? '已收藏 · ' + s.name : '已取消收藏', 'success');
+  }
+
+  updateFavUI() {
+    const btn = this.$('radio-fav');
+    if (!btn) return;
+    const s = this.current || this.geoStations[this.index];
+    const on = s && this.isFav(s.id);
+    btn.textContent = on ? '♥' : '♡';
+    btn.classList.toggle('on', Boolean(on));
   }
   /* ==================== 频谱 / 正在播放 / 状态 ==================== */
   updateStatus(text) {

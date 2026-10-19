@@ -705,63 +705,83 @@
     </div>
     <!-- ==================== AI助手页面 ==================== -->
     <!-- ==================== 世界电台（全屏沉浸式：地球 + 底部滑动选台）==================== -->
+    <!-- ==================== 世界电台（RoamSky：全屏星图 + 准星 + 底部拨盘）==================== -->
     <div id="page-radio" class="page radio-page">
-      <header class="toolbar radio-toolbar">
-        <div class="toolbar-left">
-          <button id="btn-back-radio" class="btn btn-back" title="返回主页">← 返回</button>
-          <span class="logo">电台漫游</span>
-        </div>
-        <div class="toolbar-center"></div>
-        <div class="toolbar-right radio-top-actions">
-          <div class="radio-searchbox">
-            <input id="radio-q" type="search" placeholder="搜台名 / 国家 / 流派" autocomplete="off" />
-            <div id="radio-q-list" class="radio-q-list" hidden></div>
-          </div>
-          <button id="radio-auto" class="btn btn-sm" type="button" title="每 25 秒自动换一台">自动漫游</button>
-          <span id="radio-top-meta" class="radio-chip">正在加载…</span>
-          <button id="radio-sheet-toggle" class="btn btn-sm" type="button">浏览</button>
-        </div>
-      </header>
       <main class="radio-stage" id="radio-stage">
         <div class="radio-globe-wrap" id="radio-globe-wrap">
           <div class="radio-globe" id="radio-globe"></div>
           <div class="radio-globe-tip" id="radio-globe-tip"></div>
           <div class="radio-globe-loading" id="radio-globe-loading">正在加载全球电台…</div>
         </div>
-        <div class="radio-hud">
-          <div class="radio-now">
-            <span class="radio-now-country" id="radio-now-country">拖动滑杆漫游全球</span>
-            <h2 class="radio-now-name" id="radio-now-name">世界电台</h2>
-            <span class="radio-now-sub" id="radio-now-sub">松手即播放 · 也可以点地球上的光点</span>
-            <span class="radio-now-song" id="radio-now-song"></span>
-            <span class="radio-status" id="radio-status">就绪</span>
+
+        <!-- 中心准星：停稳后自动锁定最近的台 -->
+        <div class="radio-cross" aria-hidden="true"><i class="h"></i><i class="v"></i><span></span></div>
+
+        <!-- 顶部浮动栏 -->
+        <div class="radio-topbar">
+          <div class="radio-top-left">
+            <button id="btn-back-radio" class="radio-fab" title="返回主页">←</button>
+            <div class="radio-brand"><b>RoamSky</b><span>随机一站，听见世界</span></div>
           </div>
-          <div class="radio-dock">
-            <button id="radio-prev" class="radio-icon-btn" type="button" title="上一个（←）">‹</button>
-            <div class="radio-slider-wrap">
-              <input id="radio-slider" class="radio-slider" type="range" min="0" max="0" value="0" step="1" aria-label="滑动选择电台" />
-            </div>
-            <button id="radio-next" class="radio-icon-btn" type="button" title="下一个（→）">›</button>
-            <button id="radio-play" class="radio-play-btn" type="button" title="播放 / 暂停（空格）">▶</button>
+          <div class="radio-top-right">
+            <span id="radio-top-meta" class="radio-count">正在加载…</span>
+            <button id="radio-fav" class="radio-fab" type="button" title="收藏 / 取消收藏（F）">♡</button>
+            <button id="radio-q-btn" class="radio-fab" type="button" title="搜索（/）">⌕</button>
+            <button id="radio-auto" class="radio-fab" type="button" title="自动漫游（每 25 秒换台）">▶</button>
+            <button id="radio-sheet-toggle" class="radio-fab" type="button" title="浏览全部电台">☰</button>
           </div>
-          <div class="radio-dock-foot">
-            <span id="radio-hint" class="radio-hint">拖动滑杆换台 · 点光点试听</span>
-            <div id="radio-spec" class="radio-spec" title="频谱"></div>
-            <label class="radio-vol"><span>音量</span><input id="radio-volume" type="range" min="0" max="100" value="80" /></label>
-          </div>
-          <audio id="radio-audio" preload="none"></audio>
         </div>
+
+        <!-- 搜索浮层 -->
+        <div class="radio-searchbox" id="radio-searchbox" hidden>
+          <input id="radio-q" type="search" placeholder="搜台名 / 国家 / 流派，回车选择第一个" autocomplete="off" />
+          <div id="radio-q-list" class="radio-q-list" hidden></div>
+        </div>
+
+        <!-- 底部控制面板 -->
+        <div class="radio-panel">
+          <div class="radio-info">
+            <div class="radio-info-top">
+              <span id="radio-now-country" class="radio-now-country">拖动地球 → 准星停稳自动收听</span>
+              <span id="radio-status" class="radio-status">就绪</span>
+            </div>
+            <h2 id="radio-now-name" class="radio-now-name">世界电台</h2>
+            <span id="radio-now-sub" class="radio-now-sub"></span>
+            <span id="radio-now-song" class="radio-now-song"></span>
+          </div>
+          <div class="radio-controls">
+            <div class="radio-dialrow">
+              <button id="radio-prev" class="radio-nav" type="button" title="上一站（←）">←</button>
+              <div class="radio-dial">
+                <input id="radio-slider" class="radio-slider" type="range" min="0" max="0" value="0" step="1" aria-label="滑动选择电台" />
+              </div>
+              <button id="radio-next" class="radio-nav" type="button" title="下一站（→）">→</button>
+              <button id="radio-play" class="radio-play-btn" type="button" title="播放 / 暂停（空格）">▶</button>
+              <button id="radio-enter" class="radio-enter" type="button" title="进入当前电台（Enter）">进入 ⏎</button>
+            </div>
+            <div class="radio-foot">
+              <span id="radio-hint" class="radio-hint">拖动旋转 · 滚轮远近 · 准星停稳自动收听</span>
+              <div id="radio-spec" class="radio-spec" title="频谱"></div>
+              <label class="radio-vol" title="音量">音量<input id="radio-volume" type="range" min="0" max="100" value="80" /></label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 浏览 / 筛选抽屉 -->
         <div class="radio-sheet" id="radio-sheet" hidden>
           <div class="radio-sheet-head">
-            <input id="radio-search" class="radio-search" type="search" placeholder="搜台名，例如 jazz / rock" autocomplete="off" />
+            <input id="radio-search" class="radio-search" type="search" placeholder="在列表里搜台名" autocomplete="off" />
             <select id="radio-country" class="radio-select"><option value="">全部国家</option></select>
             <select id="radio-tag" class="radio-select"><option value="">全部流派</option></select>
-            <button id="radio-sheet-close" class="radio-icon-btn" type="button" title="关闭">×</button>
+            <button id="radio-sheet-close" class="radio-fab" type="button" title="关闭">×</button>
           </div>
           <div class="radio-list" id="radio-list"></div>
         </div>
+
+        <audio id="radio-audio" preload="none"></audio>
       </main>
     </div>
+
     <!-- ==================== 小说阅读（独立阅读器页，iframe 嵌入）==================== -->
     <div id="page-novel" class="page">
       <header class="toolbar">

@@ -3226,3 +3226,91 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
   #page-radio .radio-q-list { width: min(300px, calc(100vw - 24px)); }
   #page-radio .radio-spec { display: none; }
 }
+/* ============================================================================
+   2026-10-19：电台页 v4 —— 对标 roamdial：全屏星图 + 中心准星 + 底部完整面板
+   ============================================================================ */
+#page-radio.radio-page { position: relative; }
+#page-radio .radio-stage { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; background: #020924; }
+#page-radio .radio-globe-wrap {
+  position: absolute; inset: 0; width: 100%; height: 100% !important;
+  border: 0; border-radius: 0; box-shadow: none;
+  background: radial-gradient(120% 120% at 50% 30%, #0a1f33 0%, #04101c 55%, #020924 100%);
+}
+#page-radio .radio-globe { position: absolute; inset: 0; }
+#page-radio .radio-globe canvas { display: block; width: 100%; height: 100%; }
+
+/* 中心准星 */
+#page-radio .radio-cross { position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; pointer-events: none; z-index: 3; opacity: .8; }
+#page-radio .radio-cross i { position: absolute; }
+#page-radio .radio-cross i.h { left: -46px; right: -46px; top: 50%; height: 1px; background: linear-gradient(90deg, transparent, rgba(170,240,255,.8), transparent); }
+#page-radio .radio-cross i.v { top: -46px; bottom: -46px; left: 50%; width: 1px; background: linear-gradient(180deg, transparent, rgba(170,240,255,.8), transparent); }
+#page-radio .radio-cross span { position: absolute; inset: 23px; border: 1px solid rgba(170,240,255,.65); border-radius: 50%; box-shadow: 0 0 20px rgba(120,230,255,.35), inset 0 0 14px rgba(120,230,255,.2); }
+
+/* 顶部浮动栏 */
+#page-radio .radio-topbar { position: absolute; inset: 0 0 auto 0; display: flex; justify-content: space-between; align-items: flex-start; padding: 16px 18px; z-index: 6; pointer-events: none; }
+#page-radio .radio-topbar > * { pointer-events: auto; }
+#page-radio .radio-top-left { display: flex; align-items: center; gap: 10px; }
+#page-radio .radio-brand b { display: block; font-size: 15px; letter-spacing: .6px; color: #eaf6fb; text-shadow: 0 2px 12px rgba(0,0,0,.65); }
+#page-radio .radio-brand span { font-size: 11px; color: rgba(200,230,240,.6); }
+#page-radio .radio-top-right { display: flex; align-items: center; gap: 6px; }
+#page-radio .radio-fab {
+  width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(140,210,235,.22);
+  background: rgba(8,16,30,.62); color: #dff4fc; font-size: 15px; display: grid; place-items: center;
+  cursor: pointer; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); transition: .15s; padding: 0;
+}
+#page-radio .radio-fab:hover { border-color: rgba(127,216,238,.6); background: rgba(127,216,238,.16); }
+#page-radio .radio-fab.on { color: #ff7d9c; border-color: rgba(255,125,156,.6); }
+#page-radio .radio-count { font-size: 11.5px; color: rgba(200,230,240,.7); align-self: center; padding: 0 4px; }
+
+/* 搜索浮层 */
+#page-radio .radio-searchbox { position: absolute; top: 62px; right: 18px; width: min(360px, calc(100vw - 36px)); z-index: 8; }
+#page-radio .radio-searchbox input { width: 100%; height: 40px; border-radius: 12px; border: 1px solid rgba(140,210,235,.3); background: rgba(6,14,24,.94); color: #eaf6fb; padding: 0 14px; font-size: 13px; outline: none; }
+#page-radio .radio-searchbox input:focus { border-color: rgba(127,216,238,.65); }
+#page-radio .radio-q-list { position: static; width: 100%; margin-top: 6px; max-height: 300px; }
+
+/* 底部面板 */
+#page-radio .radio-panel {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 7;
+  padding: 18px 22px calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex; gap: 22px; align-items: flex-end;
+  background: linear-gradient(0deg, rgba(2,6,18,.94), rgba(2,6,18,.6) 55%, rgba(2,6,18,0));
+}
+#page-radio .radio-info { flex: 1 1 320px; min-width: 0; color: #eaf6fb; }
+#page-radio .radio-info-top { display: flex; align-items: center; gap: 10px; }
+#page-radio .radio-now-country { font-size: 10.5px; letter-spacing: 2px; text-transform: uppercase; color: #7fd8ee; }
+#page-radio .radio-status { margin-top: 0; }
+#page-radio .radio-now-name { margin: 6px 0 2px; font-size: 24px; line-height: 1.2; color: #f2fbff !important; }
+#page-radio .radio-now-sub { display: block; font-size: 12px; color: rgba(210,235,245,.65); }
+#page-radio .radio-now-song { display: none; font-size: 12.5px; color: #9fe3f2; margin-top: 3px; }
+#page-radio .radio-controls { flex: 1 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+#page-radio .radio-dialrow { display: flex; align-items: center; gap: 8px; }
+#page-radio .radio-dial { flex: 1 1 auto; min-width: 0; padding: 0 4px; }
+#page-radio .radio-nav {
+  flex: 0 0 auto; width: 38px; height: 38px; border-radius: 10px; border: 1px solid rgba(140,210,235,.25);
+  background: rgba(8,16,30,.6); color: #dff4fc; font-size: 16px; cursor: pointer; display: grid; place-items: center; transition: .15s;
+}
+#page-radio .radio-nav:hover { border-color: rgba(127,216,238,.6); background: rgba(127,216,238,.16); }
+#page-radio .radio-enter {
+  flex: 0 0 auto; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(127,216,238,.35);
+  background: rgba(127,216,238,.12); color: #dff4fc; font-size: 12.5px; cursor: pointer;
+}
+#page-radio .radio-enter:hover { background: rgba(127,216,238,.24); }
+#page-radio .radio-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; color: rgba(200,230,240,.6); }
+#page-radio .radio-vol { display: inline-flex; align-items: center; gap: 6px; color: rgba(200,230,240,.75); font-size: 11px; }
+#page-radio .radio-vol input { width: 90px; accent-color: #2bb3a3; }
+
+/* 抽屉放到面板上方 */
+#page-radio .radio-sheet { bottom: 132px; left: 16px; right: 16px; max-height: 54%; }
+
+@media (max-width: 720px) {
+  #page-radio .radio-panel { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 14px calc(12px + env(safe-area-inset-bottom, 0px)); }
+  #page-radio .radio-now-name { font-size: 19px; }
+  #page-radio .radio-controls { flex-basis: auto; }
+  #page-radio .radio-topbar { padding: 12px; }
+  #page-radio .radio-brand span { display: none; }
+  #page-radio .radio-count { display: none; }
+  #page-radio .radio-enter { padding: 0 9px; font-size: 11.5px; }
+  #page-radio .radio-spec { display: none; }
+  #page-radio .radio-sheet { bottom: 150px; left: 10px; right: 10px; }
+  #page-radio .radio-cross { opacity: .55; }
+}

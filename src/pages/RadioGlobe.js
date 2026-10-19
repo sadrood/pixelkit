@@ -249,6 +249,8 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   /* ==================== 10. 选中标记 ==================== */
   let selectedIndex = -1;
   let focusTarget = null;      // 滑杆选台时的镜头目标朝向 { y, x }
+  let settleCb = null;         // 拖动停稳后的回调（准星自动选台）
+  let settleTimer = null;
   const selectTex = makeRingTexture(THREE);
   const selectRing = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
     map: selectTex, color: 0xffffff, transparent: true, opacity: 0.9,
@@ -310,6 +312,14 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   };
   const onUp = (e) => {
     dragging = false; canvas.style.cursor = 'grab';
+    if (moved >= 6) {
+      // 拖动停稳后（1.2s 没有继续拖）交给页面做准星选台
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = setTimeout(() => {
+        settleTimer = null;
+        if (!dragging && settleCb) { try { settleCb(); } catch { /* ignore */ } }
+      }, 1200);
+    }
     if (moved < 6) {
       const i = hitTest(e);
       if (i >= 0) { onPick(stations[i]); setSelectedIndex(i); lastInteract = Date.now(); }
@@ -448,6 +458,26 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     pick(index) { if (stations[index]) { setSelectedIndex(index); onPick(stations[index]); } },
     /** 频谱能量 0~1：点云呼吸 + 选中光圈脉动 */
     setEnergy(v) { energy = Math.max(0, Math.min(1, Number(v) || 0)); },
+    /** 准星（屏幕中心）对准的最近电台：返回下标，超过约 18° 返回 -1 */
+    pickCenter() {
+      if (!stations.length) return -1;
+      const camDir = new THREE.Vector3(0, 0, -1);
+      camDir.applyQuaternion(camera.quaternion);
+      const inv = new THREE.Matrix4().copy(world.matrixWorld).invert();
+      const camLocal = camera.position.clone().applyMatrix4(inv);
+      const v = new THREE.Vector3();
+      let best = -1, bestAngle = 0.32;   // ~18°
+      for (let i = 0; i < stations.length; i++) {
+        v.set(posArr[i * 3], posArr[i * 3 + 1], posArr[i * 3 + 2]);
+        const toCam = camLocal.clone().sub(v).normalize();
+        const n = v.clone().normalize();
+        const ang = Math.acos(Math.max(-1, Math.min(1, n.dot(toCam))));
+        if (ang < bestAngle) { bestAngle = ang; best = i; }
+      }
+      return best;
+    },
+    /** 拖动停稳后的回调（页面用来做准星自动收听） */
+    onSettle(cb) { settleCb = cb; },
     /** 把某个电台转到镜头正前方（滑杆 / 列表选台时用），带平滑动画 */
     focus(station) {
       if (!station || !Number.isFinite(station.lon)) return;
