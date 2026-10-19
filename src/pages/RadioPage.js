@@ -79,6 +79,22 @@ export class RadioPage {
     this.loadFavs();
     this.$('radio-fav')?.addEventListener('click', () => this.toggleFav());
     this.$('radio-song-fav')?.addEventListener('click', () => this.toggleFav());
+    // 星盘按钮
+    this.$('dial-play')?.addEventListener('click', () => {
+      const st = this._dialStation || this.current;
+      if (!st) return;
+      if (this.current && this.current.id === st.id) this.togglePlay();
+      else this.playStation(st);
+    });
+    this.$('dial-fav')?.addEventListener('click', () => { this.toggleFav(); this.updateDialFav(); });
+    this.$('dial-next')?.addEventListener('click', () => { this.step(1); this.closeDial(); });
+    this.$('dial-close')?.addEventListener('click', () => this.closeDial());
+    document.addEventListener('pointerdown', (e) => {
+      const dial = this.$('radio-dial');
+      if (!dial || dial.hidden || dial.contains(e.target)) return;
+      if (e.target.closest && e.target.closest('#radio-globe')) return;
+      this.closeDial();
+    });
     // 视图切换：地球 / 流派星云 / 收藏
     this.view = 'globe';
     this.genreFilter = -1;
@@ -174,6 +190,7 @@ export class RadioPage {
         this._globe = await createRadioGlobe(el, this.geoStations, {
           tooltipEl: this.$('radio-globe-tip'),
           onPick: (s) => this.onGlobePick(s),
+          onHover: (s, x, y) => this.onHover(s, x, y),
         });
       } catch (err) {
         // 3D 不可用（老显卡/WebGL 被禁）：退回 2D 星云视图，保证画面能出来
@@ -217,6 +234,71 @@ export class RadioPage {
     const i = this.geoStations.findIndex((s) => s.id === station.id);
     if (i >= 0) { this.index = i; this.syncSlider(); }
     this.playStation(station);
+    this.openDial(station);
+  }
+
+  /** 悬停星点：显示台名提示（roamdial 的悬停动画） */
+  onHover(station, x, y) {
+    const tip = this.$('radio-globe-tip');
+    if (!tip) return;
+    if (typeof x === 'number') this._hoverX = x;
+    if (typeof y === 'number') this._hoverY = y;
+    if (!station) { tip.style.display = 'none'; return; }
+    tip.textContent = station.name || '';
+    tip.style.display = 'block';
+    const stage = this.$('radio-globe-wrap');
+    const rect = stage ? stage.getBoundingClientRect() : { left: 0, top: 0 };
+    tip.style.left = Math.round((this._hoverX || 0) - rect.left + 14) + 'px';
+    tip.style.top = Math.round((this._hoverY || 0) - rect.top - 12) + 'px';
+  }
+
+  /** 星盘：点中星点后在准星处弹出的圆形操作盘 */
+  openDial(station) {
+    const dial = this.$('radio-dial');
+    if (!dial || !station) return;
+    const name = this.$('dial-name');
+    const genre = this.$('dial-genre');
+    const meta = this.$('dial-meta');
+    if (name) name.textContent = station.name || '';
+    if (genre) genre.textContent = (this.genres && station.g != null ? this.genres[station.g] : '') || '电台';
+    if (meta) {
+      const flag = this.flagOf(station.cc);
+      meta.textContent = [flag, station.country, station.bitrate ? station.bitrate + ' KBPS' : ''].filter(Boolean).join(' · ');
+    }
+    this._dialStation = station;
+    dial.hidden = false;
+    requestAnimationFrame(() => dial.classList.add('open'));
+    this.buildDialTicks();
+    this.updateDialFav();
+  }
+
+  closeDial() {
+    const dial = this.$('radio-dial');
+    if (!dial) return;
+    dial.classList.remove('open');
+    setTimeout(() => { if (!dial.classList.contains('open')) dial.hidden = true; }, 240);
+  }
+
+  buildDialTicks() {
+    const g = this.$('dial-tick-marks');
+    if (!g || g.childNodes.length) return;
+    let html = '';
+    for (let i = 0; i < 40; i++) {
+      const a = (i / 40) * Math.PI * 2;
+      const r1 = 88, r2 = i % 5 === 0 ? 96 : 92;
+      const x1 = 100 + Math.cos(a) * r1, y1 = 100 + Math.sin(a) * r1;
+      const x2 = 100 + Math.cos(a) * r2, y2 = 100 + Math.sin(a) * r2;
+      html += '<line x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '" stroke="rgba(255,217,160,.5)" stroke-width="1"/>';
+    }
+    g.innerHTML = html;
+  }
+
+  updateDialFav() {
+    const b = this.$('dial-fav');
+    if (!b) return;
+    const s = this._dialStation || this.current;
+    if (!s) return;
+    b.textContent = this.isFav(s.id) ? '♥' : '♡';
   }
 
   syncSlider() {
@@ -469,12 +551,20 @@ export class RadioPage {
     const neb = this.$('radio-nebula');
     const labels = this.$('radio-labels');
     if (v === 'nebula') {
-      // 真正的 2D 星云视图：每个分类一团光斑，点光斑就听那个台
-      if (globeEl) globeEl.style.display = 'none';
-      if (neb) neb.hidden = false;
-      if (labels) labels.innerHTML = '';
-      this.renderNebula();
-      this.setHint('流派星云 · 点任意光斑收听，或按 G 回到地球');
+      if (this._globe && this._globe.setLayout) {
+        // 3D 星云：地球点云原地变形成 11 个星团（0.95 秒过渡）
+        if (neb) neb.hidden = true;
+        if (globeEl) globeEl.style.display = '';
+        this._globe.setLayout('nebula');
+        this.setHint('流派星云 · 拖动旋转，准星停稳自动收听；G 回地球');
+      } else {
+        // WebGL 不可用：退回 2D 光斑星云
+        if (globeEl) globeEl.style.display = 'none';
+        if (neb) neb.hidden = false;
+        if (labels) labels.innerHTML = '';
+        this.renderNebula();
+        this.setHint('流派星云 · 点任意光斑收听，或按 G 回到地球');
+      }
       return;
     }
     if (neb) neb.hidden = true;
@@ -512,6 +602,12 @@ export class RadioPage {
     if (!box) return;
     this._labelTimer = setInterval(() => {
       if (!this._globe || this.view === 'fav') { box.innerHTML = ''; return; }
+      if (this.view === 'nebula') {
+        let clusters = [];
+        try { clusters = this._globe.getNebulaLabels ? this._globe.getNebulaLabels() : []; } catch { clusters = []; }
+        box.innerHTML = clusters.map((c, k) => '<span class="nebula-cluster-label" style="left:' + Math.round(c.x) + 'px;top:' + Math.round(c.y + (k % 2 === 0 ? -46 : 30)) + 'px"><b>' + this.esc((this.genres && this.genres[c.i]) || '') + '</b><span>' + c.count.toLocaleString('zh-CN') + ' 个电台</span></span>').join('');
+        return;
+      }
       let labels = [];
       try { labels = this._globe.getLabels(80) || []; } catch { labels = []; }
       const cur = this.current ? this.current.name : '';
@@ -815,6 +911,8 @@ export class RadioPage {
       for (let i = 0; i < Math.min(8, n); i++) bass += this._freq[i];
       bass = bass / (Math.min(8, n) * 255);
       try { this._globe?.setEnergy?.(bass); } catch { /* ignore */ }
+      const dial = this.$('radio-dial');
+      if (dial && !dial.hidden) dial.style.setProperty('--energy', bass.toFixed(3));
       if (bars) {
         const kids = bars.children;
         for (let i = 0; i < kids.length; i++) {

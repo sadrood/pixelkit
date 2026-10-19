@@ -725,6 +725,26 @@
         <div class="radio-cross" aria-hidden="true"><i class="h"></i><i class="v"></i><span></span><em id="radio-lock-meta" class="radio-lock-meta"></em></div>
         <div class="radio-labels" id="radio-labels"></div>
 
+        <!-- 星盘：点中星点后出现的圆形操作盘 -->
+        <div class="radio-dial" id="radio-dial" hidden>
+          <svg class="dial-ticks" viewBox="0 0 200 200" aria-hidden="true">
+            <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,217,160,.25)" stroke-width="1"/>
+            <circle cx="100" cy="100" r="72" fill="none" stroke="rgba(255,217,160,.14)" stroke-width="1"/>
+            <g id="dial-tick-marks"></g>
+          </svg>
+          <div class="dial-core">
+            <span class="dial-genre" id="dial-genre"></span>
+            <b class="dial-name" id="dial-name"></b>
+            <span class="dial-meta" id="dial-meta"></span>
+            <div class="dial-actions">
+              <button class="dial-btn" id="dial-play" type="button" title="播放 / 暂停">▶</button>
+              <button class="dial-btn" id="dial-fav" type="button" title="收藏">♡</button>
+              <button class="dial-btn" id="dial-next" type="button" title="下一站">→</button>
+              <button class="dial-btn" id="dial-close" type="button" title="关闭">×</button>
+            </div>
+          </div>
+        </div>
+
         <!-- 顶部浮动栏 -->
         <div class="radio-topbar">
           <div class="radio-top-left">

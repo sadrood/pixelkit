@@ -46,6 +46,51 @@ export async function createRadioGlobe(container, stations, opts = {}) {
 
   const world = new THREE.Group();
   world.rotation.y = 0.6;
+  /* ---------- 陆地点阵（暗点把陆地画出来） ---------- */
+  let landPoints = null;
+  const landDots = [];
+  const LAND_R = 0.9975;
+  const toVec3Radius = (lat, lon, r) => {
+    const phi = (90 - lat) * Math.PI / 180;
+    const theta = (lon + 180) * Math.PI / 180;
+    return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(theta));
+  };
+  function buildLandLayer(m) {
+    const { cols, rows, step, mask } = m;
+    const bin = atob(mask);
+    const bits = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bits[i] = bin.charCodeAt(i);
+    const total = cols * rows;
+    const pos = new Float32Array(total * 3);
+    const col = new Float32Array(total * 3);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const idx = r * cols + c;
+        const land = (bits[idx >> 3] >> (idx & 7)) & 1;
+        const lat = 90 - (r + 0.5) * step;
+        const lon = -180 + (c + 0.5) * step;
+        const v = toVec3Radius(lat, lon, LAND_R);
+        pos[idx * 3] = v.x; pos[idx * 3 + 1] = v.y; pos[idx * 3 + 2] = v.z;
+        // 目标颜色按 sRGB 指定，再转线性（否则会被 sRGB 输出提亮成一片白点）
+        if (land) { tmpC.setRGB(0.50, 0.68, 0.56).convertSRGBToLinear(); }
+        else { tmpC.setRGB(0.055, 0.115, 0.095).convertSRGBToLinear(); }
+        col[idx * 3] = tmpC.r; col[idx * 3 + 1] = tmpC.g; col[idx * 3 + 2] = tmpC.b;
+        landDots.push({ lat, lon, land });
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    landPoints = new THREE.Points(geo, new THREE.PointsMaterial({
+      size: 0.0055, vertexColors: true, transparent: true, opacity: 0.95,
+      sizeAttenuation: true, depthWrite: false,
+    }));
+    world.add(landPoints);
+  }
+  fetch('/data/land-mask.json', { cache: 'force-cache' })
+    .then((r) => r.json())
+    .then(buildLandLayer)
+    .catch(() => { /* 没有掩膜就只显示星点 */ });
   scene.add(world);
 
   /* ---------- 星空 ---------- */
@@ -92,12 +137,18 @@ export async function createRadioGlobe(container, stations, opts = {}) {
 
   /* ---------- 布局 + 重建 ---------- */
   let layout = 'globe';
+  let nebulaCenters = [];
+  let nebulaCounts = [];
+  let morph = null;              // 地球↔星云的位置渐变
   const RADIUS = 1.0;
   let filtered = stations.slice();
   let pointGeo = null;
   let dotTex = null;
   let points = null;
   let selectedMesh = null;
+  let hoverIndex = -1;
+  let hoverRing = null;
+  let hoverCb = opts.onHover || null;
 
   function computePositions(list) {
     const n = list.length;
@@ -112,32 +163,47 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         col[i * 3] = tmpC.r; col[i * 3 + 1] = tmpC.g; col[i * 3 + 2] = tmpC.b;
       }
     } else {
+      // 流派星云：11 个星团横向排成一条"银河带"（和 roamdial 一致）
       const G = GENRE_COLORS.length;
-      const R = RADIUS * 1.5;
-      const centers = [];
+      nebulaCounts = new Array(G).fill(0);
+      for (const s of list) nebulaCounts[(s.g || 0) % G] += 1;
+      const maxCount = Math.max(1, ...nebulaCounts);
+      nebulaCenters = [];
       for (let g = 0; g < G; g++) {
-        const y = 1 - 2 * (g + 0.5) / G;
-        const rr = Math.sqrt(Math.max(0, 1 - y * y));
-        const th = g * 2.39996;
-        centers.push(new THREE.Vector3(Math.cos(th) * rr, y, Math.sin(th) * rr).multiplyScalar(R));
+        // 平铺在一条水平带上（z 固定 0），保证投影后不重叠
+        nebulaCenters.push(new THREE.Vector3(
+          (g - (G - 1) / 2) * 0.50,
+          Math.sin(g * 0.95) * 0.14,
+          0
+        ));
       }
       for (let i = 0; i < n; i++) {
         const s = list[i];
-        const c = centers[(s.g || 0) % G];
+        const g = (s.g || 0) % G;
+        const c = nebulaCenters[g];
         const h = hashOf(s);
-        const jitter = 0.17;
-        const j1 = ((h % 1000) / 1000 - 0.5) * jitter;
-        const j2 = (((h >> 10) % 1000) / 1000 - 0.5) * jitter;
-        const j3 = (((h >> 20) % 1000) / 1000 - 0.5) * jitter;
-        const depth = 1 + ((h >> 5) % 100) / 100 * 0.12;
-        pos[i * 3] = (c.x + j1) * depth;
-        pos[i * 3 + 1] = (c.y + j2) * depth;
-        pos[i * 3 + 2] = (c.z + j3) * depth;
-        tmpC.setHex(GENRE_COLORS[(s.g || 0) % GENRE_COLORS.length]);
+        const spread = 0.075 + 0.105 * Math.sqrt(nebulaCounts[g] / maxCount);
+        const a = (h % 1024) / 1024 * Math.PI * 2;
+        const rr = Math.pow(((h >> 10) % 1024) / 1024, 0.55) * spread;
+        const zz = ((((h >> 20) % 1024) / 1024) - 0.5) * spread * 1.4;
+        pos[i * 3] = c.x + Math.cos(a) * rr;
+        pos[i * 3 + 1] = c.y + Math.sin(a) * rr * 0.75;
+        pos[i * 3 + 2] = c.z + zz;
+        tmpC.setHex(GENRE_COLORS[g]);
         col[i * 3] = tmpC.r; col[i * 3 + 1] = tmpC.g; col[i * 3 + 2] = tmpC.b;
       }
     }
     return { pos, col };
+  }
+
+  function applyColors() {
+    if (!pointGeo) return;
+    const col = pointGeo.attributes.color.array;
+    for (let i = 0; i < filtered.length; i++) {
+      tmpC.setHex(GENRE_COLORS[(filtered[i].g || 0) % GENRE_COLORS.length]);
+      col[i * 3] = tmpC.r; col[i * 3 + 1] = tmpC.g; col[i * 3 + 2] = tmpC.b;
+    }
+    pointGeo.attributes.color.needsUpdate = true;
   }
 
   function rebuild() {
@@ -203,7 +269,31 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
   };
   const onMove = (e) => {
-    if (!dragging) return;
+    if (!dragging) {
+      // 悬停：命中星点就放大高亮 + 回调给页面显示台名
+      const hi = hitTest(e);
+      if (hi !== hoverIndex) {
+        hoverIndex = hi;
+        canvas.style.cursor = hi >= 0 ? 'pointer' : 'grab';
+        if (hi >= 0) {
+          const arr = pointGeo.attributes.position.array;
+          const v = new THREE.Vector3(arr[hi * 3], arr[hi * 3 + 1], arr[hi * 3 + 2]);
+          if (!hoverRing) {
+            hoverRing = new THREE.Mesh(
+              new THREE.RingGeometry(0.02, 0.026, 28),
+              new THREE.MeshBasicMaterial({ color: 0xffe2b8, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false })
+            );
+            world.add(hoverRing);
+          }
+          hoverRing.position.copy(v);
+          hoverRing.visible = true;
+        } else if (hoverRing) hoverRing.visible = false;
+        if (hoverCb) { try { hoverCb(hi >= 0 ? filtered[hi] : null, e.clientX, e.clientY); } catch { /* ignore */ } }
+      } else if (hi >= 0 && hoverCb) {
+        try { hoverCb(filtered[hi], e.clientX, e.clientY); } catch { /* ignore */ }
+      }
+      return;
+    }
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
     moved += Math.abs(dx) + Math.abs(dy);
     lastX = e.clientX; lastY = e.clientY;
@@ -237,6 +327,14 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   canvas.addEventListener('pointermove', onMove);
   canvas.addEventListener('pointerup', onUp);
   canvas.addEventListener('wheel', onWheel, { passive: false });
+  canvas.addEventListener('pointerleave', () => {
+    if (hoverIndex >= 0) {
+      hoverIndex = -1;
+      if (hoverRing) hoverRing.visible = false;
+      canvas.style.cursor = 'grab';
+      if (hoverCb) { try { hoverCb(null, 0, 0); } catch { /* ignore */ } }
+    }
+  });
 
   /* ---------- 尺寸 ---------- */
   const resize = () => {
@@ -264,17 +362,43 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       world.rotation.y += dy * 0.09;
       world.rotation.x += (focusTarget.x - world.rotation.x) * 0.09;
       if (Math.abs(dy) < 0.006) focusTarget = null;
-    } else if (!dragging && Date.now() - lastInteract > 3500) {
+    } else if (layout === 'globe' && !dragging && Date.now() - lastInteract > 3500) {
       world.rotation.y += dt * 0.04;
     }
 
     if (points) {
+      const wantOpacity = layout === 'nebula' ? 0.62 : 0.92;
+      points.material.opacity += (wantOpacity - points.material.opacity) * 0.12;
       const want = (mobile ? 0.05 : 0.036) * (1 + energy * 0.55);
       points.material.size += (want - points.material.size) * 0.15;
+    }
+    if (morph) {
+      morph.t += dt / morph.dur;
+      const t = Math.min(1, morph.t);
+      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      const arr = pointGeo.attributes.position.array;
+      const from = morph.from, to = morph.to;
+      for (let i = 0; i < arr.length; i++) arr[i] = from[i] + (to[i] - from[i]) * e;
+      pointGeo.attributes.position.needsUpdate = true;
+      if (t >= 1) morph = null;
     }
     if (selectedMesh && selectedMesh.visible) {
       const p = 1 + Math.sin(performance.now() / 420) * 0.18;
       selectedMesh.scale.set(p, p, 1);
+    }
+    if (hoverRing && hoverRing.visible) {
+      const hp = 1 + Math.sin(performance.now() / 260) * 0.22 + energy * 0.2;
+      hoverRing.scale.set(hp, hp, 1);
+    }
+    if (landPoints) {
+      landPoints.material.opacity = 0.85 + energy * 0.12;
+    }
+    // 星云布局：整体缓慢漂移 + 星团随音乐轻微起伏
+    if (layout === 'nebula' && !morph && points) {
+      const now = performance.now();
+      points.rotation.y = Math.sin(now / 7000) * 0.045;
+      points.rotation.x = Math.cos(now / 9000) * 0.02;
+      points.rotation.z = Math.sin(now / 6000) * 0.02;
     }
     renderer.render(scene, camera);
   };
@@ -361,10 +485,29 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     },    setEnergy(v) { energy = Math.max(0, Math.min(1, Number(v) || 0)); },
     onSettle(cb) { settleCb = cb; },
     setLayout(mode) {
-      layout = mode === 'nebula' ? 'nebula' : 'globe';
-      rebuild();
+      const target = mode === 'nebula' ? 'nebula' : 'globe';
+      if (target === layout) return layout;
+      layout = target;
+      const targetPos = computePositions(filtered).pos;
+      const from = pointGeo.attributes.position.array.slice();
+      morph = { from, to: targetPos, t: 0, dur: 0.95 };
+      camera.position.z = target === 'nebula' ? 4.35 : 2.55;
+      if (target === 'nebula') { world.rotation.x = 0; world.rotation.y = 0; }
+      if (landPoints) landPoints.visible = target === 'globe';
+      applyColors();
       selectedIndex = -1;
+      lastInteract = Date.now();
       return layout;
+    },
+    /** 星云星团的屏幕坐标 + 数量（页面用来画品类标签） */
+    getNebulaLabels() {
+      if (layout !== 'nebula' || !nebulaCenters.length) return [];
+      const w = canvas.clientWidth || 1;
+      const h = canvas.clientHeight || 1;
+      return nebulaCenters.map((c, i) => {
+        const p = c.clone().applyMatrix4(world.matrixWorld).project(camera);
+        return { i, x: (p.x * 0.5 + 0.5) * w, y: (-p.y * 0.5 + 0.5) * h, count: nebulaCounts[i] || 0 };
+      });
     },
     setFilter(pred) {
       filtered = pred ? stations.filter(pred) : stations.slice();
