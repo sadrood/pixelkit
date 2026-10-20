@@ -4180,3 +4180,16 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
   filter: blur(8px); animation: rd-hole-spin 12s linear infinite;
 }
 #page-radio .radio-dial { position: absolute; }
+
+/* 介绍页：让下层地球可拖动，仅交互区接收指针 */
+#page-radio .rd-intro { pointer-events: none; }
+#page-radio .rd-intro .rd-intro-brand,
+#page-radio .rd-intro .rd-intro-now,
+#page-radio .rd-intro .rd-credit { pointer-events: auto; }
+#page-radio.pre .radio-globe-wrap { pointer-events: auto; }
+
+/* 粒子唱片：画布替换黑胶，黑洞在下面 */
+#page-radio .rd-vinyl { display: none; }
+#page-radio .rd-viz { display: block; width: clamp(220px, 26vw, 320px); height: clamp(220px, 26vw, 320px); position: relative; z-index: 1; }
+#page-radio .rd-viz-mode { position: absolute; left: 50%; bottom: -34px; transform: translateX(-50%); border: 1px solid #f5f1e833; background: #101f1d99; color: var(--rd-dim); font: 400 11px var(--rd-mono); letter-spacing: .08em; padding: 6px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+#page-radio .rd-viz-mode:hover { color: var(--rd-ink); border-color: #f5f1e880; }

@@ -1179,6 +1179,56 @@ export class RadioPage {
     this.step(dir);
   }
 
+  /* ==================== 粒子唱片（5 种律动形态） ==================== */
+  startViz() {
+    const cv = this.$('rd-viz');
+    if (!cv || this._vizRaf) return;
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height, C = W / 2;
+    const N = 900;
+    const seed = Array.from({ length: N }, (_, i) => {
+      const r1 = Math.sin(i * 12.9898) * 43758.5453;
+      const k = r1 - Math.floor(r1);
+      const r2 = Math.sin(i * 78.233) * 24634.6345;
+      const k2 = r2 - Math.floor(r2);
+      return { a: (i / N) * Math.PI * 2, r: 34 + k * 104, s: 0.5 + k2, k: k2, k3: k };
+    });
+    const MODES = ['环形', '螺旋', '波浪', '球体', '星云'];
+    let t = 0;
+    const draw = () => {
+      const box = this.$('rd-record');
+      if (!box || box.hidden) { this._vizRaf = requestAnimationFrame(draw); return; }
+      t += 0.016;
+      ctx.clearRect(0, 0, W, H);
+      const e = this._bassE || 0;
+      const m = this._vizMode || 0;
+      for (let i = 0; i < N; i++) {
+        const p = seed[i];
+        let x, y, rad;
+        if (m === 0) { rad = p.r * (1 + e * 0.2 + 0.05 * Math.sin(t * 2 + i * 0.05)); x = C + Math.cos(p.a + t * 0.12) * rad; y = C + Math.sin(p.a + t * 0.12) * rad; }
+        else if (m === 1) { rad = p.r * 0.72 + (i / N) * 138; x = C + Math.cos(p.a + t * 0.35 + p.r * 0.012) * rad; y = C + Math.sin(p.a + t * 0.35 + p.r * 0.012) * rad; }
+        else if (m === 2) { const w = Math.sin(p.a * 5 + t * 2) * (5 + e * 22); x = C + Math.cos(p.a) * p.r * 0.95; y = C + Math.sin(p.a) * (p.r * 0.4 + w); }
+        else if (m === 3) { const th = p.a * 3 + t * 0.4; const rr = Math.sqrt(p.k) * 92; x = C + Math.cos(th) * Math.sin(rr / 90) * 92 * Math.cos(t * 0.2); y = C + Math.sin(th) * Math.sin(rr / 90) * 92; }
+        else { x = C + Math.cos(p.a * 3 + t * 0.15) * p.r * (1 + 0.35 * Math.sin(t + i * 0.01) + e * 0.25); y = C + Math.sin(p.a * 2 + t * 0.2) * p.r; }
+        const sz = 1.1 + p.s * 1.8;
+        ctx.fillStyle = 'rgba(255,214,160,' + (0.18 + 0.5 * p.k3 + e * 0.2).toFixed(3) + ')';
+        ctx.fillRect(x, y, sz, sz);
+      }
+      this._vizRaf = requestAnimationFrame(draw);
+    };
+    draw();
+    const btn = this.$('rd-viz-mode');
+    if (btn && !btn._bound) {
+      btn._bound = true;
+      btn.addEventListener('click', () => {
+        this._vizMode = ((this._vizMode || 0) + 1) % MODES.length;
+        btn.textContent = '粒子 · ' + MODES[this._vizMode];
+      });
+      btn.textContent = '粒子 · ' + MODES[this._vizMode || 0];
+    }
+  }
+  stopViz() { if (this._vizRaf) { cancelAnimationFrame(this._vizRaf); this._vizRaf = 0; } }
+
   /* ==================== 设置面板 ==================== */
   getSettings() {
     try { return Object.assign({ autotune: true, autodive: true, reduce: false, hints: true }, JSON.parse(localStorage.getItem('pk_radio_settings') || '{}')); }
@@ -1575,11 +1625,12 @@ export class RadioPage {
     if (!box) return;
     this.ensureTuneAudio();
     box.hidden = false;
-    requestAnimationFrame(() => box.classList.add('shown'));
+    requestAnimationFrame(() => { box.classList.add('shown'); this.startViz(); });
     this.updateRecord();
   }
 
   closeRecord() {
+    this.stopViz();
     const box = this.$('rd-record');
     if (!box) return;
     box.classList.remove('shown');
@@ -1660,6 +1711,7 @@ export class RadioPage {
       try { this._globe?.setEnergy?.(bass); } catch { /* ignore */ }
       try { this._neb3d?.setEnergy?.(bass); } catch { /* ignore */ }
       try { this.$('page-radio')?.style.setProperty('--rd-energy', String(bass)); } catch { /* ignore */ }
+      this._bassE = bass;
       const dial = this.$('radio-dial');
       if (dial && !dial.hidden) dial.style.setProperty('--energy', bass.toFixed(3));
       if (bars) {
