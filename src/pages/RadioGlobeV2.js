@@ -473,6 +473,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   let rotVX = 0, rotVY = 0, focusTarget = null;
   let diveT = 1, diveFrom = END_Z, diveTo = END_Z, diveDur = 0.7;
   let introHold = false;
+  let zoomT = 1, zoomFrom = 0, zoomToZ = 0, zoomDur = 0.35;
   const clock = new THREE.Clock();
   let introStart = performance.now();
   const tick = () => {
@@ -506,6 +507,11 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       if (Math.abs(focusTarget.y - world.rotation.y) < 0.004) focusTarget = null;
     }
     // 视图切换：俯冲进入
+    if (zoomT < 1) {
+      zoomT = Math.min(1, zoomT + dt / Math.max(0.001, zoomDur));
+      const e = zoomT * zoomT * (3 - 2 * zoomT);
+      camera.position.z = zoomFrom + (zoomToZ - zoomFrom) * e;
+    }
     if (diveT < 1) {
       diveT = Math.min(1, diveT + dt / Math.max(0.001, diveDur));
       const e = diveT * diveT * (3 - 2 * diveT);
@@ -638,6 +644,8 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       return filtered.length;
     },
     applyZoomLevel() { applyZoomLevel(); },
+    /** 吸附动画：轻微推近到目标电台 */
+    zoomTo(z, dur = 0.35) { zoomFrom = camera.position.z; zoomToZ = z; zoomT = 0; zoomDur = dur; },
     setStations(list) {
       stations = Array.isArray(list) ? list : [];
       filtered = stations.slice();

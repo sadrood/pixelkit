@@ -313,7 +313,7 @@ export class RadioPage {
     if (i >= 0) { this.index = i; this.syncSlider(); }
     this.playStation(station);
     this.openDial(station);
-    try { if (this.view === 'nebula') this._neb3d?.flyToStation?.(station); } catch { /* ignore */ }
+    try { if (this.view === 'nebula') this._neb3d?.flyToStation?.(station); else this._globe?.zoomTo?.(1.45, 0.4); } catch { /* ignore */ }
   }
 
   /** 悬停星点：显示台名提示（roamdial 的悬停动画） */
