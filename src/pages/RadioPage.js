@@ -107,15 +107,12 @@ export class RadioPage {
       if (prevBtn) prevBtn.innerHTML = '⏮';
     } catch { /* ignore */ }
     // 地球风格切换（点阵 / 写实）
-    this.$('radio-globe-style')?.addEventListener('click', () => {
-      const cur = localStorage.getItem('pk_globe_style') === 'real' ? 'real' : 'dots';
-      const next = cur === 'real' ? 'dots' : 'real';
-      try { this._globe?.setStyle?.(next); } catch { /* ignore */ }
-      localStorage.setItem('pk_globe_style', next);
-      this.toast?.show?.(next === 'real' ? '地球风格：写实卫星' : '地球风格：GitHub 点阵', 'success');
-      const b = this.$('radio-globe-style');
-      if (b) b.textContent = next === 'real' ? '🌍' : '◍';
+    this.$('rd-settings-close')?.addEventListener('click', () => this.closeSettings());
+    this.$('radio-globe-style')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openSettings();
     });
+
     // 视图切换：地球 / 流派星云 / 收藏
     this.view = 'globe';
     this.genreFilter = -1;
@@ -174,7 +171,9 @@ export class RadioPage {
         const sheet = this.$('radio-sheet');
         const sb = this.$('radio-searchbox');
         const dial = this.$('radio-dial');
-        if (rec && !rec.hidden) this.closeRecord();
+        const setBox = this.$('rd-settings');
+        if (setBox && !setBox.hidden) this.closeSettings();
+        else if (rec && !rec.hidden) this.closeRecord();
         else if (dial && !dial.hidden) dial.hidden = true;
         else if (sheet && !sheet.hidden) this.toggleSheet(false);
         else if (sb && !sb.hidden) sb.hidden = true;
@@ -210,6 +209,7 @@ export class RadioPage {
         stage.addEventListener('pointerleave', () => bh.classList.remove('on'));
       }
     } catch { /* ignore */ }
+    this.applySettings();
     this.ensureSpaceBackground();
     this.loadFilters();
     this.loadListStations();
@@ -1156,6 +1156,43 @@ export class RadioPage {
     this.step(dir);
   }
 
+  /* ==================== 设置面板 ==================== */
+  getSettings() {
+    try { return Object.assign({ autotune: true, autodive: true, reduce: false, hints: true }, JSON.parse(localStorage.getItem('pk_radio_settings') || '{}')); }
+    catch { return { autotune: true, autodive: true, reduce: false, hints: true }; }
+  }
+  saveSettings(v) {
+    try { localStorage.setItem('pk_radio_settings', JSON.stringify(v)); } catch { /* ignore */ }
+    this.applySettings(v);
+  }
+  applySettings(v) {
+    const s2 = v || this.getSettings();
+    try { this.$('page-radio')?.classList.toggle('reduce-motion', !!s2.reduce); } catch { /* ignore */ }
+    try { const hints = this.$('radio-hints'); if (hints) hints.style.display = s2.hints ? '' : 'none'; } catch { /* ignore */ }
+  }
+  openSettings() {
+    const box = this.$('rd-settings');
+    if (!box) return;
+    const s2 = this.getSettings();
+    const set = (id, val) => { const el = this.$(id); if (el) el.checked = !!val; };
+    set('rd-set-autotune', s2.autotune); set('rd-set-autodive', s2.autodive); set('rd-set-reduce', s2.reduce); set('rd-set-hints', s2.hints);
+    box.hidden = false;
+    requestAnimationFrame(() => box.classList.add('shown'));
+    const onChange = () => this.saveSettings({
+      autotune: this.$('rd-set-autotune')?.checked, autodive: this.$('rd-set-autodive')?.checked,
+      reduce: this.$('rd-set-reduce')?.checked, hints: this.$('rd-set-hints')?.checked,
+    });
+    ['rd-set-autotune', 'rd-set-autodive', 'rd-set-reduce', 'rd-set-hints'].forEach((id) => {
+      const el = this.$(id); if (el) el.onchange = onChange;
+    });
+  }
+  closeSettings() {
+    const box = this.$('rd-settings');
+    if (!box) return;
+    box.classList.remove('shown');
+    setTimeout(() => { if (!box.classList.contains('shown')) box.hidden = true; }, 260);
+  }
+
   /* ==================== 陆地掩膜：把兜底坐标的电台撒到国土陆地上 ==================== */
   async ensureLandMask() {
     if (this._landMask || this._landMaskLoading) return;
@@ -1425,6 +1462,7 @@ export class RadioPage {
   }
   /* ==================== 准星自动收听 / 收藏 ==================== */
   autoTuneFromCrosshair() {
+    try { if (!this.getSettings().autotune) return; } catch { /* ignore */ }
     if (!this._globe || !this.geoStations.length) return;
     const i = this._globe.pickCenter ? this._globe.pickCenter() : -1;
     if (i < 0) { this.setHint('准星没对准电台，再拖一点'); return; }

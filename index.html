@@ -889,6 +889,23 @@
           </div>
         </div>
 
+        <!-- 设置面板 -->
+        <div class="rd-record rd-settings" id="rd-settings" hidden>
+          <div class="rd-record-inner" style="flex-direction:column;align-items:stretch;gap:14px;min-width:min(520px,86vw)">
+            <button class="rd-record-close" id="rd-settings-close" type="button" title="关闭（Esc）">×</button>
+            <div class="rd-k"><i></i><span>设置</span></div>
+            <h2 class="rd-settings-title">播放与显示</h2>
+            <div class="rd-settings-rows">
+              <label class="rd-srow"><span>准星停稳后自动收听</span><input type="checkbox" id="rd-set-autotune" checked></label>
+              <label class="rd-srow"><span>自动巡游（30s 无操作）</span><input type="checkbox" id="rd-set-autodive" checked></label>
+              <label class="rd-srow"><span>减少动效（关闭入场/过渡动画）</span><input type="checkbox" id="rd-set-reduce"></label>
+              <label class="rd-srow"><span>显示右下快捷键提示</span><input type="checkbox" id="rd-set-hints" checked></label>
+            </div>
+            <p class="rd-settings-note">设置保存在本机 localStorage（pk_radio_settings）</p>
+          </div>
+        </div>
+
+        <!-- 底部流派筛选条 -->
         <!-- 底部流派筛选条 -->
         <div class="radio-chips" id="radio-chips"></div>
 

@@ -4095,3 +4095,15 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 /* 介绍页期间隐藏主顶栏（介绍页自带品牌） */
 #page-radio.pre .radio-topbar { opacity: 0; transition: opacity .2s; }
 #page-radio.pre .rd-tune { opacity: 0; }
+/* 设置面板 */
+#page-radio .rd-settings-title { font: 650 26px var(--rd-sans); letter-spacing: -.03em; margin: 0; color: var(--rd-ink) !important; }
+#page-radio .rd-settings-rows { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+#page-radio .rd-srow {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  padding: 14px 4px; border-bottom: 1px solid #f5f1e81a; font-size: 14px; color: var(--rd-ink);
+}
+#page-radio .rd-srow input { width: 18px; height: 18px; accent-color: #f36b45; }
+#page-radio .rd-settings-note { font: 400 10.5px var(--rd-mono); color: #f5f1e866; letter-spacing: .06em; margin: 4px 0 0; }
+#page-radio.reduce-motion .rd-intro.enter *,
+#page-radio.reduce-motion .radio-cross .reticle-orbit,
+#page-radio.reduce-motion .rd-vinyl { animation: none !important; }
