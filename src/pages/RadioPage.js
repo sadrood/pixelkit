@@ -864,7 +864,7 @@ export class RadioPage {
         list.innerHTML = clusters.map((c, k) => {
           const dy = (k % 2 === 0 ? -62 : 44) + (k % 3) * 8;
           const dx = (k % 2 === 0 ? -1 : 1) * (16 + (k % 3) * 12);
-          return '<span class="nebula-cluster-label" style="left:' + Math.round(c.x + dx) + 'px;top:' + Math.round(c.y + dy) + 'px"><b>' + this.esc((this.genres && this.genres[c.i]) || '') + '</b><span>' + c.count.toLocaleString('zh-CN') + ' 个电台</span></span>';
+          return '<span class="nebula-cluster-label" style="left:' + Math.round(c.x + dx) + 'px;top:' + Math.round(c.y + dy) + 'px"><b>' + this.esc((this.ccNames && this.ccNames[c.name]) || (this.genres && this.genres[c.i]) || c.name || '') + '</b><span>' + c.count.toLocaleString('zh-CN') + ' 个电台</span></span>';
         }).join('');
         if (leaders) leaders.innerHTML = '';
         return;

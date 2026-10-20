@@ -113,6 +113,7 @@ export async function createNebula3D(container, stations, opts = {}) {
   let stationsRef = [];
   let posArr = null;
   let counts = new Array(nGenre).fill(0);
+  let skyClusters = [];
 
   function rebuild(list) {
     stationsRef = list.slice();
@@ -124,15 +125,25 @@ export async function createNebula3D(container, stations, opts = {}) {
     const phase = new Float32Array(count);
     counts = new Array(nGenre).fill(0);
     const tmp = new THREE.Color();
+    // §5.3 Sky：电台节点按国家分组，布局可复现（顺序固定、不随机漂移）
+    const groups = new Map();
+    for (const s of stationsRef) { const k = s.cc || '??'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(s); }
+    const order = [...groups.entries()].sort((a, b) => (b[1].length - a[1].length) || (a[0] < b[0] ? -1 : 1));
+    const countryCenters = new Map();
+    order.forEach(([cc, arr], idx) => {
+      const ang = idx * 2.39996;
+      const radius = 3.0 + Math.sqrt(idx + 1) * 1.35;
+      countryCenters.set(cc, { v: new THREE.Vector3(Math.cos(ang) * radius, Math.sin(idx * 0.9) * 1.8, Math.sin(ang) * radius), n: arr.length });
+    });
+    skyClusters = order.map(([cc, arr]) => ({ cc, count: arr.length, v: countryCenters.get(cc).v }));
     for (let i = 0; i < n; i++) {
       const s = stationsRef[i];
       const g = (s.g || 0) % nGenre;
       counts[g] += 1;
-      const c = centers[g];
+      const ccGroup = countryCenters.get(s.cc || '??') || { v: new THREE.Vector3(0, 0, 0), n };
+      const c = ccGroup.v;
       const h = hash(s.id || s.name);
-      // 星团半径随该团台数增长
-      const baseR = (LAYOUT[g % LAYOUT.length] || { r: 0.9 }).r;
-      const spread = baseR * (0.55 + Math.sqrt(counts[g] || 1) * 0.045);
+      const spread = 0.5 + Math.sqrt(ccGroup.n) * 0.05;
       pos[i * 3] = c.x + gauss(h) * spread;
       pos[i * 3 + 1] = c.y + gauss(h >> 5) * spread * 0.9;
       pos[i * 3 + 2] = c.z + gauss(h >> 11) * spread * 1.25;
@@ -292,11 +303,13 @@ export async function createNebula3D(container, stations, opts = {}) {
     const r = canvas.getBoundingClientRect();
     const w = r.width || 1, h = r.height || 1;
     const out = [];
-    for (let g = 0; g < nGenre; g++) {
-      tmpV.copy(centers[g]).applyMatrix4(camera.matrixWorldInverse);
+    const top = skyClusters.slice(0, 60);
+    for (let k = 0; k < top.length; k++) {
+      const cl = top[k];
+      tmpV.copy(cl.v).applyMatrix4(camera.matrixWorldInverse);
       if (tmpV.z > -1) continue;
       tmpV.applyMatrix4(camera.projectionMatrix);
-      out.push({ i: g, x: (tmpV.x * 0.5 + 0.5) * w, y: (-tmpV.y * 0.5 + 0.5) * h, count: counts[g] || 0 });
+      out.push({ i: k, name: cl.cc, x: (tmpV.x * 0.5 + 0.5) * w, y: (-tmpV.y * 0.5 + 0.5) * h, count: cl.count || 0 });
     }
     return out;
   }
