@@ -255,6 +255,7 @@ export class RadioPage {
       this.updateFavCount();
       const slider = this.$('radio-slider');
       if (slider) { slider.max = String(Math.max(0, this.geoStations.length - 1)); slider.disabled = false; }
+      try { if (!(/[?&]s=[0-9a-f]{6,12}/i.test(location.search))) this._globe?.holdIntro?.(); } catch { /* ignore */ }
       // ?s=<12位 hex> 分享链接：直接定位该台且跳过入场页
       try {
         const sp = new URLSearchParams(location.search).get('s');
@@ -887,12 +888,15 @@ export class RadioPage {
     this.index = this.geoStations.indexOf(target);
     box.hidden = false;
     box.classList.remove('gone');
+    box.classList.remove('enter');
+    requestAnimationFrame(() => box.classList.add('enter'));
     try { this.$('page-radio')?.classList.add('pre'); } catch { /* ignore */ }
     const close = (play) => {
       try { localStorage.setItem('pk_roam_seen', '1'); } catch { /* ignore */ }
       box.classList.add('gone');
       setTimeout(() => { box.hidden = true; }, 260);
       try { this.$('page-radio')?.classList.remove('pre'); } catch { /* ignore */ }
+      try { this._globe?.replayIntro?.(); } catch { /* ignore */ }
       if (play) { this.setIndex(this.index, true); this.playStation(this.geoStations[this.index]); }
     };
     this.$('rd-continue')?.addEventListener('click', () => close(true), { once: true });

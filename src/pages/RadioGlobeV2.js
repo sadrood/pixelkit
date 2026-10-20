@@ -76,7 +76,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   const EARTH_R = 1;
   const earth = new THREE.Mesh(
     new THREE.SphereGeometry(EARTH_R, mobile ? 64 : 96, mobile ? 48 : 64),
-    new THREE.MeshPhongMaterial({ color: 0x07100e, specular: 0x0d1a16, shininess: 2 })
+    new THREE.MeshPhongMaterial({ color: 0x0b1815, specular: 0x122320, shininess: 3 })
   );
   world.add(earth);
   scene.add(new THREE.AmbientLight(0x8fb5d8, 0.9));
@@ -138,6 +138,51 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         }));
         world.add(landLayer);
         console.log('[radio] 陆地点阵：' + n + ' 点');
+
+        // 陆地轮廓：对掩膜做 marching squares，提取海岸线线段
+        const segs = [];
+        const bitAt = (cc, rr) => {
+          if (rr < 0 || rr >= rows || cc < 0 || cc >= cols) return 0;
+          const idx2 = rr * cols + cc;
+          return (bits[idx2 >> 3] >> (idx2 & 7)) & 1;
+        };
+        const toVec = (lat, lon) => {
+          const v = toVec3(lat, lon, EARTH_R * 1.02);
+          return [v.x, v.y, v.z];
+        };
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const tl = bitAt(c, r), tr = bitAt(c + 1, r), br = bitAt(c + 1, r + 1), bl = bitAt(c, r + 1);
+            if (tl === tr && tr === br && br === bl) continue;
+            const latTop = 90 - r * step, latBot = 90 - (r + 1) * step;
+            const lonL = -180 + c * step, lonM = lonL + step / 2, lonR = lonL + step;
+            const latM = (latTop + latBot) / 2;
+            const pts = [];
+            if (tl !== tr) pts.push([latTop, lonM]);
+            if (tr !== br) pts.push([latM, lonR]);
+            if (br !== bl) pts.push([latBot, lonM]);
+            if (bl !== tl) pts.push([latM, lonL]);
+            if (pts.length >= 2) {
+              const a = toVec(pts[0][0], pts[0][1]);
+              const b = toVec(pts[1][0], pts[1][1]);
+              segs.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+              if (pts.length === 4) {
+                const c2 = toVec(pts[2][0], pts[2][1]);
+                const d2 = toVec(pts[3][0], pts[3][1]);
+                segs.push(c2[0], c2[1], c2[2], d2[0], d2[1], d2[2]);
+              }
+            }
+          }
+        }
+        if (segs.length) {
+          const lg = new THREE.BufferGeometry();
+          lg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(segs), 3));
+          const outline = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({
+            color: 0xb4d6c6, transparent: true, opacity: 0.6, depthWrite: false,
+          }));
+          world.add(outline);
+          console.log('[radio] 陆地轮廓：' + (segs.length / 6) + ' 段');
+        }
       } catch (e) { /* ignore */ }
     })
     .catch(() => { /* 没有掩膜就不画 */ });
@@ -401,15 +446,19 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   let raf = 0, disposed = false, energy = 0, introDone = false;
   let rotVX = 0, rotVY = 0, focusTarget = null;
   let diveT = 1, diveFrom = END_Z, diveTo = END_Z, diveDur = 0.7;
+  let introHold = false;
   const clock = new THREE.Clock();
-  const t0 = performance.now();
+  let introStart = performance.now();
   const tick = () => {
     if (disposed) return;
     raf = requestAnimationFrame(tick);
     const dt = Math.min(clock.getDelta(), 0.05);
-    const el = performance.now() - t0;
+    const el = performance.now() - introStart;
     // 入场：只在前 1.9s 接管相机；之后完全交给用户（否则缩放/旋转会被每帧重置）
-    if (!introDone) {
+    if (introHold) {
+      camera.position.z = START_Z;
+      if (points) points.material.opacity = 0;
+    } else if (!introDone) {
       const intro = Math.min(1, el / 1900);
       const ie = intro * intro * (3 - 2 * intro);
       camera.position.z = START_Z + (END_Z - START_Z) * ie;
@@ -476,6 +525,16 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         x: Math.max(-0.9, Math.min(0.9, -(station.lat || 0) * Math.PI / 180 * 0.9)),
       };
       lastInteract = Date.now();
+    },
+    /** 介绍页期间：保持远景、隐藏点云，等用户点「开始收听」再飞入 */
+    holdIntro() { introHold = true; introDone = false; },
+    replayIntro() {
+      introHold = false;
+      introDone = false;
+      const t = performance.now();
+      try { window.__pkT0 = t; } catch { /* ignore */ }
+      // 重置内部计时：用新的起点
+      introStart = t;
     },
     /** 视图切换动画：镜头俯冲进入地球 */
     diveIn(dur = 0.7) {

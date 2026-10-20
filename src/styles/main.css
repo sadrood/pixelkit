@@ -4037,3 +4037,19 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .rd-record-songline > button { white-space: nowrap; flex: 0 0 auto; }
 #page-radio .rd-record-songline { max-width: min(560px, 60vw); }
 #page-radio .rd-record-songline b { white-space: normal; }
+
+
+/* 首次打开：介绍页元素依次升起 */
+@keyframes rd-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+#page-radio .rd-intro.enter .rd-irow { animation: rd-rise .42s var(--rd-ease) 60ms both; }
+#page-radio .rd-intro.enter .rd-intro-brand > .rd-poem { animation: rd-rise .42s var(--rd-ease) 140ms both; }
+#page-radio .rd-intro.enter .rd-intro-brand > .rd-poem-by { animation: rd-rise .42s var(--rd-ease) 200ms both; }
+#page-radio .rd-intro.enter .rd-k { animation: rd-rise .42s var(--rd-ease) 260ms both; }
+#page-radio .rd-intro.enter .rd-intro-name { animation: rd-rise .5s var(--rd-ease) 320ms both; }
+#page-radio .rd-intro.enter .rd-intro-place { animation: rd-rise .42s var(--rd-ease) 400ms both; }
+#page-radio .rd-intro.enter .rd-intro-meta { animation: rd-rise .42s var(--rd-ease) 440ms both; }
+#page-radio .rd-intro.enter .rd-intro-acts { animation: rd-rise .42s var(--rd-ease) 520ms both; }
+#page-radio .rd-intro.enter .rd-credit { animation: rd-rise .42s var(--rd-ease) 600ms both; }
+@media (prefers-reduced-motion: reduce) {
+  #page-radio .rd-intro.enter * { animation: none !important; }
+}
