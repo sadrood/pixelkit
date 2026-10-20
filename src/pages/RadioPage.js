@@ -423,6 +423,8 @@ export class RadioPage {
 
   /** 切到第 i 个电台：预览（play=false）或直接播放 */
   setIndex(i, play) {
+    // 首次进入工作区默认切到 Sky 星图（规格书 §4.1）
+    if (play && !this._enteredSky) { this._enteredSky = true; try { this.setView('nebula'); } catch { /* ignore */ } }
     const n = this.geoStations.length;
     if (!n) return;
     const idx = ((i % n) + n) % n;

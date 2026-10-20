@@ -303,7 +303,7 @@ export async function createNebula3D(container, stations, opts = {}) {
     const r = canvas.getBoundingClientRect();
     const w = r.width || 1, h = r.height || 1;
     const out = [];
-    const top = skyClusters.slice(0, 60);
+    const top = skyClusters.slice(0, 14);
     for (let k = 0; k < top.length; k++) {
       const cl = top[k];
       tmpV.copy(cl.v).applyMatrix4(camera.matrixWorldInverse);
