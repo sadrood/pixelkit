@@ -210,6 +210,27 @@ export class RadioPage {
       }
     } catch { /* ignore */ }
     this.applySettings();
+    // 无操作：1.2s 隐藏 UI、30s 自动巡游（设置可关）
+    this._act = Date.now();
+    this._introOpen = true;
+    const act = () => { this._act = Date.now(); try { this.$('page-radio')?.classList.remove('ui-idle'); } catch { /* ignore */ } };
+    ['pointerdown', 'pointermove', 'keydown', 'wheel'].forEach((ev) => window.addEventListener(ev, act, { passive: true }));
+    if (!this._idleTimer) {
+      this._idleTimer = setInterval(() => {
+        const page = this.$('page-radio');
+        if (!page || !page.classList.contains('active')) return;
+        if (this._introOpen) { this._act = Date.now(); return; }
+        const idle = Date.now() - this._act;
+        const busy = ['rd-record', 'rd-settings', 'radio-sheet', 'radio-searchbox'].some((id) => { const el = this.$(id); return el && !el.hidden; });
+        page.classList.toggle('ui-idle', !busy && idle > 1200);
+        const st = this.getSettings ? this.getSettings() : {};
+        if (st.autodive !== false && idle > 30000 && this.audio && !this.audio.paused && !busy) {
+          this._act = Date.now();
+          this.step(1);
+          this.setHint('自动巡游 · 下一站');
+        }
+      }, 4000);
+    }
     this.ensureSpaceBackground();
     this.loadFilters();
     this.loadListStations();
@@ -302,6 +323,7 @@ export class RadioPage {
       if (loading) loading.style.display = 'none';
       this.bootHide();
       this.ensureLandMask();
+      setTimeout(() => { this._introOpen = false; }, 30000);
       try { this.showIntro(); } catch (e) { console.warn('intro 失败：', e); }
       // 恢复上次听的电台（没有就从第一个开始）
       let startIdx = 0;
@@ -981,6 +1003,7 @@ export class RadioPage {
       box.classList.add('gone');
       setTimeout(() => { box.hidden = true; }, 260);
       try { this.$('page-radio')?.classList.remove('pre'); } catch { /* ignore */ }
+      this._introOpen = false;
       try { this._globe?.replayIntro?.(); } catch { /* ignore */ }
       if (play) { this.setIndex(this.index, true); this.playStation(this.geoStations[this.index]); }
     };

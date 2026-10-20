@@ -4108,3 +4108,17 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio.reduce-motion .radio-cross .reticle-orbit,
 #page-radio.reduce-motion .rd-vinyl { animation: none !important; }
 #page-radio .radio-q-item.sel { background: #f5f1e814; outline: 1px solid #f36b4580; }
+
+/* 无操作隐藏 UI */
+#page-radio.ui-idle .radio-panel,
+#page-radio.ui-idle .radio-chips,
+#page-radio.ui-idle .radio-hints,
+#page-radio.ui-idle .radio-topbar,
+#page-radio.ui-idle .radio-cross,
+#page-radio.ui-idle .radio-clock { opacity: 0 !important; pointer-events: none; }
+#page-radio .radio-panel,
+#page-radio .radio-chips,
+#page-radio .radio-hints,
+#page-radio .radio-topbar,
+#page-radio .radio-cross,
+#page-radio .radio-clock { transition: opacity .4s var(--rd-ease); }
