@@ -4107,3 +4107,4 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio.reduce-motion .rd-intro.enter *,
 #page-radio.reduce-motion .radio-cross .reticle-orbit,
 #page-radio.reduce-motion .rd-vinyl { animation: none !important; }
+#page-radio .radio-q-item.sel { background: #f5f1e814; outline: 1px solid #f36b4580; }

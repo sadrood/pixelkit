@@ -1688,8 +1688,19 @@ export class RadioPage {
     q.addEventListener('input', () => this.renderSearchList(q.value.trim()));
     q.addEventListener('focus', () => { if (q.value.trim()) this.renderSearchList(q.value.trim()); });
     q.addEventListener('keydown', (e) => {
+      const items = () => Array.from(list.querySelectorAll('.radio-q-item'));
+      const cur = () => list.querySelector('.radio-q-item.sel');
       if (e.key === 'Escape') { list.hidden = true; q.blur(); }
-      else if (e.key === 'Enter') { const first = list.querySelector('.radio-q-item'); if (first) first.click(); }
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const arr = items();
+        if (!arr.length) return;
+        const i = arr.indexOf(cur());
+        const n = e.key === 'ArrowDown' ? (i + 1 + arr.length) % arr.length : (i <= 0 ? arr.length - 1 : i - 1);
+        arr.forEach((el, k) => el.classList.toggle('sel', k === n));
+        arr[n].scrollIntoView({ block: 'nearest' });
+      }
+      else if (e.key === 'Enter') { const pick = cur() || list.querySelector('.radio-q-item'); if (pick) pick.click(); }
     });
     document.addEventListener('click', (e) => {
       if (!e.target || !e.target.closest || !e.target.closest('.radio-searchbox')) list.hidden = true;
