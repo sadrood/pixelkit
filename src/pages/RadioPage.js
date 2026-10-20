@@ -123,9 +123,17 @@ export class RadioPage {
       b.addEventListener('click', () => this.setView(b.dataset.view));
     });
     // 进入：确保正在播放当前台（或从当前开始播）
-    this.$('radio-enter')?.addEventListener('click', () => {
-      if (this.current) { this.audio.play().catch(() => {}); this.updateStatus('正在播放 · 空格暂停'); }
-      else this.step(1);
+    this.$('radio-enter')?.addEventListener('click', () => this.openRecord());
+    this.$('rd-record-close')?.addEventListener('click', () => this.closeRecord());
+    this.$('rd-record-play')?.addEventListener('click', () => {
+      if (this.audio && !this.audio.paused) this.audio.pause();
+      else if (this.current) this.audio.play().catch(() => {});
+      setTimeout(() => this.updateRecord(), 120);
+    });
+    this.$('rd-record-next')?.addEventListener('click', () => { this.step(1); this.updateRecord(); });
+    this.$('rd-record-fav')?.addEventListener('click', () => { this.toggleFav(); this.updateRecord(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') this.closeRecord();
     });
 
     // 浏览面板
@@ -137,9 +145,9 @@ export class RadioPage {
     this.$('radio-tag')?.addEventListener('change', () => this.loadListStations());
 
     // 音频事件
-    this.audio?.addEventListener('playing', () => { this.setPlayingUI(true); this.clearStall(); });
+    this.audio?.addEventListener('playing', () => { this.setPlayingUI(true); this.clearStall(); try { this.updateRecord(); } catch { /* ignore */ } });
     this.audio?.addEventListener('timeupdate', () => { if (this.audio && this.audio.currentTime > 0.2) this.clearStall(); });
-    this.audio?.addEventListener('pause', () => this.setPlayingUI(false));
+    this.audio?.addEventListener('pause', () => { this.setPlayingUI(false); try { this.updateRecord(); } catch { /* ignore */ } });
     this.audio?.addEventListener('error', () => this.onAudioError());
     this.audio?.addEventListener('stalled', () => { /* 等看门狗 */ });
 
@@ -364,6 +372,7 @@ export class RadioPage {
     this.setNowPlaying(s);
     // 预览（play=false）时不移动镜头，保持初始的全球视角；切台才聚焦
     try { this._globe?.setSelected(s); if (play) this._globe?.focus?.(s); } catch { /* ignore */ }
+    if (play) { try { this.playTuneStatic('switch'); } catch { /* ignore */ } }
     this.syncSlider();
     this.setHint(`第 ${idx + 1} / ${n} 个 · ${[s.country, s.codec, s.bitrate ? s.bitrate + 'kbps' : ''].filter(Boolean).join(' · ')}`);
     if (play) {
@@ -1221,6 +1230,7 @@ export class RadioPage {
     this.setIndex(i, true);
     this.updateStatus('已锁定');
     this.setHint('准星锁定 · 自动收听');
+    this.playTuneStatic('lock');
   }
 
   loadFavs() {
@@ -1253,6 +1263,96 @@ export class RadioPage {
     btn.textContent = on ? '♥' : '♡';
     btn.classList.toggle('on', Boolean(on));
   }
+  /* ==================== 调频音效（切台静电噪声） ==================== */
+  ensureTuneAudio() {
+    if (this._tuneCtx) return this._tuneCtx;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      const ctx = new Ctx();
+      // 预生成 0.5s 白噪声
+      const len = Math.floor(ctx.sampleRate * 0.5);
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * 0.6;
+      this._tuneCtx = ctx;
+      this._tuneNoise = buf;
+      return ctx;
+    } catch (e) { return null; }
+  }
+
+  /** 切台时播放一段静电/调谐声（受静音与音量控制） */
+  playTuneStatic(kind = 'switch') {
+    try {
+      if (this.audio && this.audio.muted) return;
+      const ctx = this.ensureTuneAudio();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') ctx.resume();
+      const now = ctx.currentTime;
+      const src = ctx.createBufferSource();
+      src.buffer = this._tuneNoise;
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.Q.value = kind === 'lock' ? 6 : 1.4;
+      bp.frequency.setValueAtTime(kind === 'lock' ? 1600 : 700, now);
+      bp.frequency.exponentialRampToValueAtTime(kind === 'lock' ? 2400 : 2800, now + 0.18);
+      const gain = ctx.createGain();
+      const vol = Math.max(0, Math.min(1, (this.volume == null ? 0.8 : this.volume))) * (kind === 'lock' ? 0.10 : 0.16);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(vol, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + (kind === 'lock' ? 0.16 : 0.26));
+      src.connect(bp); bp.connect(gain); gain.connect(ctx.destination);
+      src.start(now); src.stop(now + 0.35);
+    } catch { /* ignore */ }
+  }
+
+  /* ==================== 唱片界面 ==================== */
+  openRecord() {
+    const box = this.$('rd-record');
+    if (!box) return;
+    this.ensureTuneAudio();
+    box.hidden = false;
+    requestAnimationFrame(() => box.classList.add('shown'));
+    this.updateRecord();
+  }
+
+  closeRecord() {
+    const box = this.$('rd-record');
+    if (!box) return;
+    box.classList.remove('shown');
+    setTimeout(() => { if (!box.classList.contains('shown')) box.hidden = true; }, 300);
+  }
+
+  updateRecord() {
+    const s = this.current || this.geoStations[this.index];
+    if (!s) return;
+    const name = this.$('rd-record-name'); if (name) name.textContent = s.name || '';
+    const place = this.$('rd-record-place');
+    if (place) {
+      const city = (s.state || '').replace(/\s+/g, ' ').trim();
+      place.textContent = [city ? city.toUpperCase() + ', ' : '', s.country || s.cc].filter(Boolean).join(' ');
+    }
+    const meta = this.$('rd-record-meta');
+    if (meta) {
+      const genre = this.genres && s.g != null ? this.genres[s.g] : '';
+      const lang = this.langs && s.l != null ? this.langs[s.l] : '';
+      meta.textContent = [genre, lang, s.bitrate ? s.bitrate + ' KBPS' : '码率未知'].filter(Boolean).join(' · ');
+    }
+    const initial = this.$('rd-vinyl-initial'); if (initial) initial.textContent = (s.name || 'R').trim().charAt(0).toUpperCase();
+    const genreLabel = this.$('rd-vinyl-genre'); if (genreLabel) genreLabel.textContent = (this.genres && this.genres[s.g]) || '电台';
+    const fav = this.$('rd-record-fav'); if (fav) fav.textContent = this.isFav(s.id) ? '♥ 已收藏' : '♡ 收藏';
+    const songEl = this.$('rd-record-song'); if (songEl) songEl.textContent = this._lastSong || '';
+    const play = this.$('rd-record-play');
+    if (play) play.textContent = (this.audio && !this.audio.paused) ? '❚❚ 暂停' : '▶ 播放';
+    const vinyl = this.$('rd-vinyl');
+    if (vinyl) vinyl.classList.toggle('spinning', Boolean(this.audio && !this.audio.paused));
+    try { this.buildServices(s); } catch { /* ignore */ }
+    // 唱片上的音乐服务链接
+    const services = this.$('rd-record-services');
+    const src = this.$('radio-services');
+    if (services && src) services.innerHTML = src.innerHTML;
+  }
+
   /* ==================== 频谱 / 正在播放 / 状态 ==================== */
   updateStatus(text) {
     const el = this.$('radio-status');
@@ -1326,6 +1426,8 @@ export class RadioPage {
         if (song) {
           song.textContent = title ? '正在播放：' + title : '';
           song.style.display = title ? 'block' : 'none';
+          this._lastSong = title || '';
+          try { this.updateRecord(); } catch { /* ignore */ }
         }
       } catch { /* ignore */ }
     };

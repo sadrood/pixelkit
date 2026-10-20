@@ -857,6 +857,36 @@
           <div class="rd-credit">电台目录来自 Radio Browser · 地理数据来自 GeoNames</div>
         </div>
 
+        <!-- 唱片界面：点「进入 · Enter」打开 -->
+        <div class="rd-record" id="rd-record" hidden>
+          <div class="rd-record-inner">
+            <button class="rd-record-close" id="rd-record-close" type="button" title="关闭（Esc）">×</button>
+            <div class="rd-vinyl-wrap">
+              <div class="rd-vinyl" id="rd-vinyl">
+                <div class="rd-vinyl-grooves"></div>
+                <div class="rd-vinyl-label" id="rd-vinyl-label">
+                  <b id="rd-vinyl-genre">综合</b>
+                  <span id="rd-vinyl-initial">R</span>
+                </div>
+                <div class="rd-vinyl-hole"></div>
+              </div>
+              <div class="rd-tonearm" id="rd-tonearm"></div>
+            </div>
+            <div class="rd-record-info">
+              <div class="rd-k"><i></i><span id="rd-record-k">正在播放</span></div>
+              <h2 id="rd-record-name">世界电台</h2>
+              <div class="rd-record-place" id="rd-record-place"></div>
+              <div class="rd-record-meta" id="rd-record-meta"></div>
+              <div class="rd-record-songline"><span>此刻</span><b id="rd-record-song"></b><button id="rd-record-fav" class="rd-lnk" type="button">♡ 收藏</button></div>
+              <div class="rd-record-services" id="rd-record-services"></div>
+              <div class="rd-record-actions">
+                <button class="rd-cta" id="rd-record-play" type="button">▶ 播放</button>
+                <button class="rd-lnk" id="rd-record-next" type="button">下一站 →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 底部流派筛选条 -->
         <div class="radio-chips" id="radio-chips"></div>
 

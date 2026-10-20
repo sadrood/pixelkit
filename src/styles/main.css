@@ -3939,3 +3939,86 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .radio-nebula3d { opacity: 0; transition: opacity .5s var(--rd-ease); }
 #page-radio .radio-nebula3d.shown { opacity: 1; }
 #page-radio .radio-globe canvas { transition: opacity .5s var(--rd-ease); }
+
+
+/* ============ 唱片界面 + 星云入口可见 ============ */
+/* globe 视图也显示视图切换胶囊（否则用户不知道如何进入星云） */
+#page-radio:not(.sky) .radio-top-right { display: flex; align-items: center; gap: 10px; }
+#page-radio:not(.sky) .radio-top-right > :not(.radio-views) { display: none; }
+#page-radio .radio-views { display: inline-flex; }
+#page-radio.sky .radio-views { display: inline-flex; }
+
+/* 唱片 overlay */
+#page-radio .rd-record {
+  position: absolute; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 16, 14, .72); backdrop-filter: blur(16px) saturate(1.2);
+  opacity: 0; transition: opacity .3s var(--rd-ease);
+}
+#page-radio .rd-record.shown { opacity: 1; }
+#page-radio .rd-record[hidden] { display: none; }
+#page-radio .rd-record-inner {
+  position: relative; display: flex; align-items: center; gap: clamp(28px, 5vw, 72px);
+  padding: clamp(24px, 4vw, 48px); max-width: min(1100px, 92vw);
+}
+#page-radio .rd-record-close {
+  position: absolute; right: -6px; top: -6px; width: 40px; height: 40px; border-radius: 50%;
+  border: 1px solid #f5f1e833; background: #101f1d99; color: var(--rd-ink); font-size: 20px; cursor: pointer;
+}
+#page-radio .rd-vinyl-wrap { position: relative; flex: 0 0 auto; }
+#page-radio .rd-vinyl {
+  position: relative; width: clamp(200px, 26vw, 300px); height: clamp(200px, 26vw, 300px);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #0d0d0d 0 34%, #141414 35% 36%, #0b0b0b 37% 100%);
+  box-shadow: 0 30px 80px -20px #000000cc, inset 0 0 60px #000000aa;
+  animation: rd-vinyl-spin 8s linear infinite;
+  animation-play-state: paused;
+}
+#page-radio .rd-vinyl.spinning { animation-play-state: running; }
+@keyframes rd-vinyl-spin { to { transform: rotate(360deg); } }
+#page-radio .rd-vinyl-grooves {
+  position: absolute; inset: 6%; border-radius: 50%;
+  background: repeating-radial-gradient(circle, #ffffff0d 0 1px, transparent 1px 7px);
+  opacity: .8;
+}
+#page-radio .rd-vinyl-label {
+  position: absolute; inset: 30%; border-radius: 50%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  background: var(--glow-c, #8FA39C); color: #101f1d; text-align: center; overflow: hidden;
+  box-shadow: inset 0 0 20px #00000055;
+}
+#page-radio .rd-vinyl-label b { font: 500 10px var(--rd-mono); letter-spacing: .18em; opacity: .75; }
+#page-radio .rd-vinyl-label span {
+  font: 650 clamp(22px, 3vw, 34px)/1 var(--rd-sans); letter-spacing: -.03em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90%;
+}
+#page-radio .rd-vinyl-hole {
+  position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px;
+  border-radius: 50%; background: #0b0b0b; box-shadow: inset 0 0 0 2px #1b1b1b;
+}
+#page-radio .rd-tonearm {
+  position: absolute; right: -14%; top: -8%; width: 42%; height: 8px;
+  background: linear-gradient(90deg, #cfc8b8, #8d8677); border-radius: 4px;
+  transform-origin: 95% 50%; transform: rotate(24deg);
+  opacity: .0; transition: opacity .3s;
+}
+#page-radio .rd-vinyl.spinning ~ .rd-tonearm { opacity: .8; }
+#page-radio .rd-record-info { color: var(--rd-ink); min-width: 0; }
+#page-radio .rd-record-info h2 {
+  font: 650 clamp(28px, 3vw, 42px)/1.05 var(--rd-sans); letter-spacing: -.04em; margin: 8px 0;
+}
+#page-radio .rd-record-place { color: var(--rd-dim); font-size: 14px; }
+#page-radio .rd-record-meta { font: 400 10.5px var(--rd-mono); letter-spacing: .1em; text-transform: uppercase; color: #b3c1b7bf; margin-top: 6px; }
+#page-radio .rd-record-songline {
+  display: flex; align-items: center; gap: 10px; margin-top: 16px;
+  padding-left: 12px; border-left: 1px solid #f5f1e82e; font-size: 14px; color: var(--rd-dim);
+}
+#page-radio .rd-record-songline b { color: var(--rd-ink); font-weight: 500; }
+#page-radio .rd-record-services { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
+#page-radio .rd-record-services a { color: #b3c1b7cc; font-size: 12px; text-decoration: none; }
+#page-radio .rd-record-actions { display: flex; align-items: center; gap: 22px; margin-top: 24px; }
+#page-radio .rd-record-actions .rd-cta { height: 50px; padding: 0 22px; font-size: 15px; }
+@media (max-width: 820px) {
+  #page-radio .rd-record-inner { flex-direction: column; gap: 22px; }
+  #page-radio .rd-record-info h2 { font-size: 26px; }
+}
