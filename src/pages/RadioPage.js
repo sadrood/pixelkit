@@ -230,6 +230,8 @@ export class RadioPage {
       // 拖动停稳后：准星对准的最近电台自动收听（RoamDial 的核心交互）
       try { this._globe.onSettle?.(() => this.autoTuneFromCrosshair()); } catch { /* ignore */ }
       this.loadFullStations();
+      // 预热星云模块（用户切过去时不用等）
+      import('./RadioNebula3D.js').catch(() => {});
       this.buildChips();
       this.startLabels();
       this.updateFavCount();
@@ -561,6 +563,7 @@ export class RadioPage {
   applyGenreFilter(g) {
     this.genreFilter = g;
     const n = this._globe ? this._globe.setFilter(g < 0 ? null : (s) => (s.g || 0) === g) : 0;
+    try { this._neb3d?.setFilter?.(g < 0 ? null : (s) => (s.g || 0) === g); } catch { /* ignore */ }
     this.buildChips();
     this.setHint(g < 0 ? `全部 ${n} 个电台` : `${this.genres[g] || ''} · ${n} 个电台`);
     const first = this._globe && this._globe.getFiltered ? this._globe.getFiltered()[0] : null;
@@ -571,7 +574,7 @@ export class RadioPage {
   }
 
   /** 切换视图：地球 / 流派星云 / 收藏 */
-  setView(v) {
+  async setView(v) {
     this.view = v;
     document.querySelectorAll('#page-radio .radio-view').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
     if (v === 'fav') { this.showFavSheet(); this.setHint('收藏 · 点一个台开始收听'); return; }
@@ -581,13 +584,38 @@ export class RadioPage {
     const labels = this.$('radio-labels');
     if (v === 'nebula') {
       if (this._globe && this._globe.isGlobeGL) {
-        // globe.gl 地球：星云切到 2D 动态星云画布
-        this._globe.setLayout('nebula');
-        if (neb) { neb.hidden = false; neb.style.display = ''; }
-        if (labels) labels.innerHTML = '';
-        this.renderNebula();
-        this.startNebulaAnim();
-        this.setHint('流派星云 · 点任意光斑收听；G 回地球');
+        // 真 3D 星云（three.js 粒子场，有纵深、近镜头虚化）
+        const wrap = this.$('radio-nebula3d');
+        if (wrap) wrap.hidden = false;
+        if (globeEl) globeEl.style.visibility = 'hidden';
+        if (neb) neb.hidden = true;
+        const listEl = this.$('radio-label-list'); if (listEl) listEl.innerHTML = '';
+        const leadEl = this.$('radio-leaders'); if (leadEl) leadEl.innerHTML = '';
+        try {
+          if (!this._neb3d && !this._neb3dFailed) {
+            this.setHint('正在生成星云…（首次需要几秒）');
+            const { createNebula3D } = await import('./RadioNebula3D.js');
+            this._neb3d = await createNebula3D(wrap, this.geoStations, {
+              genres: this.genres,
+              onPick: (st) => this.onGlobePick(st),
+              onHover: (st, x, y) => this.onHover(st, x, y),
+            });
+            this._neb3d.onSettle?.(() => {
+              try { const i = this._neb3d.pickCenter(); if (i >= 0) this.setIndex(i, true); } catch { /* ignore */ }
+            });
+          }
+          if (this._neb3d && this._neb3d.setStations) this._neb3d.setStations(this.geoStations);
+          if (this.genreFilter >= 0) this._neb3d.setFilter?.((st) => (st.g || 0) === this.genreFilter);
+          this.setHint('流派星云 · 拖动旋转 · 滚轮拉近（粒子会贴到镜头）· 点星云收听');
+        } catch (err) {
+          console.warn('3D 星云不可用，回退 2D：', err);
+          this._neb3dFailed = true;
+          if (wrap) wrap.hidden = true;
+          if (neb) neb.hidden = false;
+          this.renderNebula();
+          this.startNebulaAnim();
+        }
+        this.setHint('流派星云 · 拖动旋转 · 滚轮拉近（粒子会贴到镜头）· 点星云收听');
       } else if (this._globe && this._globe.setLayout) {
         // 自绘点阵：地球点云原地变形成 11 个星团（0.95 秒过渡）
         if (neb) neb.hidden = true;
@@ -598,7 +626,8 @@ export class RadioPage {
         // WebGL 不可用：退回 2D 光斑星云
         if (globeEl) globeEl.style.display = 'none';
         if (neb) neb.hidden = false;
-        if (labels) labels.innerHTML = '';
+        const listEl = this.$('radio-label-list'); if (listEl) listEl.innerHTML = '';
+        const leadEl = this.$('radio-leaders'); if (leadEl) leadEl.innerHTML = '';
         this.renderNebula();
         this.setHint('流派星云 · 点任意光斑收听，或按 G 回到地球');
       }
@@ -606,6 +635,9 @@ export class RadioPage {
     }
     if (neb) { neb.hidden = true; neb.style.display = 'none'; }
     this.stopNebulaAnim();
+    const wrap3d = this.$('radio-nebula3d');
+    if (wrap3d) wrap3d.hidden = true;
+    if (globeEl) globeEl.style.visibility = '';
     if (globeEl) globeEl.style.display = '';
     if (this._globe) this._globe.setLayout('globe');
     this.setHint('拖动旋转 · 滚轮远近 · 准星停稳自动收听');
@@ -644,7 +676,10 @@ export class RadioPage {
       if (!this._globe || this.view === 'fav') { list.innerHTML = ''; if (leaders) leaders.innerHTML = ''; return; }
       if (this.view === 'nebula') {
         let clusters = [];
-        try { clusters = this._globe.getNebulaLabels ? this._globe.getNebulaLabels() : []; } catch { clusters = []; }
+        try {
+          if (this._neb3d && this._neb3d.getClusterLabels) clusters = this._neb3d.getClusterLabels();
+          else if (this._globe.getNebulaLabels) clusters = this._globe.getNebulaLabels();
+        } catch { clusters = []; }
         list.innerHTML = clusters.map((c, k) => '<span class="nebula-cluster-label" style="left:' + Math.round(c.x) + 'px;top:' + Math.round(c.y + (k % 2 === 0 ? -46 : 30)) + 'px"><b>' + this.esc((this.genres && this.genres[c.i]) || '') + '</b><span>' + c.count.toLocaleString('zh-CN') + ' 个电台</span></span>').join('');
         if (leaders) leaders.innerHTML = '';
         return;
@@ -727,7 +762,8 @@ export class RadioPage {
         if (k >= 0) { this.index = k; this.current = this.geoStations[k]; this.syncSlider(); }
       }
       this.buildChips();
-      if (this.view === 'nebula') this.renderNebula();
+      try { this._neb3d?.setStations?.(this.geoStations); } catch { /* ignore */ }
+      if (this.view === 'nebula' && this._neb3dFailed) this.renderNebula();
       const slider = this.$('radio-slider');
       if (slider) slider.max = String(Math.max(0, this.geoStations.length - 1));
       const meta = this.$('radio-top-meta');
@@ -1086,6 +1122,7 @@ export class RadioPage {
       for (let i = 0; i < Math.min(8, n); i++) bass += this._freq[i];
       bass = bass / (Math.min(8, n) * 255);
       try { this._globe?.setEnergy?.(bass); } catch { /* ignore */ }
+      try { this._neb3d?.setEnergy?.(bass); } catch { /* ignore */ }
       const dial = this.$('radio-dial');
       if (dial && !dial.hidden) dial.style.setProperty('--energy', bass.toFixed(3));
       if (bars) {

@@ -3555,3 +3555,8 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 /* v9.4：时钟右上大字；提示不与它重叠 */
 #page-radio .radio-clock { top: 76px; right: 26px; bottom: auto; }
 #page-radio .radio-clock b { font-size: 44px; }
+
+/* v13：3D 星云容器 */
+#page-radio .radio-nebula3d { position: absolute; inset: 0; z-index: 2; overflow: hidden; }
+#page-radio .radio-nebula3d[hidden] { display: none; }
+#page-radio .radio-nebula3d canvas { display: block; width: 100% !important; height: 100% !important; }
