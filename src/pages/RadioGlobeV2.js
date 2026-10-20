@@ -178,7 +178,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
           const lg = new THREE.BufferGeometry();
           lg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(segs), 3));
           const outline = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({
-            color: 0xb4d6c6, transparent: true, opacity: 0.6, depthWrite: false,
+            color: 0xcfe8db, transparent: true, opacity: 0.85, depthWrite: false,
           }));
           world.add(outline);
           console.log('[radio] 陆地轮廓：' + (segs.length / 6) + ' 段');
@@ -205,6 +205,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   let filtered = stations.slice();
   let points = null;
   let pointsGlow = null;
+  let morphT = 1, morphDur = 1.5, morphBase = null, morphTarget = null;
   let pointGeo = null;
   let pointsList = [];
   let zoomLevel = 1;
@@ -248,6 +249,27 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
     }));
     world.add(pointsGlow);
+    // 记录变形起点；目标 = 该电台所属流派的星团位置（与星云 LAYOUT 一致的方位）
+    morphBase = pos.slice();
+    const LAY = [
+      [1.05, -0.15, 0.45], [1.95, -1.2, 0.15], [0.3, -1.8, 0.68], [2.4, 0.15, -0.45],
+      [-2.1, 1.35, 0.83], [-2.2, 0.08, -0.68], [2.1, 1.43, 0.23], [-1.0, -0.38, 1.2],
+      [0.83, 0.9, 1.28], [1.43, -0.68, -1.43], [0.15, 1.88, -0.3],
+    ];
+    morphTarget = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const g = (list[i].g || 0) % LAY.length;
+      const L = LAY[g];
+      let h = 0; const id = String(list[i].id || list[i].name || i);
+      for (let k = 0; k < id.length; k++) h = (h * 31 + id.charCodeAt(k)) >>> 0;
+      const jx = (((h >>> 3) % 1000) / 1000 - 0.5) * 0.7;
+      const jy = (((h >>> 13) % 1000) / 1000 - 0.5) * 0.7;
+      const jz = (((h >>> 23) % 1000) / 1000 - 0.5) * 0.7;
+      morphTarget[i * 3] = L[0] + jx;
+      morphTarget[i * 3 + 1] = L[1] + jy;
+      morphTarget[i * 3 + 2] = L[2] + jz;
+    }
+    morphT = 1;
   }
   buildPoints(filtered);
 
@@ -340,7 +362,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         return Math.abs(dLat) <= 8 && Math.abs(dLng) * cos <= 8;
       });
       buildPoints(near.length ? near : stations);
-      if (points) { points.material.size = mobile ? 0.02 : 0.013; points.material.opacity = 0.6; }
+      if (points) { points.material.size = mobile ? 0.011 : 0.007; points.material.opacity = 0.55; }
     } else {
       // 远景只显示强台，中景显示中强台：弱信号要放大才出现
       const minPower = lvl === 0 ? 60 : 46;
@@ -350,6 +372,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       });
       buildPoints(strong.length > 1200 ? strong : stations);
       if (points) points.material.size = lvl === 0 ? (mobile ? 0.02 : 0.012) : (mobile ? 0.028 : 0.018);
+      if (landLayer) landLayer.visible = lvl !== 2;
     }
   }
   applyZoomLevel();
@@ -382,8 +405,9 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       const dx = e.clientX - lastX, dy = e.clientY - lastY;
       moved += Math.abs(dx) + Math.abs(dy);
       lastX = e.clientX; lastY = e.clientY;
-      world.rotation.y += dx * 0.005;
-      world.rotation.x = Math.max(-1.1, Math.min(1.1, world.rotation.x + dy * 0.004));
+      const sens = Math.max(0.22, Math.min(1, (camera.position.z - 1.05) / 2.0));
+      world.rotation.y += dx * 0.005 * sens;
+      world.rotation.x = Math.max(-1.1, Math.min(1.1, world.rotation.x + dy * 0.004 * sens));
       rotVX = dx * 0.0016;
       rotVY = dy * 0.0013;
       focusTarget = null;
@@ -490,6 +514,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       const ie = intro * intro * (3 - 2 * intro);
       camera.position.z = START_Z + (END_Z - START_Z) * ie;
       if (points) points.material.opacity = 0.92 * ie;
+      if (landLayer) landLayer.visible = zoomLevel !== 2;
       if (intro >= 1) { introDone = true; applyZoomLevel(); }
     } else if (points && points.material.opacity < 0.92) {
       points.material.opacity = Math.min(0.92, points.material.opacity + dt * 0.6);
@@ -532,15 +557,23 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     }
     // 频谱呼吸
     if (points) {
-      const base = zoomLevel === 2 ? (mobile ? 0.02 : 0.013) : zoomLevel === 1 ? (mobile ? 0.03 : 0.022) : (mobile ? 0.022 : 0.014);
+      const base = zoomLevel === 2 ? (mobile ? 0.011 : 0.007) : zoomLevel === 1 ? (mobile ? 0.03 : 0.022) : (mobile ? 0.022 : 0.014);
       const want = base * (1 + energy * 0.5);
       points.material.size += (want - points.material.size) * 0.12;
       if (pointsGlow) {
         pointsGlow.material.size = points.material.size * (zoomLevel >= 2 ? 2.2 : 2.0);
-        pointsGlow.material.opacity = zoomLevel >= 2 ? 0.04 : 0.05;
+        pointsGlow.material.opacity = zoomLevel >= 2 ? 0.0 : 0.05;
       }
     }
     // 不再自动旋转：避免用户操作时地球「乱转」
+    // 粒子变形：球面 → 星团
+    if (morphT < 1 && morphBase && morphTarget && pointGeo) {
+      morphT = Math.min(1, morphT + dt / Math.max(0.001, morphDur));
+      const e = 1 - Math.pow(1 - morphT, 3);
+      const arr = pointGeo.attributes.position.array;
+      for (let i = 0; i < arr.length; i++) arr[i] = morphBase[i] + (morphTarget[i] - morphBase[i]) * e;
+      pointGeo.attributes.position.needsUpdate = true;
+    }
     renderer.render(scene, camera);
     try { bctx.clearRect(0, 0, bloom.width, bloom.height); bctx.drawImage(canvas, 0, 0, bloom.width, bloom.height); } catch { /* ignore */ }
   };
@@ -644,6 +677,21 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       return filtered.length;
     },
     applyZoomLevel() { applyZoomLevel(); },
+    /** 地球→星云：同一批粒子从球面飞散到星团位置 */
+    morphToNebula(dur = 1.5) {
+      if (!morphBase) return;
+      morphT = 0;
+      morphDur = dur;
+      zoomFrom = camera.position.z; zoomToZ = 3.4; zoomT = 0; zoomDur = dur;
+    },
+    /** 星云→地球：恢复球面位置 */
+    resetMorph() {
+      if (!morphBase || !pointGeo) return;
+      const arr = pointGeo.attributes.position.array;
+      for (let i = 0; i < arr.length; i++) arr[i] = morphBase[i];
+      pointGeo.attributes.position.needsUpdate = true;
+      morphT = 1;
+    },
     /** 吸附动画：轻微推近到目标电台 */
     zoomTo(z, dur = 0.35) { zoomFrom = camera.position.z; zoomToZ = z; zoomT = 0; zoomDur = dur; },
     setStations(list) {

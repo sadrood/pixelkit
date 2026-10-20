@@ -651,9 +651,11 @@ export class RadioPage {
         // 过渡动画：地球先俯冲并淡出，再切换到星云并从远到近飞入
         const wrap = this.$('radio-nebula3d');
         const fadeEl = this.$('rd-fade');
-        try { this._globe.diveIn?.(1.0); this._globe.setOpacity?.(0.55); } catch { /* ignore */ }
-        try { if (fadeEl) { fadeEl.style.transition = 'opacity .42s var(--rd-ease)'; fadeEl.style.opacity = '1'; } } catch { /* ignore */ }
-        await new Promise((r) => setTimeout(r, 560));
+        // 同一批粒子从地球球面飞散成星团（1.5s），最后 0.3s 淡入黑场
+        try { this._globe.morphToNebula?.(1.5); } catch { /* ignore */ }
+        await new Promise((r) => setTimeout(r, 1180));
+        try { if (fadeEl) { fadeEl.style.transition = 'opacity .3s var(--rd-ease)'; fadeEl.style.opacity = '1'; } } catch { /* ignore */ }
+        await new Promise((r) => setTimeout(r, 330));
         if (globeEl) globeEl.style.visibility = 'hidden';
         if (neb) neb.hidden = true;
         if (wrap) { wrap.hidden = false; wrap.classList.remove('shown'); }
@@ -718,6 +720,7 @@ export class RadioPage {
     if (neb) { neb.hidden = true; neb.style.display = 'none'; }
     if (wrap3d) wrap3d.hidden = true;
     if (globeEl) globeEl.style.visibility = '';
+    try { this._globe?.resetMorph?.(); } catch { /* ignore */ }
     try { this._globe?.setOpacity?.(1); this._globe?.pullOut?.(0.8); } catch { /* ignore */ }
     await new Promise((r) => setTimeout(r, 220));
     try { if (fadeEl2) fadeEl2.style.opacity = '0'; } catch { /* ignore */ }
@@ -1190,6 +1193,13 @@ export class RadioPage {
         if (s2.prec > 0) continue;
         const h = hash(String(s2.id || s2.name));
         // 优先围绕本国一个真实（有精确坐标的）台散开 0.4~0.9°，保证在本国国土上
+        if (precise.length < 8 && cells.length >= 4) {
+          const cell = cells[h % cells.length];
+          s2.lat = cell[0] + (((h >>> 8) % 1000) / 1000 - 0.5) * 0.8;
+          s2.lon = cell[1] + (((h >>> 18) % 1000) / 1000 - 0.5) * 0.8;
+          moved++;
+          continue;
+        }
         const seed = precise[h % precise.length];
         const ang = ((h >>> 9) % 4096) / 4096 * Math.PI * 2;
         const rr = 0.35 + ((h >>> 21) % 1000) / 1000 * 0.6;
