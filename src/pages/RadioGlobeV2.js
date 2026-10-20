@@ -220,16 +220,18 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       const v = toVec3(s.lat, s.lon, EARTH_R * 1.006);
       pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
       tmpC.set(POINT_COLORS[(s.g || 0) % POINT_COLORS.length]);
-      // pop 0–9 提亮；码率未知（br=0）降权
-      const popK = 0.5 + (Math.min(9, Math.max(0, s.pop || 0)) / 9) * 0.34;
-      const brK = s.bitrate ? 0.95 : 0.66;
-      // 远景去饱和成灰白点阵；近景保留 genre 色
-      const sat = zoomLevel >= 2 ? 1 : (zoomLevel === 1 ? 0.45 : 0.12);
-      const gray = 0.78;
-      const r0 = tmpC.r * popK * brK, g0 = tmpC.g * popK * brK, b0 = tmpC.b * popK * brK;
-      col[i * 3] = (r0 * sat + gray * (1 - sat)) * (sat < 1 ? 0.85 : 1);
-      col[i * 3 + 1] = (g0 * sat + gray * (1 - sat)) * (sat < 1 ? 0.85 : 1);
-      col[i * 3 + 2] = (b0 * sat + gray * (1 - sat)) * (sat < 1 ? 0.85 : 1);
+      // 夜间灯光风格：genre 色向暖白混，越远越暖越淡
+      const warm = zoomLevel >= 2 ? 0.25 : (zoomLevel === 1 ? 0.55 : 0.75);
+      const r0 = tmpC.r * (1 - warm) + 1.0 * warm;
+      const g0 = tmpC.g * (1 - warm) + 0.82 * warm;
+      const b0 = tmpC.b * (1 - warm) + 0.55 * warm;
+      // 信号强度（pop 0–9 + 码率）：弱的暗，只在大地图时出现
+      const power = (s.pop || 0) * 10 + (s.bitrate >= 128 ? 6 : s.bitrate >= 64 ? 4 : s.bitrate ? 2 : 0);
+      const strength = Math.min(1, 0.22 + power / 100);
+      const k = strength * (zoomLevel >= 2 ? 1 : zoomLevel === 1 ? 0.8 : 0.55);
+      col[i * 3] = r0 * k;
+      col[i * 3 + 1] = g0 * k;
+      col[i * 3 + 2] = b0 * k;
     }
     pointGeo = new THREE.BufferGeometry();
     pointGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -330,13 +332,24 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         if (d < bestD) { bestD = d; best = s; }
       }
       const cc = best ? best.cc : null;
-      const near = stations.filter((s) => (cc && s.cc === cc));
-      buildPoints(near.length > 30 ? near : stations);
-      if (points) points.material.size = mobile ? 0.045 : 0.03;
+      // 本国 + 8° 内的台，放大后画面才有足够分散的点
+      const near = stations.filter((s) => {
+        if (cc && s.cc === cc) return true;
+        const dLat = s.lat - c.lat;
+        const dLng = ((s.lon - c.lon + 540) % 360) - 180;
+        return Math.abs(dLat) <= 8 && Math.abs(dLng) * cos <= 8;
+      });
+      buildPoints(near.length ? near : stations);
+      if (points) points.material.size = mobile ? 0.032 : 0.02;
     } else {
-      // 远景/中景：全部电台都画（小点），形成"点云地球"
-      buildPoints(stations);
-      if (points) points.material.size = lvl === 0 ? (mobile ? 0.022 : 0.014) : (mobile ? 0.03 : 0.022);
+      // 远景只显示强台，中景显示中强台：弱信号要放大才出现
+      const minPower = lvl === 0 ? 60 : 46;
+      const strong = stations.filter((s) => {
+        const power = (s.pop || 0) * 10 + (s.bitrate >= 128 ? 6 : s.bitrate >= 64 ? 4 : s.bitrate ? 2 : 0);
+        return power >= minPower;
+      });
+      buildPoints(strong.length > 1200 ? strong : stations);
+      if (points) points.material.size = lvl === 0 ? (mobile ? 0.02 : 0.012) : (mobile ? 0.028 : 0.018);
     }
   }
   applyZoomLevel();
@@ -457,7 +470,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     // 入场：只在前 1.9s 接管相机；之后完全交给用户（否则缩放/旋转会被每帧重置）
     if (introHold) {
       camera.position.z = START_Z;
-      if (points) points.material.opacity = 0;
+      if (points) points.material.opacity = 0.3;
     } else if (!introDone) {
       const intro = Math.min(1, el / 1900);
       const ie = intro * intro * (3 - 2 * intro);
@@ -615,6 +628,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       selectedIndex = -1;
       return filtered.length;
     },
+    applyZoomLevel() { applyZoomLevel(); },
     setStations(list) {
       stations = Array.isArray(list) ? list : [];
       filtered = stations.slice();

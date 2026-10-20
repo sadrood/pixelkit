@@ -4053,3 +4053,32 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 @media (prefers-reduced-motion: reduce) {
   #page-radio .rd-intro.enter * { animation: none !important; }
 }
+
+
+/* ============ 鼠标黑洞效果（星云视图） ============ */
+#page-radio .rd-blackhole {
+  position: absolute; left: 0; top: 0; width: 160px; height: 160px; margin: -80px 0 0 -80px;
+  pointer-events: none; z-index: 8; opacity: 0; transform: scale(.6);
+  transition: opacity .25s var(--rd-ease), transform .25s var(--rd-ease);
+}
+#page-radio .rd-blackhole.on { opacity: 1; transform: scale(1); }
+#page-radio .rd-blackhole i {
+  position: absolute; inset: 38px; border-radius: 50%;
+  background: radial-gradient(circle, #000 0 38%, #050807 58%, transparent 70%);
+  box-shadow: 0 0 60px 22px #000a, 0 0 90px 40px #f36b451f;
+  animation: rd-bh-pulse 3.2s var(--rd-ease) infinite alternate;
+}
+#page-radio .rd-blackhole b {
+  position: absolute; inset: 18px; border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 12%, #ffd9a833 20%, transparent 30% 55%, #f36b4544 66%, transparent 78%);
+  filter: blur(6px); animation: rd-bh-spin 4.5s linear infinite;
+}
+@keyframes rd-bh-spin { to { transform: rotate(360deg); } }
+@keyframes rd-bh-pulse { from { transform: scale(.94); } to { transform: scale(1.08); } }
+
+/* 星盘随音乐律动 */
+#page-radio .radio-dial { transform: scale(calc(1 + var(--rd-energy, 0) * .07)); transition: transform .12s linear; }
+#page-radio .radio-dial .dial-core { box-shadow: 0 0 calc(20px + var(--rd-energy, 0) * 40px) #f36b4555; }
+@media (prefers-reduced-motion: reduce) {
+  #page-radio .rd-blackhole i, #page-radio .rd-blackhole b { animation: none; }
+}

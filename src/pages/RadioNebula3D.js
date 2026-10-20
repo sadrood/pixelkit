@@ -39,7 +39,7 @@ export async function createNebula3D(container, stations, opts = {}) {
   container.innerHTML = '';
   container.appendChild(canvas);
   const bloom = document.createElement('canvas');
-  bloom.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen;filter:blur(18px) saturate(1.3);opacity:.5;z-index:0';
+  bloom.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen;filter:blur(14px) saturate(1.25);opacity:.42;z-index:0';
   container.style.position = 'relative';
   container.appendChild(bloom);
   const bctx = bloom.getContext('2d');
@@ -117,10 +117,11 @@ export async function createNebula3D(container, stations, opts = {}) {
   function rebuild(list) {
     stationsRef = list.slice();
     const n = stationsRef.length;
-    const pos = new Float32Array(n * 3);
-    const col = new Float32Array(n * 3);
-    const size = new Float32Array(n);
-    const phase = new Float32Array(n);
+    const count = n * 2;
+    const pos = new Float32Array(count * 3);
+    const col = new Float32Array(count * 3);
+    const size = new Float32Array(count);
+    const phase = new Float32Array(count);
     counts = new Array(nGenre).fill(0);
     const tmp = new THREE.Color();
     for (let i = 0; i < n; i++) {
@@ -136,11 +137,21 @@ export async function createNebula3D(container, stations, opts = {}) {
       pos[i * 3 + 1] = c.y + gauss(h >> 5) * spread * 0.9;
       pos[i * 3 + 2] = c.z + gauss(h >> 11) * spread * 1.25;
       tmp.set(GENRE_TINTS[g]).convertSRGBToLinear();
-      const popK = 0.5 + ((s.pop || 0) / 9) * 0.5;
+      // 更淡：向暖白混合 40%
+      tmp.lerp(new THREE.Color(1, 0.96, 0.9), 0.4);
+      const popK = 0.45 + ((s.pop || 0) / 9) * 0.45;
       tmp.multiplyScalar(popK);
       col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
-      size[i] = 0.14 + ((h >> 17) % 100) / 100 * 0.22;
-      phase[i] = ((h >> 7) % 1000) / 1000 * Math.PI * 2;
+      size[i] = 0.14 + ((h >>> 17) % 100) / 100 * 0.22;
+      phase[i] = ((h >>> 7) % 1000) / 1000 * Math.PI * 2;
+      // 第二份光晕粒子：偏移一点、小一半、更透明
+      const j = n + i;
+      pos[j * 3] = pos[i * 3] + ((((h >>> 3) % 1000) / 1000) - 0.5) * 0.6;
+      pos[j * 3 + 1] = pos[i * 3 + 1] + ((((h >>> 13) % 1000) / 1000) - 0.5) * 0.6;
+      pos[j * 3 + 2] = pos[i * 3 + 2] + ((((h >>> 23) % 1000) / 1000) - 0.5) * 0.6;
+      col[j * 3] = tmp.r * 0.55; col[j * 3 + 1] = tmp.g * 0.55; col[j * 3 + 2] = tmp.b * 0.55;
+      size[j] = size[i] * 1.15;
+      phase[j] = phase[i] + 1.7;
     }
     posArr = pos;
     if (points) { scene.remove(points); points.geometry.dispose(); points.material.dispose(); }
@@ -156,6 +167,7 @@ export async function createNebula3D(container, stations, opts = {}) {
         uTime: { value: 0 },
         uEnergy: { value: 0 },
         uScale: { value: 320 },
+        uCamDist: { value: 15 },
       },
       vertexColors: true,
       transparent: true,
@@ -168,6 +180,7 @@ export async function createNebula3D(container, stations, opts = {}) {
         varying float vAlpha;
         uniform float uTime;
         uniform float uEnergy;
+        uniform float uCamDist;
         void main() {
           vColor = color;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
@@ -175,9 +188,10 @@ export async function createNebula3D(container, stations, opts = {}) {
           float tw = 0.72 + 0.28 * sin(uTime * 1.6 + aPhase) + uEnergy * 0.25;
           gl_Position = projectionMatrix * mv;
           float s = aSize * (1.0 + uEnergy * 0.5);
-          gl_PointSize = s * (560.0 / max(dist, 0.35));
+          float cap = mix(30.0, 6.5, smoothstep(6.0, 2.0, uCamDist));
+          gl_PointSize = min(cap, s * (560.0 / max(dist, 0.35)));
           // 远处淡去、近处（贴镜头）也变淡，避免完全挡住视线
-          vAlpha = tw * smoothstep(0.8, 2.2, dist) * (1.0 - smoothstep(24.0, 70.0, dist) * 0.35);
+          vAlpha = 0.7 * tw * smoothstep(0.8, 2.2, dist) * (1.0 - smoothstep(24.0, 70.0, dist) * 0.35);
         }
       `,
       fragmentShader: `
@@ -233,7 +247,7 @@ export async function createNebula3D(container, stations, opts = {}) {
   };
   const onWheel = (e) => {
     e.preventDefault();
-    camDist = Math.max(2.2, Math.min(46, camDist * (e.deltaY > 0 ? 1.12 : 0.89)));
+    camDist = Math.max(0.7, Math.min(46, camDist * (e.deltaY > 0 ? 1.12 : 0.89)));
     lastInteract = Date.now();
   };
   canvas.addEventListener('pointerdown', onDown);
@@ -281,6 +295,7 @@ export async function createNebula3D(container, stations, opts = {}) {
   /* ---------- 尺寸 / 动画 ---------- */
   let raf = 0, disposed = false;
   let flyT = 1, flyFrom = 15, flyTo = 15, flyDur = 0.9;
+  let nearTween = null;
   const clock = new THREE.Clock();
   const resize = () => {
     const host = container.closest('#radio-stage') || container;
@@ -303,6 +318,12 @@ export async function createNebula3D(container, stations, opts = {}) {
     raf = requestAnimationFrame(tick);
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = performance.now() / 1000;
+    if (nearTween) {
+      camDist += (nearTween.dist - camDist) * 0.14;
+      camYaw += (nearTween.yaw - camYaw) * 0.14;
+      camPitch += (nearTween.pitch - camPitch) * 0.14;
+      if (Math.abs(nearTween.dist - camDist) < 0.05 && Math.abs(nearTween.yaw - camYaw) < 0.01) nearTween = null;
+    }
     if (flyT < 1) {
       flyT = Math.min(1, flyT + dt / Math.max(0.001, flyDur));
       const e = flyT * flyT * (3 - 2 * flyT);
@@ -316,6 +337,7 @@ export async function createNebula3D(container, stations, opts = {}) {
     bgStars.rotation.y += dt * 0.004;
     if (points) {
       points.material.uniforms.uTime.value = t;
+    points.material.uniforms.uCamDist.value = camDist;
       points.rotation.y = Math.sin(t * 0.05) * 0.04;
     }
     renderer.render(scene, camera);
@@ -326,6 +348,18 @@ export async function createNebula3D(container, stations, opts = {}) {
   return {
     mode: 'nebula3d',
     resize,
+    /** 快速贴近某个电台所在星团 */
+    flyToStation(st) {
+      if (!st) return;
+      const g = Math.max(0, Math.min(10, st.g || 0));
+      const L = LAYOUT[g % LAYOUT.length];
+      const dist = Math.sqrt(L.x * L.x + L.z * L.z);
+      nearTween = {
+        dist: 2.6,
+        yaw: Math.atan2(L.x, L.z),
+        pitch: Math.atan2(L.y, dist || 1),
+      };
+    },
     /** 从远处飞入星云 */
     enter(dur = 1.1) {
       flyFrom = 46;
@@ -355,7 +389,7 @@ export async function createNebula3D(container, stations, opts = {}) {
       const len = c.length() || 1;
       camYaw = Math.atan2(c.x, c.z);
       camPitch = Math.max(-0.9, Math.min(0.9, Math.asin(c.y / len)));
-      camDist = Math.max(4, Math.min(26, len * 1.4 + 4));
+      camDist = Math.max(2.6, Math.min(26, len * 1.1 + 2.4));
       lastInteract = Date.now();
     },
     getClusterLabels,

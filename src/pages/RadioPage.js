@@ -181,6 +181,20 @@ export class RadioPage {
       if (this.view === 'nebula') this.renderNebula();
     });
 
+    try {
+      const bh = this.$('rd-blackhole');
+      const stage = this.$('radio-stage');
+      if (bh && stage) {
+        stage.addEventListener('pointermove', (e) => {
+          if (this.view !== 'nebula') { bh.classList.remove('on'); return; }
+          const r = stage.getBoundingClientRect();
+          bh.style.left = (e.clientX - r.left) + 'px';
+          bh.style.top = (e.clientY - r.top) + 'px';
+          bh.classList.add('on');
+        });
+        stage.addEventListener('pointerleave', () => bh.classList.remove('on'));
+      }
+    } catch { /* ignore */ }
     this.ensureSpaceBackground();
     this.loadFilters();
     this.loadListStations();
@@ -214,6 +228,7 @@ export class RadioPage {
       // 按经度排序：滑杆从左到右就像绕地球飞一圈
       this.geoStations = stations.slice().sort((a, b) => (a.lon - b.lon) || (a.lat - b.lat));
       this._globeStations = this.geoStations;   // 调试/测试用别名
+        this.ensureLandMask();
       this.bootShow(`正在绘制星图（${this.geoStations.length.toLocaleString('zh-CN')} 个电台）…`);
       this.bootShow('正在加载 3D 地球…');
       const globeOpts = {
@@ -255,7 +270,12 @@ export class RadioPage {
       this.updateFavCount();
       const slider = this.$('radio-slider');
       if (slider) { slider.max = String(Math.max(0, this.geoStations.length - 1)); slider.disabled = false; }
-      try { if (!(/[?&]s=[0-9a-f]{6,12}/i.test(location.search))) this._globe?.holdIntro?.(); } catch { /* ignore */ }
+      try {
+        if (!(/[?&]s=[0-9a-f]{6,12}/i.test(location.search))) {
+          this._globe?.holdIntro?.();
+        this._globe?.setOpacity?.(0.3);
+        }
+      } catch { /* ignore */ }
       // ?s=<12位 hex> 分享链接：直接定位该台且跳过入场页
       try {
         const sp = new URLSearchParams(location.search).get('s');
@@ -266,6 +286,7 @@ export class RadioPage {
       } catch { /* ignore */ }
       if (loading) loading.style.display = 'none';
       this.bootHide();
+      this.ensureLandMask();
       try { this.showIntro(); } catch (e) { console.warn('intro 失败：', e); }
       // 恢复上次听的电台（没有就从第一个开始）
       let startIdx = 0;
@@ -292,6 +313,7 @@ export class RadioPage {
     if (i >= 0) { this.index = i; this.syncSlider(); }
     this.playStation(station);
     this.openDial(station);
+    try { if (this.view === 'nebula') this._neb3d?.flyToStation?.(station); } catch { /* ignore */ }
   }
 
   /** 悬停星点：显示台名提示（roamdial 的悬停动画） */
@@ -628,8 +650,8 @@ export class RadioPage {
       if (this._globe) {
         // 过渡动画：地球先俯冲并淡出，再切换到星云并从远到近飞入
         const wrap = this.$('radio-nebula3d');
-        try { this._globe.diveIn?.(0.85); this._globe.setOpacity?.(0.45); } catch { /* ignore */ }
-        await new Promise((r) => setTimeout(r, 620));
+        try { this._globe.diveIn?.(1.1); this._globe.setOpacity?.(0.5); } catch { /* ignore */ }
+        await new Promise((r) => setTimeout(r, 780));
         if (globeEl) globeEl.style.visibility = 'hidden';
         if (neb) neb.hidden = true;
         if (wrap) { wrap.hidden = false; wrap.classList.remove('shown'); }
@@ -652,7 +674,7 @@ export class RadioPage {
           if (this._neb3d && this._neb3d.setStations) this._neb3d.setStations(this.geoStations);
           if (this.genreFilter >= 0) this._neb3d.setFilter?.((st) => (st.g || 0) === this.genreFilter);
           // 从远处飞入星云（不是放大缩小）
-          try { this._neb3d.enter?.(1.25); } catch { /* ignore */ }
+          try { this._neb3d.enter?.(1.5); } catch { /* ignore */ }
           if (wrap) {
             requestAnimationFrame(() => wrap.classList.add('shown'));
           }
@@ -727,6 +749,23 @@ export class RadioPage {
     if (!box || !list) return;
     this._labelTimer = setInterval(() => {
       if (!this._globe || this.view === 'fav') { list.innerHTML = ''; if (leaders) leaders.innerHTML = ''; return; }
+      // 星云里贴近某个星团时，弹出星盘（跟着音乐律动）
+      try {
+        if (this.view === 'nebula' && this._neb3d) {
+          const dbg = this._neb3d.debug ? this._neb3d.debug() : null;
+          const d = dbg ? dbg.camDist : 15;
+          const dial = this.$('radio-dial');
+          if (d < 3.9) {
+            const i = this._neb3d.pickCenter ? this._neb3d.pickCenter() : -1;
+            if (i >= 0) {
+              if (this.index !== i) { this.setIndex(i, false); }
+              this.openDial(this.geoStations[i]);
+            }
+          } else if (dial && !dial.hidden && d > 5.2) {
+            dial.hidden = true;
+          }
+        }
+      } catch { /* ignore */ }
       // 调谐状态：准星到最近星的像素距离
       try {
         const cx0 = (this.$('radio-labels')?.clientWidth || 1) / 2;
@@ -840,6 +879,7 @@ export class RadioPage {
       this.geoStations = all.slice().sort((a, b) => (a.lon - b.lon) || (a.lat - b.lat));
       this._globeStations = this.geoStations;
       if (this._globe && this._globe.setStations) this._globe.setStations(this.geoStations);
+      try { this.applyLandSpread(); } catch { /* ignore */ }
       if (curId) {
         const k = this.geoStations.findIndex((s) => s.id === curId);
         if (k >= 0) { this.index = k; this.current = this.geoStations[k]; this.syncSlider(); }
@@ -1056,6 +1096,87 @@ export class RadioPage {
     } catch (e) { /* ignore */ }
   }
 
+
+  /* ==================== 陆地掩膜：把兜底坐标的电台撒到国土陆地上 ==================== */
+  async ensureLandMask() {
+    if (this._landMask || this._landMaskLoading) return;
+    this._landMaskLoading = fetch('/data/land-mask.json', { cache: 'force-cache' })
+      .then((r) => r.json())
+      .then((m) => {
+        try {
+          const bin = atob(m.mask);
+          const bits = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bits[i] = bin.charCodeAt(i);
+          this._landMask = { cols: m.cols, rows: m.rows, step: m.step, bits };
+          this.applyLandSpread();
+        } catch { /* ignore */ }
+      })
+      .catch(() => { /* 没有掩膜就用原来的散开方案 */ });
+  }
+
+  isLand(lat, lon) {
+    const m = this._landMask;
+    if (!m) return true;
+    const c = Math.floor((lon + 180) / m.step);
+    const r = Math.floor((90 - lat) / m.step);
+    if (r < 0 || r >= m.rows || c < 0 || c >= m.cols) return false;
+    const idx = r * m.cols + c;
+    return Boolean((m.bits[idx >> 3] >> (idx & 7)) & 1);
+  }
+
+  /** 把 prec=0（无精确定位）的电台分配到所属国家的陆地点上，避免飘到海里 */
+  applyLandSpread() {
+    const m = this._landMask;
+    if (!m || !this.geoStations || !this.geoStations.length) return;
+    const groups = new Map();
+    for (const s of this.geoStations) {
+      const k = s.cc || '??';
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(s);
+    }
+    // 收集陆地点（1° 步长）
+    const landCells = [];
+    for (let r = 0; r < m.rows; r += 2) {
+      for (let c = 0; c < m.cols; c += 2) {
+        const idx = r * m.cols + c;
+        if (!((m.bits[idx >> 3] >> (idx & 7)) & 1)) continue;
+        landCells.push([90 - (r + 0.5) * m.step, -180 + (c + 0.5) * m.step]);
+      }
+    }
+    const hash = (str) => { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0; return h; };
+    let moved = 0;
+    for (const [, arr] of groups) {
+      const precise = arr.filter((x) => x.prec > 0);
+      if (!precise.length) continue;
+      const lat0 = precise.reduce((a, x) => a + x.lat, 0) / precise.length;
+      const lon0 = precise.reduce((a, x) => a + x.lon, 0) / precise.length;
+      const n = arr.length;
+      const rad = Math.min(11, Math.max(2.6, 2.4 + Math.sqrt(n) * 0.3));
+      const cosLat = Math.max(0.25, Math.cos(lat0 * Math.PI / 180));
+      const cells = [];
+      for (const [la, lo] of landCells) {
+        const dLat = la - lat0;
+        const dLon = ((lo - lon0 + 540) % 360) - 180;
+        if (Math.abs(dLat) <= rad && Math.abs(dLon) * cosLat <= rad) cells.push([la, lo]);
+      }
+      if (cells.length < 4) continue;
+      for (const s2 of arr) {
+        if (s2.prec > 0) continue;
+        const h = hash(String(s2.id || s2.name));
+        const cell = cells[h % cells.length];
+        const jLat = ((h >>> 8) % 1000) / 1000 - 0.5;
+        const jLon = ((h >>> 18) % 1000) / 1000 - 0.5;
+        s2.lat = Math.max(-84, Math.min(84, cell[0] + jLat * 0.9));
+        s2.lon = ((cell[1] + jLon * 0.9 + 540) % 360) - 180;
+        moved++;
+      }
+    }
+    try {
+      this._globe?.setStations?.(this.geoStations);
+      this._globe?.applyZoomLevel?.();
+      console.log('[radio] 陆地对齐完成（移动 ' + moved + ' 台）');
+    } catch { /* ignore */ }
+  }
   /* ==================== 准星刻度 / 时钟 ==================== */
   buildReticle() {
     const g = this.$('reticle-ticks');
@@ -1400,6 +1521,7 @@ export class RadioPage {
       bass = bass / (Math.min(8, n) * 255);
       try { this._globe?.setEnergy?.(bass); } catch { /* ignore */ }
       try { this._neb3d?.setEnergy?.(bass); } catch { /* ignore */ }
+      try { this.$('page-radio')?.style.setProperty('--rd-energy', String(bass)); } catch { /* ignore */ }
       const dial = this.$('radio-dial');
       if (dial && !dial.hidden) dial.style.setProperty('--energy', bass.toFixed(3));
       if (bars) {
