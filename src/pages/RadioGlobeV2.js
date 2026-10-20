@@ -133,7 +133,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
         landLayer = new THREE.Points(g, new THREE.PointsMaterial({
-          map: dotTex, size: 0.0055, color: 0x3f544b, transparent: true, opacity: 0.4,
+          map: dotTex, size: 0.0065, color: 0x4d6a5f, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending,
           depthWrite: false, sizeAttenuation: true,
         }));
         world.add(landLayer);
@@ -521,7 +521,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         pointsGlow.material.opacity = zoomLevel >= 2 ? 0.08 : 0.05;
       }
     }
-    if (!dragging && Date.now() - lastInteract > 5000) world.rotation.y += dt * 0.02;
+    // 不再自动旋转：避免用户操作时地球「乱转」
     renderer.render(scene, camera);
     try { bctx.clearRect(0, 0, bloom.width, bloom.height); bctx.drawImage(canvas, 0, 0, bloom.width, bloom.height); } catch { /* ignore */ }
   };
@@ -531,12 +531,8 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   return {
     mode: 'custom3d',
     focus(station) {
+      // 只标记选中，不再自动旋转地球（用户反馈放大后地球会乱转）
       if (!station) return;
-      const theta = (station.lon + 180) * Math.PI / 180;
-      focusTarget = {
-        y: Math.PI / 2 - theta,
-        x: Math.max(-0.9, Math.min(0.9, -(station.lat || 0) * Math.PI / 180 * 0.9)),
-      };
       lastInteract = Date.now();
     },
     /** 介绍页期间：保持远景、隐藏点云，等用户点「开始收听」再飞入 */

@@ -117,7 +117,7 @@ export async function createNebula3D(container, stations, opts = {}) {
   function rebuild(list) {
     stationsRef = list.slice();
     const n = stationsRef.length;
-    const count = n * 2;
+    const count = n;
     const pos = new Float32Array(count * 3);
     const col = new Float32Array(count * 3);
     const size = new Float32Array(count);
@@ -142,16 +142,8 @@ export async function createNebula3D(container, stations, opts = {}) {
       const popK = 0.45 + ((s.pop || 0) / 9) * 0.45;
       tmp.multiplyScalar(popK);
       col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
-      size[i] = 0.14 + ((h >>> 17) % 100) / 100 * 0.22;
+      size[i] = 0.2 + ((h >>> 17) % 100) / 100 * 0.3;
       phase[i] = ((h >>> 7) % 1000) / 1000 * Math.PI * 2;
-      // 第二份光晕粒子：偏移一点、小一半、更透明
-      const j = n + i;
-      pos[j * 3] = pos[i * 3] + ((((h >>> 3) % 1000) / 1000) - 0.5) * 0.6;
-      pos[j * 3 + 1] = pos[i * 3 + 1] + ((((h >>> 13) % 1000) / 1000) - 0.5) * 0.6;
-      pos[j * 3 + 2] = pos[i * 3 + 2] + ((((h >>> 23) % 1000) / 1000) - 0.5) * 0.6;
-      col[j * 3] = tmp.r * 0.55; col[j * 3 + 1] = tmp.g * 0.55; col[j * 3 + 2] = tmp.b * 0.55;
-      size[j] = size[i] * 1.15;
-      phase[j] = phase[i] + 1.7;
     }
     posArr = pos;
     if (points) { scene.remove(points); points.geometry.dispose(); points.material.dispose(); }
@@ -168,6 +160,8 @@ export async function createNebula3D(container, stations, opts = {}) {
         uEnergy: { value: 0 },
         uScale: { value: 320 },
         uCamDist: { value: 15 },
+        uHole: { value: new THREE.Vector3(999, 999, 999) },
+        uHoleOn: { value: 0 },
       },
       vertexColors: true,
       transparent: true,
@@ -181,17 +175,28 @@ export async function createNebula3D(container, stations, opts = {}) {
         uniform float uTime;
         uniform float uEnergy;
         uniform float uCamDist;
+        uniform vec3 uHole;
+        uniform float uHoleOn;
         void main() {
           vColor = color;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           float dist = -mv.z;
+          vec3 wp = (modelMatrix * vec4(position, 1.0)).xyz;
+          vec3 toHole = uHole - wp;
+          float hd = length(toHole);
+          float pull = uHoleOn * smoothstep(5.0, 0.0, hd);
+          vec3 dir = normalize(toHole + vec3(0.0001));
+          vec3 tangent = normalize(cross(dir, vec3(0.0, 1.0, 0.0)) + vec3(0.0001));
+          vec3 moved = position + (dir * pull * 2.2 + tangent * pull * 1.5);
+          mv = modelViewMatrix * vec4(moved, 1.0);
+          dist = -mv.z;
           float tw = 0.72 + 0.28 * sin(uTime * 1.6 + aPhase) + uEnergy * 0.25;
           gl_Position = projectionMatrix * mv;
           float s = aSize * (1.0 + uEnergy * 0.5);
           float cap = mix(30.0, 6.5, smoothstep(6.0, 2.0, uCamDist));
           gl_PointSize = min(cap, s * (560.0 / max(dist, 0.35)));
           // 远处淡去、近处（贴镜头）也变淡，避免完全挡住视线
-          vAlpha = 0.7 * tw * smoothstep(0.8, 2.2, dist) * (1.0 - smoothstep(24.0, 70.0, dist) * 0.35);
+          vAlpha = 0.7 * tw * smoothstep(0.8, 2.2, dist) * mix(1.0, smoothstep(0.2, 1.6, hd), uHoleOn) * (1.0 - smoothstep(24.0, 70.0, dist) * 0.35);
         }
       `,
       fragmentShader: `
@@ -245,11 +250,24 @@ export async function createNebula3D(container, stations, opts = {}) {
     const i = pickAt(e.clientX, e.clientY, false);
     if (i >= 0) { onPick(stationsRef[i], i); lastInteract = Date.now(); }
   };
+  const setHole = (clientX, clientY) => {
+    if (!points) return;
+    const r = canvas.getBoundingClientRect();
+    const nx = ((clientX - r.left) / Math.max(1, r.width)) * 2 - 1;
+    const ny = -(((clientY - r.top) / Math.max(1, r.height)) * 2 - 1);
+    tmpV.set(nx, ny, 0.5).unproject(camera);
+    const dir = tmpV.sub(camera.position).normalize();
+    const hp = camera.position.clone().add(dir.multiplyScalar(Math.max(1.2, camDist)));
+    points.material.uniforms.uHole.value.copy(hp);
+    points.material.uniforms.uHoleOn.value = 1;
+  };
   const onWheel = (e) => {
     e.preventDefault();
     camDist = Math.max(0.7, Math.min(46, camDist * (e.deltaY > 0 ? 1.12 : 0.89)));
     lastInteract = Date.now();
   };
+  canvas.addEventListener('pointermove', (e) => { if (e.buttons === 0) setHole(e.clientX, e.clientY); });
+  canvas.addEventListener('pointerleave', () => { if (points) points.material.uniforms.uHoleOn.value = 0; });
   canvas.addEventListener('pointerdown', onDown);
   canvas.addEventListener('pointermove', onMove);
   canvas.addEventListener('pointerup', onUp);

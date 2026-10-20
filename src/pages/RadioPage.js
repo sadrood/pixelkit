@@ -650,8 +650,10 @@ export class RadioPage {
       if (this._globe) {
         // 过渡动画：地球先俯冲并淡出，再切换到星云并从远到近飞入
         const wrap = this.$('radio-nebula3d');
-        try { this._globe.diveIn?.(1.1); this._globe.setOpacity?.(0.5); } catch { /* ignore */ }
-        await new Promise((r) => setTimeout(r, 780));
+        const fadeEl = this.$('rd-fade');
+        try { this._globe.diveIn?.(1.0); this._globe.setOpacity?.(0.55); } catch { /* ignore */ }
+        try { if (fadeEl) { fadeEl.style.transition = 'opacity .42s var(--rd-ease)'; fadeEl.style.opacity = '1'; } } catch { /* ignore */ }
+        await new Promise((r) => setTimeout(r, 560));
         if (globeEl) globeEl.style.visibility = 'hidden';
         if (neb) neb.hidden = true;
         if (wrap) { wrap.hidden = false; wrap.classList.remove('shown'); }
@@ -678,6 +680,8 @@ export class RadioPage {
           if (wrap) {
             requestAnimationFrame(() => wrap.classList.add('shown'));
           }
+          await new Promise((r) => setTimeout(r, 160));
+          try { if (fadeEl) fadeEl.style.opacity = '0'; } catch { /* ignore */ }
           this.setHint('流派星云 · 拖动旋转 · 滚轮飞近（粒子会贴到镜头）· 点星云收听');
         } catch (err) {
           console.warn('3D 星云不可用，回退 2D：', err);
@@ -706,13 +710,17 @@ export class RadioPage {
       return;
     }
     const wrap3d = this.$('radio-nebula3d');
+    const fadeEl2 = this.$('rd-fade');
+    try { if (fadeEl2) { fadeEl2.style.transition = 'opacity .38s var(--rd-ease)'; fadeEl2.style.opacity = '1'; } } catch { /* ignore */ }
     if (wrap3d) wrap3d.classList.remove('shown');
     this.stopNebulaAnim();
-    await new Promise((r) => setTimeout(r, 420));
+    await new Promise((r) => setTimeout(r, 460));
     if (neb) { neb.hidden = true; neb.style.display = 'none'; }
     if (wrap3d) wrap3d.hidden = true;
     if (globeEl) globeEl.style.visibility = '';
     try { this._globe?.setOpacity?.(1); this._globe?.pullOut?.(0.8); } catch { /* ignore */ }
+    await new Promise((r) => setTimeout(r, 220));
+    try { if (fadeEl2) fadeEl2.style.opacity = '0'; } catch { /* ignore */ }
     if (globeEl) globeEl.style.display = '';
     if (this._globe) this._globe.setLayout('globe');
     this.setHint('拖动旋转 · 滚轮远近 · 准星停稳自动收听');
@@ -1134,7 +1142,7 @@ export class RadioPage {
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push(s);
     }
-    // 收集陆地点（1° 步长）
+    const hash = (str) => { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0; return h; };
     const landCells = [];
     for (let r = 0; r < m.rows; r += 2) {
       for (let c = 0; c < m.cols; c += 2) {
@@ -1143,15 +1151,15 @@ export class RadioPage {
         landCells.push([90 - (r + 0.5) * m.step, -180 + (c + 0.5) * m.step]);
       }
     }
-    const hash = (str) => { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0; return h; };
     let moved = 0;
     for (const [, arr] of groups) {
       const precise = arr.filter((x) => x.prec > 0);
       if (!precise.length) continue;
       const lat0 = precise.reduce((a, x) => a + x.lat, 0) / precise.length;
       const lon0 = precise.reduce((a, x) => a + x.lon, 0) / precise.length;
+      // 国家陆地点（用于无精确台的兜底，半径收紧，避免越境/入海）
       const n = arr.length;
-      const rad = Math.min(11, Math.max(2.6, 2.4 + Math.sqrt(n) * 0.3));
+      const rad = Math.min(6, Math.max(1.8, 1.6 + Math.sqrt(n) * 0.2));
       const cosLat = Math.max(0.25, Math.cos(lat0 * Math.PI / 180));
       const cells = [];
       for (const [la, lo] of landCells) {
@@ -1159,16 +1167,26 @@ export class RadioPage {
         const dLon = ((lo - lon0 + 540) % 360) - 180;
         if (Math.abs(dLat) <= rad && Math.abs(dLon) * cosLat <= rad) cells.push([la, lo]);
       }
-      if (cells.length < 4) continue;
       for (const s2 of arr) {
         if (s2.prec > 0) continue;
         const h = hash(String(s2.id || s2.name));
-        const cell = cells[h % cells.length];
-        const jLat = ((h >>> 8) % 1000) / 1000 - 0.5;
-        const jLon = ((h >>> 18) % 1000) / 1000 - 0.5;
-        s2.lat = Math.max(-84, Math.min(84, cell[0] + jLat * 0.9));
-        s2.lon = ((cell[1] + jLon * 0.9 + 540) % 360) - 180;
-        moved++;
+        // 优先围绕本国一个真实（有精确坐标的）台散开 0.4~0.9°，保证在本国国土上
+        const seed = precise[h % precise.length];
+        const ang = ((h >>> 9) % 4096) / 4096 * Math.PI * 2;
+        const rr = 0.35 + ((h >>> 21) % 1000) / 1000 * 0.6;
+        let placed = false;
+        for (let k = 0; k < 6; k++) {
+          const q = k === 0 ? 1 : Math.pow(0.65, k);
+          const la = seed.lat + Math.sin(ang) * rr * q;
+          const lo = seed.lon + Math.cos(ang) * rr * q / Math.max(0.3, Math.cos(seed.lat * Math.PI / 180));
+          if (this.isLand(la, lo)) { s2.lat = la; s2.lon = ((lo + 540) % 360) - 180; placed = true; moved++; break; }
+        }
+        if (!placed && cells.length >= 4) {
+          const cell = cells[h % cells.length];
+          s2.lat = cell[0];
+          s2.lon = cell[1];
+          moved++;
+        }
       }
     }
     try {
@@ -1177,6 +1195,7 @@ export class RadioPage {
       console.log('[radio] 陆地对齐完成（移动 ' + moved + ' 台）');
     } catch { /* ignore */ }
   }
+
   /* ==================== 准星刻度 / 时钟 ==================== */
   buildReticle() {
     const g = this.$('reticle-ticks');
