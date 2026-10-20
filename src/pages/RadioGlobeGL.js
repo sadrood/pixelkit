@@ -14,6 +14,8 @@ const GENRE_COLORS = [
   '#e8dcc8', '#ffd9a0', '#ff9e7a', '#8fe8ff', '#dfe8f0',
   '#ffcf8f', '#b8e6a8', '#ffb3c8', '#d8c8ff', '#ffe08a', '#cfe8d8',
 ];
+/** GitHub 风格的青绿点色 */
+const GH_POINTS = ['#58a6ff', '#3fb950', '#7ee787', '#39c5cf', '#a5d6ff', '#56d364', '#79c0ff', '#2ea043', '#8b949e', '#56d364', '#6e8a5c'];
 
 let globeLibPromise = null;
 function loadGlobeLib() {
@@ -34,9 +36,9 @@ export async function createRadioGlobeGL(container, stations, opts = {}) {
   const Globe = await loadGlobeLib();
   const mobile = window.matchMedia('(max-width: 720px)').matches;
 
-  // 贴图预取成 objectURL：three-globe 内部加载偶发失败会导致地球上不可见
-  const texUrl = await fetchObjectUrl('/vendor/globe/earth-day-small.jpg');
-  const bgUrl = await fetchObjectUrl('/vendor/globe/stars-small.jpg');
+  // GitHub 风格：暗色点阵地球（运行时生成点阵纹理，不依赖外部图片）
+  const texUrl = makeDotGlobeTexture('#08111d', '#2a4d72');
+  const bgUrl = null;
 
   // 显式宿主：保证 canvas 挂在容器内、尺寸跟随容器（而不是 window）
   container.innerHTML = '';
@@ -45,12 +47,12 @@ export async function createRadioGlobeGL(container, stations, opts = {}) {
   container.appendChild(host);
 
   const globe = Globe()(host)
-    .atmosphereColor('#7fb3ff')
-    .atmosphereAltitude(0.24)
+    .atmosphereColor('#3f7fbf')
+    .atmosphereAltitude(0.18)
     .showAtmosphere(true)
     .pointsMerge(false)
     .pointAltitude(0.001)
-    .pointRadius(mobile ? 0.7 : 0.5)
+    .pointRadius(mobile ? 0.55 : 0.4)
     .pointResolution(6)
     .pointsTransitionDuration(0)
     .pointLat((d) => d.lat)            // 我们的数据字段是 lat/lon，默认读 lng
@@ -58,10 +60,10 @@ export async function createRadioGlobeGL(container, stations, opts = {}) {
     .onPointClick((d) => onPick(d))
     .onPointHover((d) => { if (opts.onHover) opts.onHover(d || null, px, py); });
 
-  try { globe.globeMaterial().color.setHex(0x0b2336); } catch (e) { /* ignore */ }
+  try { globe.globeMaterial().color.setHex(0x081421); } catch (e) { /* ignore */ }
   if (texUrl) globe.globeImageUrl(texUrl);
-  if (bgUrl) globe.backgroundImageUrl(bgUrl);
-  else globe.backgroundColor('#05080d');
+  globe.backgroundColor('#03060a');
+  globe.showGraticules(false);
   // 兜底：4 秒后如果地球还是隐藏的，强制显示并退回纯色，绝不黑屏
   setTimeout(() => {
     try {
@@ -95,9 +97,9 @@ export async function createRadioGlobeGL(container, stations, opts = {}) {
   const raycaster = null;
 
   const setPoints = (list) => {
-    globe.pointsData(list).pointColor((d) => GENRE_COLORS[(d.g || 0) % GENRE_COLORS.length]);
+    globe.pointsData(list).pointColor((d) => GH_POINTS[(d.g || 0) % GH_POINTS.length]);
     // 按人气给点大小做一点区分（越热门越大）
-    globe.pointRadius((d) => (mobile ? 0.55 : 0.4) + (d.pop || 0) / 9 * (mobile ? 0.18 : 0.14));
+    globe.pointRadius((d) => (mobile ? 0.45 : 0.32) + (d.pop || 0) / 9 * (mobile ? 0.16 : 0.12));
   };
   setPoints(filtered);
 
@@ -109,18 +111,19 @@ export async function createRadioGlobeGL(container, stations, opts = {}) {
       .ringLat((d) => d.lat).ringLng((d) => d.lon)
       .ringColor(() => '#ffd9a0')
       .ringMaxRadius(2.2).ringPropagationSpeed(1.6).ringRepeatPeriod(900);
-    const near = filtered
-      .filter((s) => s !== station && Math.abs(s.lat - station.lat) < 22 && Math.abs(s.lon - station.lon) < 32)
-      .slice(0, 6);
-    globe.arcsData(near.map((s) => ({
-      startLat: station.lat, startLng: station.lon,
-      endLat: s.lat, endLng: s.lon,
-    })))
-      .arcColor(() => ['rgba(255,217,160,.85)', 'rgba(143,232,255,.35)'])
-      .arcAltitudeAutoScale(0.35)
-      .arcStroke(mobile ? 0.25 : 0.18)
-      .arcDashLength(0.35).arcDashGap(0.6).arcDashAnimateTime(2200)
-      .arcsTransitionDuration(400);
+    // GitHub 风格：从当前台向全球随机台拉出发光弧线
+    const pool = filtered.filter((s) => s !== station);
+    const arcs = [];
+    for (let k = 0; k < 12 && pool.length; k++) {
+      const s = pool[Math.floor((k * 7919 + station.lat * 31 + station.lon * 17) % pool.length)];
+      arcs.push({ startLat: station.lat, startLng: station.lon, endLat: s.lat, endLng: s.lon });
+    }
+    globe.arcsData(arcs)
+      .arcColor(() => ['rgba(120,190,255,1)', 'rgba(57,197,207,.25)'])
+      .arcAltitudeAutoScale(0.5)
+      .arcStroke(mobile ? 0.4 : 0.3)
+      .arcDashLength(0.32).arcDashGap(0.58).arcDashAnimateTime(2400)
+      .arcsTransitionDuration(600);
   };
 
   try { window.__globeGL = globe; } catch (e) {
@@ -163,6 +166,9 @@ export async function createRadioGlobeGL(container, stations, opts = {}) {
 
   // 初始视角
   globe.pointOfView({ lat: 32, lng: 18, altitude: mobile ? 2.4 : 1.9 }, 0);
+  if (localStorage.getItem('pk_globe_style') === 'real') {
+    try { globe.globeImageUrl('/vendor/globe/earth-day-small.jpg'); } catch (e) { /* ignore */ }
+  }
 
   const api = {
     isGlobeGL: true,
@@ -221,6 +227,25 @@ export async function createRadioGlobeGL(container, stations, opts = {}) {
     },
     setEnergy(v) { energy = Math.max(0, Math.min(1, Number(v) || 0)); },
     onSettle(cb) { settleCb = cb; },
+    /** 切换地球风格：dots=GitHub 点阵，real=写实卫星 */
+    setStyle(style) {
+      const st = style === 'real' ? 'real' : 'dots';
+      try {
+        if (st === 'real') {
+          globe.globeImageUrl('/vendor/globe/earth-day-small.jpg');
+          globe.backgroundColor('#03060a');
+          globe.atmosphereColor('#7fb3ff');
+        } else {
+          globe.globeImageUrl(makeDotGlobeTexture('#08111d', '#2a4d72'));
+          globe.backgroundColor('#03060a');
+          globe.atmosphereColor('#3f7fbf');
+        }
+        const mesh = globe.scene().children.find((c) => c.type === 'Mesh');
+        if (mesh) mesh.visible = true;
+        localStorage.setItem('pk_globe_style', st);
+      } catch (e) { /* ignore */ }
+      return st;
+    },
     setLayout(mode) {
       if (mode === 'nebula') { container.style.visibility = 'hidden'; return 'nebula'; }
       container.style.visibility = 'visible';
@@ -282,4 +307,29 @@ async function fetchObjectUrl(url) {
   } catch (e) {
     return null;
   }
+}
+
+/** 生成「暗色点阵地球」纹理（GitHub/Octoverse 观感），返回 dataURL */
+function makeDotGlobeTexture(bg, dot) {
+  const w = 2048, h = 1024;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+  // 经纬点阵
+  for (let y = 6; y < h; y += 9) {
+    for (let x = 6; x < w; x += 9) {
+      // 越靠两极越暗，制造球体的层次
+      const lat = (y / h) * Math.PI - Math.PI / 2;
+      const shade = 0.35 + 0.65 * Math.cos(lat);
+      ctx.globalAlpha = 0.35 * shade;
+      ctx.fillStyle = dot;
+      ctx.beginPath();
+      ctx.arc(x, y, 1.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+  return c.toDataURL('image/png');
 }

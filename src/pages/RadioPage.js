@@ -99,6 +99,16 @@ export class RadioPage {
     this.buildReticle();
     this.updateClock();
     if (!this._clockTimer) this._clockTimer = setInterval(() => this.updateClock(), 15000);
+    // 地球风格切换（点阵 / 写实）
+    this.$('radio-globe-style')?.addEventListener('click', () => {
+      const cur = localStorage.getItem('pk_globe_style') === 'real' ? 'real' : 'dots';
+      const next = cur === 'real' ? 'dots' : 'real';
+      try { this._globe?.setStyle?.(next); } catch { /* ignore */ }
+      localStorage.setItem('pk_globe_style', next);
+      this.toast?.show?.(next === 'real' ? '地球风格：写实卫星' : '地球风格：GitHub 点阵', 'success');
+      const b = this.$('radio-globe-style');
+      if (b) b.textContent = next === 'real' ? '🌍' : '◍';
+    });
     // 视图切换：地球 / 流派星云 / 收藏
     this.view = 'globe';
     this.genreFilter = -1;
