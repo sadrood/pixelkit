@@ -120,8 +120,7 @@ export class RadioPage {
       b.addEventListener('click', () => this.setView(b.dataset.view));
     });
     // 进入：确保正在播放当前台（或从当前开始播）
-    this.$('radio-enter')?.addEventListener('click', () => this.openRecord());
-    this.$('rd-record-close')?.addEventListener('click', () => this.closeRecord());
+    this.$('radio-enter')?.addEventListener('click', () => this.setHint('按空格播放/暂停'));
     this.$('rd-record-play')?.addEventListener('click', () => {
       if (this.audio && !this.audio.paused) this.audio.pause();
       else if (this.current) this.audio.play().catch(() => {});
@@ -243,7 +242,7 @@ export class RadioPage {
     const loading = this.$('radio-globe-loading');
     if (!el || this._loadingGeo || this._globe) return;
     this._loadingGeo = true;
-    this.bootShow('正在连接星图…');
+    this.bootShow('Loading stations…');
     try {
       await this.loadCountryNames();
       // 先加载核心台库（约 500KB，先出图），完整台库随后后台补全
@@ -979,9 +978,9 @@ export class RadioPage {
     const place = this.$('rd-intro-place');
     const meta = this.$('rd-intro-meta');
     const cta = this.$('rd-continue');
-    if (k) k.textContent = seen ? '欢迎回来 · 上次听到' : '随机一站，听见世界';
+    if (k) k.textContent = seen ? '欢迎回来 · 上次听到' : 'Loading stations…';
     if (name) name.textContent = seen ? (target.name || '') : 'Listen somewhere new.';
-    if (place) {
+    if (place && seen) {
       const flag = this.flagOf(target.cc);
       const city = (target.state || '').replace(/\s+/g, ' ').trim();
       place.textContent = [city ? city.toUpperCase() + ', ' : '', target.country].filter(Boolean).join(' ');
@@ -991,7 +990,7 @@ export class RadioPage {
       const lang = this.langs && target.l != null ? this.langs[target.l] : '';
       meta.textContent = [genre, lang, target.bitrate ? target.bitrate + ' KBPS' : '码率未知'].filter(Boolean).join(' · ');
     }
-    if (cta) cta.textContent = seen ? '▶ 继续收听' : '▶ 开始收听';
+    if (cta) cta.textContent = seen ? 'Continue listening' : 'Explore the sky';
     this.index = this.geoStations.indexOf(target);
     box.hidden = false;
     box.classList.remove('gone');
