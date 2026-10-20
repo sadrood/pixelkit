@@ -164,6 +164,21 @@ export class RadioPage {
       else if (e.key === 'G' || e.key === 'g') { this.setView(this.view === 'nebula' ? 'globe' : 'nebula'); }
       else if (e.key === 'M' || e.key === 'm') { if (this.audio) { this.audio.muted = !this.audio.muted; this.setHint(this.audio.muted ? '已静音' : '已取消静音'); } }
       else if (e.key === 'Enter') { this.$('radio-enter')?.click(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); this.stepSameCountry(-1); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); this.stepSameCountry(1); }
+      else if (e.key === 'L' || e.key === 'l') {
+        try { localStorage.setItem('pk_radio_pinned', (this.current || {}).id || ''); this.setHint('已固定：' + ((this.current || {}).name || '当前电台')); } catch { /* ignore */ }
+      }
+      else if (e.key === 'Escape') {
+        const rec = this.$('rd-record');
+        const sheet = this.$('radio-sheet');
+        const sb = this.$('radio-searchbox');
+        const dial = this.$('radio-dial');
+        if (rec && !rec.hidden) this.closeRecord();
+        else if (dial && !dial.hidden) dial.hidden = true;
+        else if (sheet && !sheet.hidden) this.toggleSheet(false);
+        else if (sb && !sb.hidden) sb.hidden = true;
+      }
       else if (e.key === '/') {
         e.preventDefault();
         const box = this.$('radio-searchbox');
@@ -1126,6 +1141,20 @@ export class RadioPage {
     } catch (e) { /* ignore */ }
   }
 
+
+  /** ↑↓ 同国家换台（在 geoStations 里按国家过滤后前后跳） */
+  stepSameCountry(dir) {
+    const cur = this.current || this.geoStations[this.index];
+    if (!cur || !this.geoStations || !this.geoStations.length) return;
+    const cc = cur.cc;
+    const n = this.geoStations.length;
+    for (let k = 1; k <= n; k++) {
+      const i = (this.index + dir * k + n * 2) % n;
+      const cand = this.geoStations[i];
+      if (cand && cand.cc === cc && cand !== cur) { this.setIndex(i, true); return; }
+    }
+    this.step(dir);
+  }
 
   /* ==================== 陆地掩膜：把兜底坐标的电台撒到国土陆地上 ==================== */
   async ensureLandMask() {
