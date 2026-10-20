@@ -33,8 +33,9 @@ export async function createNebula3D(container, stations, opts = {}) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x000000, 0);
   if ('outputColorSpace' in renderer && THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
+  container.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;overflow:hidden';
   const canvas = renderer.domElement;
-  canvas.style.cssText = 'width:100%;height:100%;display:block;touch-action:none;cursor:grab';
+  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab';
   container.innerHTML = '';
   container.appendChild(canvas);
   const bloom = document.createElement('canvas');
@@ -281,8 +282,9 @@ export async function createNebula3D(container, stations, opts = {}) {
   let raf = 0, disposed = false;
   const clock = new THREE.Clock();
   const resize = () => {
-    const w = container.clientWidth || window.innerWidth;
-    const h = container.clientHeight || window.innerHeight;
+    const host = container.closest('#radio-stage') || container;
+    const w = host.clientWidth || container.clientWidth || window.innerWidth;
+    const h = host.clientHeight || container.clientHeight || window.innerHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
@@ -290,6 +292,8 @@ export async function createNebula3D(container, stations, opts = {}) {
     bloom.height = Math.max(2, Math.round(h / 2));
   };
   resize();
+  requestAnimationFrame(resize);
+  setTimeout(resize, 400);
   const ro = window.ResizeObserver ? new ResizeObserver(resize) : null;
   if (ro) ro.observe(container);
 
@@ -315,6 +319,7 @@ export async function createNebula3D(container, stations, opts = {}) {
 
   return {
     mode: 'nebula3d',
+    resize,
     setStations(list) { rebuild(Array.isArray(list) ? list : []); },
     setFilter(pred) { rebuild(pred ? stations.filter(pred) : stations); return stationsRef.length; },
     setEnergy(v) { if (points) points.material.uniforms.uEnergy.value = Math.max(0, Math.min(1, Number(v) || 0)); },

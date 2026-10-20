@@ -636,6 +636,7 @@ export class RadioPage {
               try { const i = this._neb3d.pickCenter(); if (i >= 0) this.setIndex(i, true); } catch { /* ignore */ }
             });
           }
+          try { this._neb3d?.resize?.(); } catch { /* ignore */ }
           if (this._neb3d && this._neb3d.setStations) this._neb3d.setStations(this.geoStations);
           if (this.genreFilter >= 0) this._neb3d.setFilter?.((st) => (st.g || 0) === this.genreFilter);
           this.setHint('流派星云 · 拖动旋转 · 滚轮拉近（粒子会贴到镜头）· 点星云收听');
