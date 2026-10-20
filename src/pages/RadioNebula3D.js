@@ -103,7 +103,7 @@ export async function createNebula3D(container, stations, opts = {}) {
   const gauss = (h) => {
     // 两个均匀数近似高斯
     const a = ((h % 10000) / 10000);
-    const b = (((h >> 13) % 10000) / 10000);
+    const b = (((h >>> 13) % 10000) / 10000);
     return (a + b + a * b - 1.0) * 1.2;
   };
 

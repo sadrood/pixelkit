@@ -36,7 +36,8 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   // Bloom：把渲染结果画到模糊叠加层（低成本辉光）
   const bloom = document.createElement('canvas');
   bloom.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen;filter:blur(16px) saturate(1.35);opacity:.55;z-index:0';
-  container.style.position = 'relative';
+  container.style.position = 'absolute';
+  container.style.inset = '0';
   container.appendChild(bloom);
   const bctx = bloom.getContext('2d');
 

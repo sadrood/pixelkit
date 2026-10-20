@@ -972,7 +972,7 @@ export class RadioPage {
         const h = hashOf(String(s.id || s.name));
         // 极坐标均匀撒点（hash 决定角度/半径），保证「对齐国家、但散开」
         const a = (h % 4096) / 4096 * Math.PI * 2;
-        const rr = Math.sqrt(((h >> 12) % 4096) / 4096);
+        const rr = Math.sqrt(((h >>> 12) % 4096) / 4096);
         s.lat = lat0 + Math.sin(a) * rr * rLat;
         s.lon = lon0 + Math.cos(a) * rr * rLon / Math.max(0.3, Math.cos(lat0 * Math.PI / 180));
       }
