@@ -97,6 +97,43 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     world.add(sp);
   })();
 
+  /* ---------- 陆地点阵（球面细点纹理，RoamDial 观感） ---------- */
+  let landLayer = null;
+  fetch('/data/land-mask.json', { cache: 'force-cache' })
+    .then((r) => r.json())
+    .then((m) => {
+      try {
+        const { cols, rows, step, mask } = m;
+        const bin = atob(mask);
+        const bits = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bits[i] = bin.charCodeAt(i);
+        const cells = [];
+        // 0.5° 掩膜隔点取样（约 1°），约 1.9 万个陆地点
+        for (let r = 0; r < rows; r += 2) {
+          for (let c = 0; c < cols; c += 2) {
+            const idx = r * cols + c;
+            if (!((bits[idx >> 3] >> (idx & 7)) & 1)) continue;
+            cells.push({ lat: 90 - (r + 0.5) * step, lon: -180 + (c + 0.5) * step });
+          }
+        }
+        const n = cells.length;
+        const pos = new Float32Array(n * 3);
+        for (let i = 0; i < n; i++) {
+          const v = toVec3(cells[i].lat, cells[i].lon, EARTH_R * 1.004);
+          pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        landLayer = new THREE.Points(g, new THREE.PointsMaterial({
+          map: dotTex, size: 0.007, color: 0x5a7268, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending,
+          depthWrite: false, sizeAttenuation: true,
+        }));
+        world.add(landLayer);
+        console.log('[radio] 陆地点阵：' + n + ' 点');
+      } catch (e) { /* ignore */ }
+    })
+    .catch(() => { /* 没有掩膜就不画 */ });
+
   /* ---------- 坐标换算 ---------- */
   const toVec3 = (lat, lon, r) => {
     const phi = (90 - lat) * Math.PI / 180;
