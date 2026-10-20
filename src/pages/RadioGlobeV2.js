@@ -35,7 +35,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
 
   // Bloom：把渲染结果画到模糊叠加层（低成本辉光）
   const bloom = document.createElement('canvas');
-  bloom.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen;filter:blur(16px) saturate(1.35);opacity:.55;z-index:0';
+  bloom.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen;filter:blur(14px) saturate(1.25);opacity:.42;z-index:0';
   container.style.position = 'absolute';
   container.style.inset = '0';
   container.appendChild(bloom);
@@ -287,7 +287,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       const cc = best ? best.cc : null;
       const near = stations.filter((s) => (cc && s.cc === cc));
       buildPoints(near.length > 30 ? near : stations);
-      if (points) points.material.size = mobile ? 0.06 : 0.048;
+      if (points) points.material.size = mobile ? 0.045 : 0.03;
     } else {
       // 远景/中景：全部电台都画（小点），形成"点云地球"
       buildPoints(stations);
@@ -451,12 +451,12 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     }
     // 频谱呼吸
     if (points) {
-      const base = zoomLevel === 2 ? (mobile ? 0.06 : 0.048) : zoomLevel === 1 ? (mobile ? 0.03 : 0.022) : (mobile ? 0.022 : 0.014);
+      const base = zoomLevel === 2 ? (mobile ? 0.045 : 0.03) : zoomLevel === 1 ? (mobile ? 0.03 : 0.022) : (mobile ? 0.022 : 0.014);
       const want = base * (1 + energy * 0.5);
       points.material.size += (want - points.material.size) * 0.12;
       if (pointsGlow) {
-        pointsGlow.material.size = points.material.size * (zoomLevel >= 2 ? 3.0 : 2.2);
-        pointsGlow.material.opacity = zoomLevel >= 2 ? 0.13 : 0.05;
+        pointsGlow.material.size = points.material.size * (zoomLevel >= 2 ? 2.2 : 2.0);
+        pointsGlow.material.opacity = zoomLevel >= 2 ? 0.08 : 0.05;
       }
     }
     if (!dragging && Date.now() - lastInteract > 5000) world.rotation.y += dt * 0.02;
