@@ -7094,7 +7094,11 @@ app.get('/api/now', async (req, res) => {
       if (buf.length >= metaint + 1) {
         const len = buf[metaint] * 16;
         if (len > 0 && buf.length >= metaint + 1 + len) {
-          const meta = buf.subarray(metaint + 1, metaint + 1 + len).toString('latin1');
+          const rawMeta = buf.subarray(metaint + 1, metaint + 1 + len);
+          // ICY 规范是 latin1，但大量电台实际发 UTF-8：优先按 UTF-8 解，出现替换字符再回退
+          let meta = rawMeta.toString('utf8');
+          if (meta.includes('\uFFFD')) meta = rawMeta.toString('latin1');
+          meta = meta.replace(/\u0000/g, '');
           title = (/StreamTitle='([^']*)'/.exec(meta) || [])[1] || null;
           break;
         }

@@ -3933,3 +3933,9 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 }
 #page-radio .rd-irow b { font: 650 20px/1 var(--rd-sans); letter-spacing: -.025em; color: var(--rd-ink); }
 @media (max-width: 560px) { #page-radio .rd-irow { margin-bottom: 8px; } }
+
+
+/* 视图切换：星云淡入 */
+#page-radio .radio-nebula3d { opacity: 0; transition: opacity .5s var(--rd-ease); }
+#page-radio .radio-nebula3d.shown { opacity: 1; }
+#page-radio .radio-globe canvas { transition: opacity .5s var(--rd-ease); }

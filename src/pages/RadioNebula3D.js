@@ -280,6 +280,7 @@ export async function createNebula3D(container, stations, opts = {}) {
 
   /* ---------- 尺寸 / 动画 ---------- */
   let raf = 0, disposed = false;
+  let flyT = 1, flyFrom = 15, flyTo = 15, flyDur = 0.9;
   const clock = new THREE.Clock();
   const resize = () => {
     const host = container.closest('#radio-stage') || container;
@@ -302,6 +303,11 @@ export async function createNebula3D(container, stations, opts = {}) {
     raf = requestAnimationFrame(tick);
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = performance.now() / 1000;
+    if (flyT < 1) {
+      flyT = Math.min(1, flyT + dt / Math.max(0.001, flyDur));
+      const e = flyT * flyT * (3 - 2 * flyT);
+      camDist = flyFrom + (flyTo - flyFrom) * e;
+    }
     if (!dragging && Date.now() - lastInteract > 4000) camYaw += dt * 0.02;
     // 相机绕原点
     const cp = Math.cos(camPitch), sp = Math.sin(camPitch);
@@ -320,6 +326,19 @@ export async function createNebula3D(container, stations, opts = {}) {
   return {
     mode: 'nebula3d',
     resize,
+    /** 从远处飞入星云 */
+    enter(dur = 1.1) {
+      flyFrom = 46;
+      flyTo = 15;
+      flyT = 0;
+      flyDur = dur;
+      camDist = flyFrom;
+      camYaw = 0.1;
+      camPitch = 0.05;
+    },
+    setOpacity(v) {
+      canvas.style.opacity = String(Math.max(0, Math.min(1, Number(v))));
+    },
     setStations(list) { rebuild(Array.isArray(list) ? list : []); },
     setFilter(pred) { rebuild(pred ? stations.filter(pred) : stations); return stationsRef.length; },
     setEnergy(v) { if (points) points.material.uniforms.uEnergy.value = Math.max(0, Math.min(1, Number(v) || 0)); },

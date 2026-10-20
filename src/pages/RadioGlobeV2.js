@@ -133,7 +133,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
         landLayer = new THREE.Points(g, new THREE.PointsMaterial({
-          map: dotTex, size: 0.007, color: 0x5a7268, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending,
+          map: dotTex, size: 0.0055, color: 0x3f544b, transparent: true, opacity: 0.4,
           depthWrite: false, sizeAttenuation: true,
         }));
         world.add(landLayer);
@@ -326,6 +326,9 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       lastX = e.clientX; lastY = e.clientY;
       world.rotation.y += dx * 0.005;
       world.rotation.x = Math.max(-1.1, Math.min(1.1, world.rotation.x + dy * 0.004));
+      rotVX = dx * 0.0016;
+      rotVY = dy * 0.0013;
+      focusTarget = null;
       lastInteract = Date.now();
       return;
     }
@@ -396,6 +399,8 @@ export async function createRadioGlobe(container, stations, opts = {}) {
 
   /* ---------- 入场动画 + 帧循环 ---------- */
   let raf = 0, disposed = false, energy = 0, introDone = false;
+  let rotVX = 0, rotVY = 0, focusTarget = null;
+  let diveT = 1, diveFrom = END_Z, diveTo = END_Z, diveDur = 0.7;
   const clock = new THREE.Clock();
   const t0 = performance.now();
   const tick = () => {
@@ -403,12 +408,34 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     raf = requestAnimationFrame(tick);
     const dt = Math.min(clock.getDelta(), 0.05);
     const el = performance.now() - t0;
-    // 入场：相机飞入 + 光点浮现
-    const intro = Math.min(1, el / 1900);
-    const ie = intro * intro * (3 - 2 * intro);
-    camera.position.z = START_Z + (END_Z - START_Z) * ie;
-    if (points) points.material.opacity = 0.92 * ie;
-    if (world) world.rotation.y = 2.6 + Math.sin(el / 9000) * 0.02;
+    // 入场：只在前 1.9s 接管相机；之后完全交给用户（否则缩放/旋转会被每帧重置）
+    if (!introDone) {
+      const intro = Math.min(1, el / 1900);
+      const ie = intro * intro * (3 - 2 * intro);
+      camera.position.z = START_Z + (END_Z - START_Z) * ie;
+      if (points) points.material.opacity = 0.92 * ie;
+      if (intro >= 1) { introDone = true; applyZoomLevel(); }
+    } else if (points && points.material.opacity < 0.92) {
+      points.material.opacity = Math.min(0.92, points.material.opacity + dt * 0.6);
+    }
+    // 惯性旋转（松手后自然减速）
+    if (!dragging && (Math.abs(rotVX) > 0.0002 || Math.abs(rotVY) > 0.0002)) {
+      world.rotation.y += rotVX;
+      world.rotation.x = Math.max(-1.1, Math.min(1.1, world.rotation.x + rotVY));
+      rotVX *= 0.94; rotVY *= 0.94;
+    }
+    // 平滑聚焦到指定电台
+    if (focusTarget) {
+      world.rotation.y += (focusTarget.y - world.rotation.y) * 0.12;
+      world.rotation.x += (focusTarget.x - world.rotation.x) * 0.12;
+      if (Math.abs(focusTarget.y - world.rotation.y) < 0.004) focusTarget = null;
+    }
+    // 视图切换：俯冲进入
+    if (diveT < 1) {
+      diveT = Math.min(1, diveT + dt / Math.max(0.001, diveDur));
+      const e = diveT * diveT * (3 - 2 * diveT);
+      camera.position.z = diveFrom + (diveTo - diveFrom) * e;
+    }
     // 选中环脉动
     if (ring) {
       const p = 1 + Math.sin(performance.now() / 420) * 0.18 + energy * 0.2;
@@ -444,9 +471,25 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     focus(station) {
       if (!station) return;
       const theta = (station.lon + 180) * Math.PI / 180;
-      world.rotation.y = Math.PI / 2 - theta;
-      world.rotation.x = Math.max(-0.9, Math.min(0.9, -(station.lat || 0) * Math.PI / 180 * 0.9));
+      focusTarget = {
+        y: Math.PI / 2 - theta,
+        x: Math.max(-0.9, Math.min(0.9, -(station.lat || 0) * Math.PI / 180 * 0.9)),
+      };
       lastInteract = Date.now();
+    },
+    /** 视图切换动画：镜头俯冲进入地球 */
+    diveIn(dur = 0.7) {
+      diveFrom = camera.position.z;
+      diveTo = Math.max(1.45, diveFrom * 0.55);
+      diveT = 0;
+      diveDur = dur;
+    },
+    /** 切换动画：镜头拉回正常距离 */
+    pullOut(dur = 0.6) {
+      diveFrom = camera.position.z;
+      diveTo = END_Z;
+      diveT = 0;
+      diveDur = dur;
     },
     pickCenter() {
       if (!pointsList.length) return -1;
@@ -498,6 +541,12 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       if (pointsList[index]) { setSelectedIndex(index); try { onPick(pointsList[index], index); } catch { /* ignore */ } }
     },
     setEnergy(v) { energy = Math.max(0, Math.min(1, Number(v) || 0)); },
+    setOpacity(v) {
+      const o = Math.max(0, Math.min(1, Number(v)));
+      canvas.style.opacity = String(o);
+      if (points) points.material.opacity = 0.92 * o;
+      if (pointsGlow) pointsGlow.material.opacity = (zoomLevel >= 2 ? 0.13 : 0.05) * o;
+    },
     onSettle(cb) { settleCb = cb; },
     setLayout(mode) { return mode === 'nebula' ? 'globe' : 'globe'; },
     setFilter(pred) {

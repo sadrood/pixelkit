@@ -616,11 +616,13 @@ export class RadioPage {
     const labels = this.$('radio-labels');
     if (v === 'nebula') {
       if (this._globe) {
-        // 真 3D 星云（three.js 粒子场，有纵深、近镜头虚化）
+        // 过渡动画：地球先俯冲并淡出，再切换到星云并从远到近飞入
         const wrap = this.$('radio-nebula3d');
-        if (wrap) wrap.hidden = false;
+        try { this._globe.diveIn?.(0.85); this._globe.setOpacity?.(0.45); } catch { /* ignore */ }
+        await new Promise((r) => setTimeout(r, 620));
         if (globeEl) globeEl.style.visibility = 'hidden';
         if (neb) neb.hidden = true;
+        if (wrap) { wrap.hidden = false; wrap.classList.remove('shown'); }
         const listEl = this.$('radio-label-list'); if (listEl) listEl.innerHTML = '';
         const leadEl = this.$('radio-leaders'); if (leadEl) leadEl.innerHTML = '';
         try {
@@ -639,7 +641,12 @@ export class RadioPage {
           try { this._neb3d?.resize?.(); } catch { /* ignore */ }
           if (this._neb3d && this._neb3d.setStations) this._neb3d.setStations(this.geoStations);
           if (this.genreFilter >= 0) this._neb3d.setFilter?.((st) => (st.g || 0) === this.genreFilter);
-          this.setHint('流派星云 · 拖动旋转 · 滚轮拉近（粒子会贴到镜头）· 点星云收听');
+          // 从远处飞入星云（不是放大缩小）
+          try { this._neb3d.enter?.(1.25); } catch { /* ignore */ }
+          if (wrap) {
+            requestAnimationFrame(() => wrap.classList.add('shown'));
+          }
+          this.setHint('流派星云 · 拖动旋转 · 滚轮飞近（粒子会贴到镜头）· 点星云收听');
         } catch (err) {
           console.warn('3D 星云不可用，回退 2D：', err);
           this._neb3dFailed = true;
@@ -648,7 +655,7 @@ export class RadioPage {
           this.renderNebula();
           this.startNebulaAnim();
         }
-        this.setHint('流派星云 · 拖动旋转 · 滚轮拉近（粒子会贴到镜头）· 点星云收听');
+        this.setHint('流派星云 · 拖动旋转 · 滚轮飞近（粒子会贴到镜头）· 点星云收听');
       } else if (this._globe && this._globe.setLayout) {
         // 自绘点阵：地球点云原地变形成 11 个星团（0.95 秒过渡）
         if (neb) neb.hidden = true;
@@ -666,11 +673,14 @@ export class RadioPage {
       }
       return;
     }
-    if (neb) { neb.hidden = true; neb.style.display = 'none'; }
-    this.stopNebulaAnim();
     const wrap3d = this.$('radio-nebula3d');
+    if (wrap3d) wrap3d.classList.remove('shown');
+    this.stopNebulaAnim();
+    await new Promise((r) => setTimeout(r, 420));
+    if (neb) { neb.hidden = true; neb.style.display = 'none'; }
     if (wrap3d) wrap3d.hidden = true;
     if (globeEl) globeEl.style.visibility = '';
+    try { this._globe?.setOpacity?.(1); this._globe?.pullOut?.(0.8); } catch { /* ignore */ }
     if (globeEl) globeEl.style.display = '';
     if (this._globe) this._globe.setLayout('globe');
     this.setHint('拖动旋转 · 滚轮远近 · 准星停稳自动收听');
@@ -736,7 +746,11 @@ export class RadioPage {
           if (this._neb3d && this._neb3d.getClusterLabels) clusters = this._neb3d.getClusterLabels();
           else if (this._globe.getNebulaLabels) clusters = this._globe.getNebulaLabels();
         } catch { clusters = []; }
-        list.innerHTML = clusters.map((c, k) => '<span class="nebula-cluster-label" style="left:' + Math.round(c.x) + 'px;top:' + Math.round(c.y + (k % 2 === 0 ? -46 : 30)) + 'px"><b>' + this.esc((this.genres && this.genres[c.i]) || '') + '</b><span>' + c.count.toLocaleString('zh-CN') + ' 个电台</span></span>').join('');
+        list.innerHTML = clusters.map((c, k) => {
+          const dy = (k % 2 === 0 ? -62 : 44) + (k % 3) * 8;
+          const dx = (k % 2 === 0 ? -1 : 1) * (16 + (k % 3) * 12);
+          return '<span class="nebula-cluster-label" style="left:' + Math.round(c.x + dx) + 'px;top:' + Math.round(c.y + dy) + 'px"><b>' + this.esc((this.genres && this.genres[c.i]) || '') + '</b><span>' + c.count.toLocaleString('zh-CN') + ' 个电台</span></span>';
+        }).join('');
         if (leaders) leaders.innerHTML = '';
         return;
       }
