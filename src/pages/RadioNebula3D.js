@@ -250,17 +250,8 @@ export async function createNebula3D(container, stations, opts = {}) {
     const i = pickAt(e.clientX, e.clientY, false);
     if (i >= 0) { onPick(stationsRef[i], i); lastInteract = Date.now(); }
   };
-  const setHole = (clientX, clientY) => {
-    if (!points) return;
-    const r = canvas.getBoundingClientRect();
-    const nx = ((clientX - r.left) / Math.max(1, r.width)) * 2 - 1;
-    const ny = -(((clientY - r.top) / Math.max(1, r.height)) * 2 - 1);
-    tmpV.set(nx, ny, 0.5).unproject(camera);
-    const dir = tmpV.sub(camera.position).normalize();
-    const hp = camera.position.clone().add(dir.multiplyScalar(Math.max(1.2, camDist)));
-    points.material.uniforms.uHole.value.copy(hp);
-    points.material.uniforms.uHoleOn.value = 1;
-  };
+  // 跟随鼠标的黑洞已停用：黑洞属于「粒子唱片/星盘」下方
+  const setHole = () => { if (points) points.material.uniforms.uHoleOn.value = 0; };
   const onWheel = (e) => {
     e.preventDefault();
     camDist = Math.max(0.7, Math.min(46, camDist * (e.deltaY > 0 ? 1.12 : 0.89)));

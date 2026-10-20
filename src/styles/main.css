@@ -4163,3 +4163,20 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 @media (orientation: landscape) and (max-height: 480px) {
   #page-radio .radio-clock { display: none; }
 }
+/* 黑洞：位于粒子唱片/星盘下方 */
+#page-radio .rd-vinyl-wrap::before {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 150%; padding-top: 150%;
+  transform: translate(-50%,-50%); border-radius: 50%; pointer-events: none; z-index: -1;
+  background: radial-gradient(circle, #000 0 26%, #050a09 34%, #0000 62%),
+              conic-gradient(from 0deg, #ffd9a800 0 8%, #ffd9a83d 18%, #f36b454d 30%, #ffd9a800 46% 100%);
+  filter: blur(10px); animation: rd-hole-spin 9s linear infinite;
+}
+@keyframes rd-hole-spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+#page-radio .radio-dial::before {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 128%; padding-top: 128%;
+  transform: translate(-50%,-50%); border-radius: 50%; pointer-events: none; z-index: -1;
+  background: radial-gradient(circle, #000 0 30%, #050a09 40%, #0000 66%),
+              conic-gradient(from 0deg, #ffd9a800 0 10%, #f36b4540 24%, #ffd9a826 36%, #ffd9a800 50% 100%);
+  filter: blur(8px); animation: rd-hole-spin 12s linear infinite;
+}
+#page-radio .radio-dial { position: absolute; }
