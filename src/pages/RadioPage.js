@@ -173,6 +173,7 @@ export class RadioPage {
       if (this.view === 'nebula') this.renderNebula();
     });
 
+    this.ensureSpaceBackground();
     this.loadFilters();
     this.loadListStations();
     this.loadGlobe();
@@ -246,6 +247,14 @@ export class RadioPage {
       this.updateFavCount();
       const slider = this.$('radio-slider');
       if (slider) { slider.max = String(Math.max(0, this.geoStations.length - 1)); slider.disabled = false; }
+      // ?s=<12位 hex> 分享链接：直接定位该台且跳过入场页
+      try {
+        const sp = new URLSearchParams(location.search).get('s');
+        if (sp && /^[0-9a-f]{6,12}$/i.test(sp)) {
+          const idx = this.geoStations.findIndex((x) => x.id === sp);
+          if (idx >= 0) { this._shareId = sp; this.index = idx; this.setIndex(idx, false); }
+        }
+      } catch { /* ignore */ }
       if (loading) loading.style.display = 'none';
       this.bootHide();
       try { this.showIntro(); } catch (e) { console.warn('intro 失败：', e); }
@@ -357,7 +366,13 @@ export class RadioPage {
     try { this._globe?.setSelected(s); if (play) this._globe?.focus?.(s); } catch { /* ignore */ }
     this.syncSlider();
     this.setHint(`第 ${idx + 1} / ${n} 个 · ${[s.country, s.codec, s.bitrate ? s.bitrate + 'kbps' : ''].filter(Boolean).join(' · ')}`);
-    if (play) this.playStation(s);
+    if (play) {
+      this.playStation(s);
+      try {
+        const id = String(s.id || '');
+        if (/^[0-9a-f]{6,12}$/i.test(id)) history.replaceState(null, '', '?s=' + id);
+      } catch { /* ignore */ }
+    }
   }
 
   step(delta) {
@@ -821,6 +836,7 @@ export class RadioPage {
   showIntro() {
     const box = this.$('rd-intro');
     if (!box) return;
+    if (this._shareId) return;
     const seen = (() => { try { return localStorage.getItem('pk_roam_seen') === '1'; } catch { return false; } })();
     const lastId = (() => { try { return localStorage.getItem('pk_radio_station'); } catch { return null; } })();
     const last = lastId ? this.geoStations.find((s) => s.id === lastId) : null;
@@ -960,6 +976,56 @@ export class RadioPage {
         s.lon = lon0 + Math.cos(a) * rr * rLon / Math.max(0.3, Math.cos(lat0 * Math.PI / 180));
       }
     }
+  }
+
+  /** 程序化星空/星云背景（一次性生成，做成 CSS 变量） */
+  ensureSpaceBackground() {
+    if (this._spaceDone) return;
+    this._spaceDone = true;
+    try {
+      const rd = this.$('page-radio');
+      if (!rd) return;
+      const W = 1600, H = 1000;
+      const cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      const ctx = cv.getContext('2d');
+      // 底色
+      const bg = ctx.createRadialGradient(W * 0.42, H * 0.5, 0, W * 0.5, H * 0.5, W * 0.75);
+      bg.addColorStop(0, '#0b1a17');
+      bg.addColorStop(0.55, '#081210');
+      bg.addColorStop(1, '#040807');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+      // 星云雾团
+      const palette = ['#8FA39C', '#E8A9A0', '#D99A7E', '#7FC8C0', '#9DB4D6', '#D8B26E', '#E2C35A', '#B7A3D9'];
+      let seed = 20261020;
+      const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+      for (let i = 0; i < 9; i++) {
+        const cx = rnd() * W, cy = rnd() * H;
+        const r = 160 + rnd() * 420;
+        const col = palette[i % palette.length];
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        g.addColorStop(0, col + '22');
+        g.addColorStop(0.5, col + '0d');
+        g.addColorStop(1, col + '00');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // 星星
+      for (let i = 0; i < 1900; i++) {
+        const x = rnd() * W, y = rnd() * H;
+        const a = 0.12 + rnd() * 0.8;
+        const rr = 0.4 + rnd() * 1.4;
+        ctx.fillStyle = 'rgba(245,241,232,' + a.toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.arc(x, y, rr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      rd.style.setProperty('--rd-space', 'url(' + cv.toDataURL('image/jpeg', 0.82) + ')');
+      console.log('[radio] 星空背景已生成');
+    } catch (e) { /* ignore */ }
   }
 
   /* ==================== 准星刻度 / 时钟 ==================== */

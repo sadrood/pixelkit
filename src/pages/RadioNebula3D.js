@@ -23,20 +23,25 @@ export async function createNebula3D(container, stations, opts = {}) {
 
   /* ---------- 场景 ---------- */
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x070504);
+  scene.background = null;
 
   const camera = new THREE.PerspectiveCamera(58, 1, 0.05, 400);
   let camDist = 15, camYaw = 0, camPitch = 0;
   camera.position.set(0, 0, camDist);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.setClearColor(0x070504, 1);
+  renderer.setClearColor(0x000000, 0);
   if ('outputColorSpace' in renderer && THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
   const canvas = renderer.domElement;
   canvas.style.cssText = 'width:100%;height:100%;display:block;touch-action:none;cursor:grab';
   container.innerHTML = '';
   container.appendChild(canvas);
+  const bloom = document.createElement('canvas');
+  bloom.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen;filter:blur(18px) saturate(1.3);opacity:.5;z-index:0';
+  container.style.position = 'relative';
+  container.appendChild(bloom);
+  const bctx = bloom.getContext('2d');
 
   /* ---------- 远景星尘 ---------- */
   const bgStars = (() => {
@@ -281,6 +286,8 @@ export async function createNebula3D(container, stations, opts = {}) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    bloom.width = Math.max(2, Math.round(w / 2));
+    bloom.height = Math.max(2, Math.round(h / 2));
   };
   resize();
   const ro = window.ResizeObserver ? new ResizeObserver(resize) : null;
@@ -302,6 +309,7 @@ export async function createNebula3D(container, stations, opts = {}) {
       points.rotation.y = Math.sin(t * 0.05) * 0.04;
     }
     renderer.render(scene, camera);
+    try { bctx.clearRect(0, 0, bloom.width, bloom.height); bctx.drawImage(canvas, 0, 0, bloom.width, bloom.height); } catch { /* ignore */ }
   };
   tick();
 

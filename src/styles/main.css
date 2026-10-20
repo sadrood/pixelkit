@@ -3907,3 +3907,29 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 /* 星云视图：隐藏底部 hint（避免与音量重叠），标签错开 */
 #page-radio.sky .radio-hint { display: none; }
 #page-radio .nebula-cluster-label { transform: translate(-50%, -50%); }
+
+
+/* 程序化星空/星云背景（JS 设置 --rd-space） */
+#page-radio .radio-stage {
+  background-color: var(--rd-bg);
+  background-image: var(--rd-space, none);
+  background-size: cover;
+  background-position: center;
+}
+#page-radio .rd-intro {
+  background-image: linear-gradient(#0c181600 42%, #0c18169e 70%, #0c1816f2 100%),
+                    linear-gradient(#0c18168c, #0c181600 24%),
+                    var(--rd-space, none);
+  background-size: cover;
+  background-position: center;
+}
+
+
+/* 入场页品牌行 */
+#page-radio .rd-irow { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; }
+#page-radio .rd-ilogo {
+  width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid #f5f1e8cc;
+  display: grid; place-items: center; font-size: 12px; color: #f5f1e8cc; line-height: 1;
+}
+#page-radio .rd-irow b { font: 650 20px/1 var(--rd-sans); letter-spacing: -.025em; color: var(--rd-ink); }
+@media (max-width: 560px) { #page-radio .rd-irow { margin-bottom: 8px; } }

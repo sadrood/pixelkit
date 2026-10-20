@@ -18,20 +18,27 @@ export async function createRadioGlobe(container, stations, opts = {}) {
 
   /* ---------- 基础 ---------- */
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x04070d);
+  scene.background = null;
   const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 200);
   const START_Z = mobile ? 4.4 : 4.8;
   const END_Z = mobile ? 2.9 : 2.8;
   camera.position.set(0, 0.15, START_Z);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.setClearColor(0x04070d, 1);
+  renderer.setClearColor(0x000000, 0);
   if ('outputColorSpace' in renderer && THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
   const canvas = renderer.domElement;
   canvas.style.cssText = 'width:100%;height:100%;display:block;touch-action:none;cursor:grab';
   container.innerHTML = '';
   container.appendChild(canvas);
+
+  // Bloom：把渲染结果画到模糊叠加层（低成本辉光）
+  const bloom = document.createElement('canvas');
+  bloom.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen;filter:blur(16px) saturate(1.35);opacity:.55;z-index:0';
+  container.style.position = 'relative';
+  container.appendChild(bloom);
+  const bctx = bloom.getContext('2d');
 
   const world = new THREE.Group();
   world.rotation.y = 2.6;
@@ -379,6 +386,8 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    bloom.width = Math.max(2, Math.round(w / 2));
+    bloom.height = Math.max(2, Math.round(h / 2));
   };
   resize();
   const ro = window.ResizeObserver ? new ResizeObserver(resize) : null;
@@ -424,6 +433,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     }
     if (!dragging && Date.now() - lastInteract > 5000) world.rotation.y += dt * 0.02;
     renderer.render(scene, camera);
+    try { bctx.clearRect(0, 0, bloom.width, bloom.height); bctx.drawImage(canvas, 0, 0, bloom.width, bloom.height); } catch { /* ignore */ }
   };
   tick();
 
