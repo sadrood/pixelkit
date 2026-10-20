@@ -120,6 +120,8 @@ export async function createNebula3D(container, stations, opts = {}) {
     const n = stationsRef.length;
     const count = n;
     const pos = new Float32Array(count * 3);
+    const cent = new Float32Array(count * 3);
+    const rank = new Float32Array(count);
     const col = new Float32Array(count * 3);
     const size = new Float32Array(count);
     const phase = new Float32Array(count);
@@ -147,6 +149,8 @@ export async function createNebula3D(container, stations, opts = {}) {
       pos[i * 3] = c.x + gauss(h) * spread;
       pos[i * 3 + 1] = c.y + gauss(h >> 5) * spread * 0.9;
       pos[i * 3 + 2] = c.z + gauss(h >> 11) * spread * 1.25;
+      cent[i * 3] = c.x; cent[i * 3 + 1] = c.y; cent[i * 3 + 2] = c.z;
+      rank[i] = (i % 997) / 997;
       tmp.set(GENRE_TINTS[g]).convertSRGBToLinear();
       // 更淡：向暖白混合 40%
       tmp.lerp(new THREE.Color(1, 0.96, 0.9), 0.4);
@@ -163,6 +167,8 @@ export async function createNebula3D(container, stations, opts = {}) {
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
     geo.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+    geo.setAttribute('aCent', new THREE.BufferAttribute(cent, 3));
+    geo.setAttribute('aRank', new THREE.BufferAttribute(rank, 1));
 
     const mat = new THREE.ShaderMaterial({
       uniforms: {
@@ -173,6 +179,7 @@ export async function createNebula3D(container, stations, opts = {}) {
         uCamDist: { value: 15 },
         uHole: { value: new THREE.Vector3(999, 999, 999) },
         uHoleOn: { value: 0 },
+        uExpand: { value: 0 },
       },
       vertexColors: true,
       transparent: true,
@@ -188,11 +195,20 @@ export async function createNebula3D(container, stations, opts = {}) {
         uniform float uCamDist;
         uniform vec3 uHole;
         uniform float uHoleOn;
+        uniform float uExpand;
+        attribute vec3 aCent;
+        attribute float aRank;
         void main() {
           vColor = color;
-          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          // §5.3 城市螺旋展开：放大时节点绕所属国家中心螺旋散开
+          vec3 local = position - aCent;
+          float rr = length(local.xz);
+          float ang = atan(local.z, local.x) + uExpand * (1.9 - rr * 0.03) + aRank * 0.15;
+          float rr2 = rr * (1.0 + uExpand * 1.35) + uExpand * 0.35;
+          vec3 sp = aCent + vec3(cos(ang) * rr2, local.y * (1.0 + uExpand * 0.25), sin(ang) * rr2);
+          vec4 mv = modelViewMatrix * vec4(sp, 1.0);
           float dist = -mv.z;
-          vec3 wp = (modelMatrix * vec4(position, 1.0)).xyz;
+          vec3 wp = (modelMatrix * vec4(sp, 1.0)).xyz;
           vec3 toHole = uHole - wp;
           float hd = length(toHole);
           float pull = uHoleOn * smoothstep(5.0, 0.0, hd);
@@ -360,6 +376,7 @@ export async function createNebula3D(container, stations, opts = {}) {
     if (points) {
       points.material.uniforms.uTime.value = t;
     points.material.uniforms.uCamDist.value = camDist;
+    points.material.uniforms.uExpand.value = Math.max(0, Math.min(1, (18 - camDist) / 13));
       points.rotation.y = Math.sin(t * 0.05) * 0.04;
     }
     renderer.render(scene, camera);
