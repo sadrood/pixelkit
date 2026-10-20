@@ -4022,3 +4022,18 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
   #page-radio .rd-record-inner { flex-direction: column; gap: 22px; }
   #page-radio .rd-record-info h2 { font-size: 26px; }
 }
+
+
+/* 唱片界面可读性：标题强制米白、遮罩更实 */
+#page-radio .rd-record { background: rgba(6, 12, 11, .86); }
+#page-radio .rd-record-info,
+#page-radio .rd-record-info h2 { color: var(--rd-ink) !important; opacity: 1; }
+#page-radio .rd-record-info h2 { text-shadow: 0 2px 18px #000000aa; }
+#page-radio .rd-record-close { z-index: 2; }
+
+
+/* 唱片界面：此刻/收藏不换行 */
+#page-radio .rd-record-songline > span,
+#page-radio .rd-record-songline > button { white-space: nowrap; flex: 0 0 auto; }
+#page-radio .rd-record-songline { max-width: min(560px, 60vw); }
+#page-radio .rd-record-songline b { white-space: normal; }
