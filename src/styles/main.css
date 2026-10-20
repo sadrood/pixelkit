@@ -4122,3 +4122,44 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .radio-topbar,
 #page-radio .radio-cross,
 #page-radio .radio-clock { transition: opacity .4s var(--rd-ease); }
+
+/* ============ 手机端版式（≤560 / 高度≤520 / 横屏） ============ */
+@media (max-width: 560px) {
+  #page-radio .radio-panel { left: 20px; right: 20px; bottom: clamp(64px, 9vh, 84px); }
+  #page-radio .radio-info, #page-radio .radio-controls { width: 100%; }
+  #page-radio .radio-now-name { font-size: clamp(26px, 8vw, 34px); }
+  #page-radio .radio-status { font-size: 10px; margin-bottom: 8px; }
+  #page-radio .radio-clock { top: calc(var(--rd-gy) + 44px); }
+  #page-radio .radio-clock b { font-size: clamp(38px, 12vw, 56px); }
+  #page-radio .radio-clock span { font-size: 9px; letter-spacing: .08em; max-width: 46vw; text-align: right; }
+  #page-radio .radio-brand b { font-size: 17px; }
+  #page-radio .radio-count { font-size: 10px; top: 28px; }
+  #page-radio .radio-hints { display: none; }
+  #page-radio .rd-tune { display: none; }
+  #page-radio .radio-chips { left: 16px; right: 16px; bottom: 14px; }
+  #page-radio .radio-chip-btn { height: 30px; font-size: 12px; padding: 0 10px; }
+  #page-radio .radio-top-right { right: 16px; }
+  #page-radio .radio-views { transform: scale(.88); transform-origin: top right; }
+  #page-radio .radio-enter { display: none; }
+  #page-radio .radio-dialrow { gap: 10px; }
+  #page-radio .radio-play-btn { width: 52px; height: 52px; }
+  #page-radio .radio-foot { display: none; }
+  #page-radio .rd-record-inner { padding: 18px; gap: 16px; max-height: 92vh; overflow: auto; }
+  #page-radio .rd-record-name, #page-radio .rd-record-info h2 { font-size: 24px; }
+  #page-radio .rd-vinyl { width: min(52vw, 220px); height: min(52vw, 220px); }
+  #page-radio .rd-settings .rd-record-inner { min-width: 0; }
+}
+@media (max-height: 520px) {
+  #page-radio .rd-poem, #page-radio .rd-poem-by, #page-radio .rd-credit { display: none; }
+  #page-radio .rd-intro-brand { top: calc(var(--rd-gy) + 8px); }
+  #page-radio .rd-intro-now { bottom: 20px; }
+  #page-radio .rd-intro-acts { margin-top: 14px; }
+  #page-radio .radio-clock b { font-size: clamp(30px, 9vh, 46px); }
+  #page-radio .radio-panel { bottom: 56px; }
+  #page-radio .radio-now-name { font-size: 24px; }
+  #page-radio .radio-chips { bottom: 10px; }
+  #page-radio .radio-hints { display: none; }
+}
+@media (orientation: landscape) and (max-height: 480px) {
+  #page-radio .radio-clock { display: none; }
+}
