@@ -706,6 +706,7 @@ export class RadioPage {
       }
     }
     this._datasetInfo = { builtAt: d.builtAt, n, v: d.v || 1 };
+    this.spreadByCountry(out);
     return out;
   }
 
@@ -797,6 +798,44 @@ export class RadioPage {
     if (this._nebRAF) { cancelAnimationFrame(this._nebRAF); this._nebRAF = null; }
   }
 
+  /** 把「落在国家中心」的电台在国家范围内散开：国家越大/台越多，散得越开 */
+  spreadByCountry(list) {
+    const groups = new Map();
+    for (const s of list) {
+      const k = s.cc || '??';
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(s);
+    }
+    const hashOf = (str) => {
+      let h = 0;
+      for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+      return h;
+    };
+    for (const [, arr] of groups) {
+      const precise = arr.filter((s) => s.prec > 0);
+      const base = precise.length >= 4 ? precise : arr;
+      const lat0 = base.reduce((a, s) => a + s.lat, 0) / base.length;
+      const lon0 = base.reduce((a, s) => a + s.lon, 0) / base.length;
+      let sLat = 0, sLon = 0;
+      for (const s of base) { sLat += Math.pow(s.lat - lat0, 2); sLon += Math.pow((s.lon - lon0) * Math.cos(lat0 * Math.PI / 180), 2); }
+      sLat = Math.sqrt(sLat / base.length);
+      sLon = Math.sqrt(sLon / base.length);
+      const n = arr.length;
+      // 散开半径：精确坐标离散度 + 台数规模（台越多、国家越大散越开）
+      const rLat = Math.max(1.2, Math.min(9, sLat * 2.6 + Math.sqrt(n) * 0.34));
+      const rLon = Math.max(1.5, Math.min(14, sLon * 2.6 + Math.sqrt(n) * 0.42));
+      for (const s of arr) {
+        if (s.prec > 0) continue;            // 有精确坐标的不动
+        const h = hashOf(String(s.id || s.name));
+        // 极坐标均匀撒点（hash 决定角度/半径），保证「对齐国家、但散开」
+        const a = (h % 4096) / 4096 * Math.PI * 2;
+        const rr = Math.sqrt(((h >> 12) % 4096) / 4096);
+        s.lat = lat0 + Math.sin(a) * rr * rLat;
+        s.lon = lon0 + Math.cos(a) * rr * rLon / Math.max(0.3, Math.cos(lat0 * Math.PI / 180));
+      }
+    }
+  }
+
   /* ==================== 准星刻度 / 时钟 ==================== */
   buildReticle() {
     const g = this.$('reticle-ticks');
@@ -853,12 +892,13 @@ export class RadioPage {
     if (!ctx) return;
     const nG = this.genres && this.genres.length ? this.genres.length : 11;
     const cx = w / 2, cy = h / 2;
-    const R = Math.min(w, h) * 0.36;
+    // 宇宙式铺开：黄金螺旋铺满整屏（半径随屏幕尺寸放大），各团散得更开
+    const R = Math.min(w * 0.47, h * 0.46);
     const centers = [];
     for (let g = 0; g < nG; g++) {
       const th = g * 2.39996 - Math.PI / 2;
-      const rr = R * Math.sqrt((g + 0.6) / nG);
-      centers.push({ x: cx + Math.cos(th) * rr * 1.55, y: cy + Math.sin(th) * rr });
+      const rr = R * Math.sqrt((g + 0.7) / nG);
+      centers.push({ x: cx + Math.cos(th) * rr * 1.7, y: cy + Math.sin(th) * rr * 1.1 });
     }
     const counts = new Array(nG).fill(0);
     const pos = new Float32Array(this.geoStations.length * 2);
@@ -871,7 +911,7 @@ export class RadioPage {
       const t = String(s.id || s.name || '');
       for (let k = 0; k < t.length; k++) hsh = (hsh * 31 + t.charCodeAt(k)) >>> 0;
       const a = (hsh % 1024) / 1024 * Math.PI * 2;
-      const rr = Math.pow(((hsh >> 10) % 1024) / 1024, 0.7) * 52 + 3;
+      const rr = Math.pow(((hsh >> 10) % 1024) / 1024, 0.65) * 86 + 4;
       pos[i * 2] = c.x + Math.cos(a) * rr;
       pos[i * 2 + 1] = c.y + Math.sin(a) * rr;
       sizes[i] = 3.5 + ((hsh >> 20) % 100) / 100 * 5;

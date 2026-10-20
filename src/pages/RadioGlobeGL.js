@@ -96,10 +96,29 @@ export async function createRadioGlobeGL(container, stations, opts = {}) {
   let energy = 0;
   const raycaster = null;
 
+  // 缩放分级：远景只显示各国热门台，拉近逐步显示更多（放大后能看到当前国家全部电台）
+  let zoomLevel = 0;
+  const refreshPoints = () => {
+    const perCountry = zoomLevel === 0 ? 10 : zoomLevel === 1 ? 40 : 100000;
+    const byCc = new Map();
+    for (const s of filtered) {
+      const k = s.cc || '??';
+      if (!byCc.has(k)) byCc.set(k, []);
+      byCc.get(k).push(s);
+    }
+    const out = [];
+    for (const [, arr] of byCc) {
+      arr.sort((a, b) => (b.pop || 0) - (a.pop || 0));
+      for (let i = 0; i < Math.min(perCountry, arr.length); i++) out.push(arr[i]);
+    }
+    setPoints(out);
+  };
   const setPoints = (list) => {
     globe.pointsData(list).pointColor((d) => GH_POINTS[(d.g || 0) % GH_POINTS.length]);
-    // 按人气给点大小做一点区分（越热门越大）
-    globe.pointRadius((d) => (mobile ? 0.45 : 0.32) + (d.pop || 0) / 9 * (mobile ? 0.16 : 0.12));
+    // 按人气区分大小；拉近时点变小变圆，避免糊成一片
+    const baseR = zoomLevel === 2 ? (mobile ? 0.24 : 0.18) : (mobile ? 0.45 : 0.32);
+    globe.pointRadius((d) => baseR + (d.pop || 0) / 9 * (mobile ? 0.14 : 0.12));
+    globe.pointResolution(zoomLevel === 2 ? 10 : 6);
   };
   setPoints(filtered);
 
@@ -146,6 +165,17 @@ export async function createRadioGlobeGL(container, stations, opts = {}) {
 
   let settleCb = null; let settleTimer = null;
   const onStart = () => { if (settleTimer) { clearTimeout(settleTimer); settleTimer = null; } controls.autoRotate = false; };
+  let lastZoom = 0;
+  controls.addEventListener('change', () => {
+    const d = controls.getDistance();
+    const lvl = d > 300 ? 0 : d > 215 ? 1 : 2;
+    if (lvl !== lastZoom) {
+      lastZoom = lvl;
+      zoomLevel = lvl;
+      clearTimeout(onStart._zoomTimer);
+      onStart._zoomTimer = setTimeout(refreshPoints, 260);
+    }
+  });
   const onEnd = () => {
     if (settleTimer) clearTimeout(settleTimer);
     settleTimer = setTimeout(() => { settleTimer = null; if (settleCb) { try { settleCb(); } catch { /* ignore */ } } }, 1100);
@@ -164,8 +194,24 @@ export async function createRadioGlobeGL(container, stations, opts = {}) {
   };
   pulse();
 
-  // 初始视角
-  globe.pointOfView({ lat: 32, lng: 18, altitude: mobile ? 2.4 : 1.9 }, 0);
+  // 初始视角 + 入场动画：从远处飞入
+  globe.pointOfView({ lat: 32, lng: 18, altitude: mobile ? 4.4 : 3.9 }, 0);
+  setTimeout(() => {
+    try {
+      controls.autoRotate = true;
+      globe.pointOfView({ lat: 32, lng: 18, altitude: mobile ? 2.4 : 1.9 }, 1900);
+      // 光点从无到有地浮现
+      let t0 = performance.now();
+      const stepFade = () => {
+        const t = Math.min(1, (performance.now() - t0) / 1600);
+        const k = t * t * (3 - 2 * t);
+        globe.pointRadius((d) => ((d.pop || 0) / 9 * 0.12 + 0.32) * (mobile ? 0.8 : 0.7) * k + (d.pop || 0) / 9 * (mobile ? 0.16 : 0.12) * 0.1);
+        if (t < 1) requestAnimationFrame(stepFade);
+        else refreshPoints();
+      };
+      stepFade();
+    } catch (e) { /* ignore */ }
+  }, 260);
   if (localStorage.getItem('pk_globe_style') === 'real') {
     try { globe.globeImageUrl('/vendor/globe/earth-day-small.jpg'); } catch (e) { /* ignore */ }
   }
@@ -253,14 +299,14 @@ export async function createRadioGlobeGL(container, stations, opts = {}) {
     },
     setFilter(pred) {
       filtered = pred ? stations.filter(pred) : stations.slice();
-      setPoints(filtered);
+      refreshPoints();
       selected = null;
       return filtered.length;
     },
     setStations(list) {
       stations = Array.isArray(list) ? list : [];
       filtered = stations.slice();
-      setPoints(filtered);
+      refreshPoints();
       selected = null;
       return filtered.length;
     },
