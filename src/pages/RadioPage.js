@@ -1210,10 +1210,31 @@ export class RadioPage {
         else if (m === 2) { const w = Math.sin(p.a * 5 + t * 2) * (5 + e * 22); x = C + Math.cos(p.a) * p.r * 0.95; y = C + Math.sin(p.a) * (p.r * 0.4 + w); }
         else if (m === 3) { const th = p.a * 3 + t * 0.4; const rr = Math.sqrt(p.k) * 92; x = C + Math.cos(th) * Math.sin(rr / 90) * 92 * Math.cos(t * 0.2); y = C + Math.sin(th) * Math.sin(rr / 90) * 92; }
         else { x = C + Math.cos(p.a * 3 + t * 0.15) * p.r * (1 + 0.35 * Math.sin(t + i * 0.01) + e * 0.25); y = C + Math.sin(p.a * 2 + t * 0.2) * p.r; }
-        const sz = 1.1 + p.s * 1.8;
-        ctx.fillStyle = 'rgba(255,214,160,' + (0.18 + 0.5 * p.k3 + e * 0.2).toFixed(3) + ')';
-        ctx.fillRect(x, y, sz, sz);
+        const pal = ['#8FA39C', '#E8A9A0', '#D99A7E', '#7FC8C0', '#9DB4D6', '#D8B26E', '#E2C35A', '#B7A3D9', '#C8B49A', '#EDE3CC', '#A9C08A'];
+        const gi = (this.current && this.current.g) || 0;
+        const baseCol = pal[gi % pal.length];
+        const sz = 1.0 + p.s * 2.0 + e * 1.4;
+        ctx.globalAlpha = Math.min(1, 0.22 + 0.55 * p.k3 + e * 0.25);
+        ctx.fillStyle = baseCol;
+        ctx.shadowColor = baseCol;
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.arc(x, y, sz * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
       }
+      // 中心：台名首字母
+      try {
+        const nm = (this.current && this.current.name) || 'R';
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = '#f5f1e8';
+        ctx.font = '600 34px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(nm.trim().charAt(0).toUpperCase(), W / 2, H / 2);
+        ctx.globalAlpha = 1;
+      } catch { /* ignore */ }
       this._vizRaf = requestAnimationFrame(draw);
     };
     draw();

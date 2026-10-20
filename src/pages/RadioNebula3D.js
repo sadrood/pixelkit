@@ -142,7 +142,7 @@ export async function createNebula3D(container, stations, opts = {}) {
       const popK = 0.45 + ((s.pop || 0) / 9) * 0.45;
       tmp.multiplyScalar(popK);
       col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
-      size[i] = 0.2 + ((h >>> 17) % 100) / 100 * 0.3;
+      size[i] = 0.17 + ((h >>> 17) % 100) / 100 * 0.26;
       phase[i] = ((h >>> 7) % 1000) / 1000 * Math.PI * 2;
     }
     posArr = pos;
@@ -196,7 +196,7 @@ export async function createNebula3D(container, stations, opts = {}) {
           float cap = mix(30.0, 6.5, smoothstep(6.0, 2.0, uCamDist));
           gl_PointSize = min(cap, s * (560.0 / max(dist, 0.35)));
           // 远处淡去、近处（贴镜头）也变淡，避免完全挡住视线
-          vAlpha = 0.7 * tw * smoothstep(0.8, 2.2, dist) * mix(1.0, smoothstep(0.2, 1.6, hd), uHoleOn) * (1.0 - smoothstep(24.0, 70.0, dist) * 0.35);
+          vAlpha = 0.52 * tw * smoothstep(0.8, 2.2, dist) * mix(1.0, smoothstep(0.2, 1.6, hd), uHoleOn) * (1.0 - smoothstep(24.0, 70.0, dist) * 0.35);
         }
       `,
       fragmentShader: `
