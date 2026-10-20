@@ -855,6 +855,7 @@ export class RadioPage {
           const fixed = best <= 140;
           tune.textContent = fixed ? '已锁定' : '调谐中 · 最近 ' + (isFinite(best) ? Math.round(best) : '—') + ' PX';
           if (fixed && nearest) { const n = this.$('rd-tune-name'); if (n) n.textContent = nearest; }
+          else if (this.view === 'nebula') { const n = this.$('rd-tune-name'); if (n) n.textContent = ''; }
         }
       } catch { /* ignore */ }
       if (this.view === 'nebula') {
