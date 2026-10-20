@@ -3902,3 +3902,8 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .radio-top-right,
 #page-radio .radio-labels,
 #page-radio .radio-cross { transition: opacity .6s var(--rd-ease) .2s; }
+
+
+/* 星云视图：隐藏底部 hint（避免与音量重叠），标签错开 */
+#page-radio.sky .radio-hint { display: none; }
+#page-radio .nebula-cluster-label { transform: translate(-50%, -50%); }

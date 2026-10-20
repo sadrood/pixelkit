@@ -371,7 +371,8 @@ export class RadioPage {
     const name = this.$('radio-now-name');
     const sub = this.$('radio-now-sub');
     const flag = this.flagOf(s.cc);
-    const place = [flag, (s.state ? s.state + ', ' : ''), s.country || s.cc].filter(Boolean).join(' ');
+    const city = (s.state || '').replace(/\s+/g, ' ').trim();
+    const place = [city ? city.toUpperCase() + ', ' : '', s.country || s.cc].filter(Boolean).join(' ');
     if (country) country.textContent = place || '未知地区';
     if (name) name.textContent = s.name || '未命名电台';
     if (sub) {
@@ -834,7 +835,8 @@ export class RadioPage {
     if (name) name.textContent = seen ? (target.name || '') : 'Listen somewhere new.';
     if (place) {
       const flag = this.flagOf(target.cc);
-      place.textContent = [flag, target.state ? target.state + ' · ' : '', target.country].filter(Boolean).join(' ');
+      const city = (target.state || '').replace(/\s+/g, ' ').trim();
+      place.textContent = [city ? city.toUpperCase() + ', ' : '', target.country].filter(Boolean).join(' ');
     }
     if (meta) {
       const genre = this.genres && target.g != null ? this.genres[target.g] : '';
