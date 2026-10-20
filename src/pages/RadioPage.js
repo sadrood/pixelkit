@@ -792,7 +792,7 @@ export class RadioPage {
         }
         const tune = this.$('rd-tune');
         if (tune) {
-          const fixed = best <= 44;
+          const fixed = best <= 140;
           tune.textContent = fixed ? '已锁定' : '调谐中 · 最近 ' + (isFinite(best) ? Math.round(best) : '—') + ' PX';
           if (fixed && nearest) { const n = this.$('rd-tune-name'); if (n) n.textContent = nearest; }
         }

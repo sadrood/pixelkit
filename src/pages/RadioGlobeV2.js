@@ -228,7 +228,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       // 信号强度（pop 0–9 + 码率）：弱的暗，只在大地图时出现
       const power = (s.pop || 0) * 10 + (s.bitrate >= 128 ? 6 : s.bitrate >= 64 ? 4 : s.bitrate ? 2 : 0);
       const strength = Math.min(1, 0.22 + power / 100);
-      const k = strength * (zoomLevel >= 2 ? 1 : zoomLevel === 1 ? 0.8 : 0.55);
+      const k = strength * (zoomLevel >= 2 ? 0.62 : zoomLevel === 1 ? 0.8 : 0.55);
       col[i * 3] = r0 * k;
       col[i * 3 + 1] = g0 * k;
       col[i * 3 + 2] = b0 * k;
@@ -340,7 +340,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         return Math.abs(dLat) <= 8 && Math.abs(dLng) * cos <= 8;
       });
       buildPoints(near.length ? near : stations);
-      if (points) points.material.size = mobile ? 0.032 : 0.02;
+      if (points) { points.material.size = mobile ? 0.02 : 0.013; points.material.opacity = 0.6; }
     } else {
       // 远景只显示强台，中景显示中强台：弱信号要放大才出现
       const minPower = lvl === 0 ? 60 : 46;
@@ -429,11 +429,24 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       lastInteract = Date.now();
     }
   };
+  let wheelTimer = null;
   const onWheel = (e) => {
     e.preventDefault();
     camera.position.z = Math.max(1.4, Math.min(6.0, camera.position.z + (e.deltaY > 0 ? 0.2 : -0.2)));
     lastInteract = Date.now();
     applyZoomLevel();
+    // 松手停稳 650ms：把最近的一颗星「吸」过来（自动对焦/锁定）
+    if (wheelTimer) clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(() => {
+      wheelTimer = null;
+      try {
+        const i = pickCenter();
+        if (i >= 0) {
+          if (settleCb) settleCb();
+          else if (opts.onPick) opts.onPick(pointsList[i], i);
+        }
+      } catch { /* ignore */ }
+    }, 650);
   };
   canvas.addEventListener('pointerdown', onDown);
   canvas.addEventListener('pointermove', onMove);
@@ -513,12 +526,12 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     }
     // 频谱呼吸
     if (points) {
-      const base = zoomLevel === 2 ? (mobile ? 0.045 : 0.03) : zoomLevel === 1 ? (mobile ? 0.03 : 0.022) : (mobile ? 0.022 : 0.014);
+      const base = zoomLevel === 2 ? (mobile ? 0.02 : 0.013) : zoomLevel === 1 ? (mobile ? 0.03 : 0.022) : (mobile ? 0.022 : 0.014);
       const want = base * (1 + energy * 0.5);
       points.material.size += (want - points.material.size) * 0.12;
       if (pointsGlow) {
         pointsGlow.material.size = points.material.size * (zoomLevel >= 2 ? 2.2 : 2.0);
-        pointsGlow.material.opacity = zoomLevel >= 2 ? 0.08 : 0.05;
+        pointsGlow.material.opacity = zoomLevel >= 2 ? 0.04 : 0.05;
       }
     }
     // 不再自动旋转：避免用户操作时地球「乱转」
