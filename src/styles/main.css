@@ -4196,3 +4196,15 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 
 #page-radio .rd-credit-link { color: #f5f1e8aa; text-decoration: underline; text-underline-offset: 2px; text-decoration-color: #f5f1e840; pointer-events: auto; }
 #page-radio .rd-credit { pointer-events: auto; }
+
+/* ============ 旧浏览器兼容兜底 ============ */
+@supports not ((backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px))) {
+  #page-radio .radio-chip-btn,
+  #page-radio .rd-record,
+  #page-radio .radio-sheet,
+  #page-radio .radio-searchbox { background: #101f1de8 !important; }
+}
+/* 遮罩不支持时取消渐隐（避免整条筛选不可见） */
+@supports not ((mask-image: linear-gradient(#000, #000)) or (-webkit-mask-image: linear-gradient(#000, #000))) {
+  #page-radio .radio-chips { -webkit-mask-image: none; mask-image: none; }
+}
