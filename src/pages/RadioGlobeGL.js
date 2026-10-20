@@ -99,6 +99,25 @@ export async function createRadioGlobeGL(container, stations, opts = {}) {
   // 缩放分级：远景只显示各国热门台，拉近逐步显示更多（放大后能看到当前国家全部电台）
   let zoomLevel = 0;
   const refreshPoints = () => {
+    // 放大到近景：只显示准星所在国家（中心 12° 内）的电台，避免全量糊成一片
+    if (zoomLevel === 2) {
+      const w = container.clientWidth || 1, h = container.clientHeight || 1;
+      const geo = globe.toGlobeCoords(w / 2, h / 2);
+      if (geo) {
+        const cos = Math.cos(geo.lat * Math.PI / 180);
+        const dist = (s) => {
+          const dLat = s.lat - geo.lat;
+          const dLng = ((s.lon - geo.lng + 540) % 360) - 180;
+          return Math.sqrt(dLat * dLat + (dLng * cos) * (dLng * cos));
+        };
+        // 找到准星所在国家，显示该国全部 + 邻近 4° 内的台
+        let centerStation = null, bestD = 1e9;
+        for (const s of filtered) { const d = dist(s); if (d < bestD) { bestD = d; centerStation = s; } }
+        const cc = centerStation ? centerStation.cc : null;
+        const near = filtered.filter((s) => (cc && s.cc === cc) || dist(s) < 4);
+        if (near.length > 20) { setPoints(near); return; }
+      }
+    }
     const perCountry = zoomLevel === 0 ? 10 : zoomLevel === 1 ? 40 : 100000;
     const byCc = new Map();
     for (const s of filtered) {
@@ -111,14 +130,14 @@ export async function createRadioGlobeGL(container, stations, opts = {}) {
       arr.sort((a, b) => (b.pop || 0) - (a.pop || 0));
       for (let i = 0; i < Math.min(perCountry, arr.length); i++) out.push(arr[i]);
     }
-    setPoints(out);
+    setPoints(out.length ? out : filtered);
   };
   const setPoints = (list) => {
     globe.pointsData(list).pointColor((d) => GH_POINTS[(d.g || 0) % GH_POINTS.length]);
     // 按人气区分大小；拉近时点变小变圆，避免糊成一片
-    const baseR = zoomLevel === 2 ? (mobile ? 0.24 : 0.18) : (mobile ? 0.45 : 0.32);
+    const baseR = zoomLevel === 2 ? (mobile ? 0.18 : 0.12) : (mobile ? 0.45 : 0.32);
     globe.pointRadius((d) => baseR + (d.pop || 0) / 9 * (mobile ? 0.14 : 0.12));
-    globe.pointResolution(zoomLevel === 2 ? 10 : 6);
+    globe.pointResolution(zoomLevel === 2 ? 12 : 6);
   };
   setPoints(filtered);
 
