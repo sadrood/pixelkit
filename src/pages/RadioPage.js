@@ -790,6 +790,25 @@ export class RadioPage {
             if (d < best) { best = d; nearest = l.name; }
           }
         }
+        try {
+          const leads = this.$('radio-leaders');
+          if (leads && best <= 140) {
+            const lab = this.$('radio-labels');
+            const ccx = (lab && lab.clientWidth || 1) / 2, ccy = (lab && lab.clientHeight || 1) / 2;
+            let bestL = null, bd = 1e9;
+            for (const l of (this.view === 'nebula' ? [] : (this._globe?.getLabels?.(80) || []))) {
+              const d = Math.hypot(l.x - ccx, l.y - ccy);
+              if (d < bd) { bd = d; bestL = l; }
+            }
+            let line = leads.querySelector('#rd-snap-line');
+            if (bestL) {
+              if (!line) { line = document.createElementNS('http://www.w3.org/2000/svg', 'line'); line.id = 'rd-snap-line'; leads.appendChild(line); }
+              line.setAttribute('x1', String(bestL.x)); line.setAttribute('y1', String(bestL.y));
+              line.setAttribute('x2', String(ccx)); line.setAttribute('y2', String(ccy));
+              line.setAttribute('stroke', 'rgba(243,107,69,.7)'); line.setAttribute('stroke-width', '1');
+            } else if (line) line.remove();
+          }
+        } catch { /* ignore */ }
         const tune = this.$('rd-tune');
         if (tune) {
           const fixed = best <= 140;
