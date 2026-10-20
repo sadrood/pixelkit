@@ -709,6 +709,8 @@
     <!-- ==================== 世界电台（RoamSky：全屏星图 + 准星 + 底部拨盘）==================== -->
     <div id="page-radio" class="page radio-page">
       <main class="radio-stage" id="radio-stage">
+        <div class="rd-glow" id="rd-glow" aria-hidden="true"></div>
+        <div class="rd-scrim" aria-hidden="true"></div>
         <div class="radio-globe-wrap" id="radio-globe-wrap">
           <div class="radio-globe" id="radio-globe"></div>
           <canvas id="radio-nebula" class="radio-nebula" hidden></canvas>
@@ -722,15 +724,18 @@
           </div>
         </div>
 
-        <!-- 中心准星：刻度盘 + 轨道点，停稳后自动锁定最近的台 -->
-        <div class="radio-cross" aria-hidden="true">
-          <svg class="reticle-svg" viewBox="0 0 220 220">
-            <circle cx="110" cy="110" r="46" fill="none" stroke="rgba(255,217,160,.55)" stroke-width="1" />
-            <circle cx="110" cy="110" r="52" fill="none" stroke="rgba(255,217,160,.18)" stroke-width="1" />
+        <!-- 准星：80² 圆环刻度 + 调谐中的最近距离 -->
+        <div class="radio-cross" id="rd-cross" aria-hidden="true">
+          <svg class="rd-cross-svg" viewBox="0 0 80 80">
+            <circle cx="40" cy="40" r="30" fill="none" stroke="rgba(245,241,232,.4)" stroke-width="1.3" />
+            <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(245,241,232,.12)" stroke-width="1" />
             <g id="reticle-ticks"></g>
-            <g class="reticle-orbit"><circle cx="110" cy="52" r="3.4" fill="#ffb37a" /></g>
+            <g class="reticle-orbit"><circle cx="40" cy="10" r="3" fill="#f36b45" /></g>
           </svg>
-          <em id="radio-lock-meta" class="radio-lock-meta"></em>
+          <div class="rd-tune">
+            <em id="rd-tune">调谐中 · 最近 — PX</em>
+            <b id="rd-tune-name"></b>
+          </div>
         </div>
         <div class="radio-labels" id="radio-labels">
           <svg class="radio-leaders" id="radio-leaders" aria-hidden="true"></svg>
@@ -830,6 +835,25 @@
             <div>空格 暂停 · M 静音</div>
             <div>Enter 进入当前电台</div>
           </div>
+        </div>
+
+        <!-- 入场页（回访态）：题记 + 上次听到 + 继续收听 -->
+        <div class="rd-intro" id="rd-intro" hidden>
+          <div class="rd-intro-brand">
+            <span class="rd-poem">缘溪行，忘路之远近</span>
+            <span class="rd-poem-by">— 陶渊明《桃花源记》</span>
+          </div>
+          <div class="rd-intro-now">
+            <div class="rd-k"><i></i><span id="rd-intro-k">欢迎回来 · 上次听到</span></div>
+            <h2 class="rd-intro-name" id="rd-intro-name">世界电台</h2>
+            <div class="rd-intro-place" id="rd-intro-place"></div>
+            <div class="rd-intro-meta" id="rd-intro-meta"></div>
+            <div class="rd-intro-acts">
+              <button class="rd-cta" id="rd-continue" type="button">▶ 继续收听</button>
+              <button class="rd-lnk" id="rd-random" type="button">或者随机听一站</button>
+            </div>
+          </div>
+          <div class="rd-credit">电台目录来自 Radio Browser · 地理数据来自 GeoNames</div>
         </div>
 
         <!-- 底部流派筛选条 -->

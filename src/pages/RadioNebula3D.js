@@ -9,9 +9,10 @@ const THREE_URL = '/night-market/vendor/three.module.js';
 /** 模块加载时就开始拉 three，避免切换星云时干等 */
 const threePromise = import(/* @vite-ignore */ THREE_URL);
 
+// RoamDial 实测配色（综合/流行/摇滚/电子/新闻谈话/爵士与古典/地方与世界/嘻哈/宗教/运动娱乐/轻松背景）
 const GENRE_TINTS = [
-  '#ffe9c9', '#ffd28f', '#ff9f7a', '#9fe8ff', '#dfe8f0',
-  '#ffcf8f', '#b8e6a8', '#ffb3c8', '#d8c8ff', '#ffe08a', '#cfe8d8',
+  '#8FA39C', '#E8A9A0', '#D99A7E', '#7FC8C0', '#9DB4D6',
+  '#D8B26E', '#E2C35A', '#B7A3D9', '#C8B49A', '#EDE3CC', '#A9C08A',
 ];
 
 export async function createNebula3D(container, stations, opts = {}) {
@@ -67,13 +68,24 @@ export async function createNebula3D(container, stations, opts = {}) {
 
   /* ---------- 星团布局 ---------- */
   const nGenre = (opts.genres && opts.genres.length) || 11;
+  // 方位：综合中央偏右最大；新闻左上、地方与世界右上、流行右下、摇滚下中、电子右中…
+  const LAYOUT = [
+    { x: 1.4, y: -0.2, z: 0.6, r: 1.25 },  // 0 综合（最大）
+    { x: 2.6, y: -1.6, z: 0.2, r: 0.95 },  // 1 流行
+    { x: 0.4, y: -2.4, z: 0.9, r: 0.8 },   // 2 摇滚
+    { x: 3.2, y: 0.2, z: -0.6, r: 0.85 },  // 3 电子
+    { x: -2.8, y: 1.8, z: 1.1, r: 0.9 },   // 4 新闻谈话
+    { x: -2.9, y: 0.1, z: -0.9, r: 0.8 },  // 5 爵士与古典
+    { x: 2.8, y: 1.9, z: 0.3, r: 0.85 },   // 6 地方与世界
+    { x: -1.3, y: -0.5, z: 1.6, r: 0.75 }, // 7 嘻哈
+    { x: 1.1, y: 1.2, z: 1.7, r: 0.8 },    // 8 宗教
+    { x: 1.9, y: -0.9, z: -1.9, r: 0.7 },  // 9 运动与娱乐
+    { x: 0.2, y: 2.5, z: -0.4, r: 0.75 },  // 10 轻松背景
+  ];
   const centers = [];
   for (let g = 0; g < nGenre; g++) {
-    // 横向铺开 + 纵深错落（有 z 才能有视差/贴镜头）
-    const x = (g - (nGenre - 1) / 2) * 4.4;
-    const y = Math.sin(g * 1.7) * 2.3;
-    const z = Math.cos(g * 1.15) * 3.4;
-    centers.push(new THREE.Vector3(x, y, z));
+    const L = LAYOUT[g % LAYOUT.length];
+    centers.push(new THREE.Vector3(L.x, L.y, L.z));
   }
 
   const hash = (s) => {
@@ -112,11 +124,14 @@ export async function createNebula3D(container, stations, opts = {}) {
       const c = centers[g];
       const h = hash(s.id || s.name);
       // 星团半径随该团台数增长
-      const spread = 0.85 + Math.sqrt(counts[g] || 1) * 0.095;
+      const baseR = (LAYOUT[g % LAYOUT.length] || { r: 0.9 }).r;
+      const spread = baseR * (0.55 + Math.sqrt(counts[g] || 1) * 0.045);
       pos[i * 3] = c.x + gauss(h) * spread;
       pos[i * 3 + 1] = c.y + gauss(h >> 5) * spread * 0.9;
       pos[i * 3 + 2] = c.z + gauss(h >> 11) * spread * 1.25;
       tmp.set(GENRE_TINTS[g]).convertSRGBToLinear();
+      const popK = 0.5 + ((s.pop || 0) / 9) * 0.5;
+      tmp.multiplyScalar(popK);
       col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
       size[i] = 0.14 + ((h >> 17) % 100) / 100 * 0.22;
       phase[i] = ((h >> 7) % 1000) / 1000 * Math.PI * 2;

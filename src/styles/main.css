@@ -3560,3 +3560,345 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .radio-nebula3d { position: absolute; inset: 0; z-index: 2; overflow: hidden; }
 #page-radio .radio-nebula3d[hidden] { display: none; }
 #page-radio .radio-nebula3d canvas { display: block; width: 100% !important; height: 100% !important; }
+
+/* 2026-10-20：修复小说页 iframe 显示不完整（此前只有 #page-nightmarket 的样式，小说页没尺寸规则） */
+#page-novel .nightmarket-wrap {
+  flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 0;
+}
+#page-novel .nightmarket-frame {
+  flex: 1 1 auto; width: 100%; height: 100%; min-height: 0;
+  border: 0; border-radius: 0; background: #f6f1e7;
+}
+#page-novel:fullscreen .nightmarket-wrap { padding: 0; }
+/* ============================================================================
+   2026-10-20 · RoamDial 高保真复刻设计系统（字体 + tokens + 电台页版式）
+   依据：D:\PixPin\dj\roamdial_audit 的 index.css / intro_extract.css 与复刻清单
+   ============================================================================ */
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('/fonts/instrument-serif-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Instrument Serif';
+  src: url('/fonts/instrument-serif-400-italic.woff2') format('woff2');
+  font-weight: 400; font-style: italic; font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-500.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-400.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-500.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-600.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-700.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+
+:root {
+  --rd-bg: #101f1d;
+  --rd-surface: #1c3430;
+  --rd-panel: #1c3430d1;
+  --rd-ink: #f5f1e8;
+  --rd-dim: #b3c1b7;
+  --rd-faint: #f5f1e829;
+  --rd-signal: #f36b45;
+  --rd-ink-dark: #172d2a;
+  --rd-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'PingFang SC', 'Noto Sans SC', monospace;
+  --rd-sans: 'Inter', 'PingFang SC', 'Noto Sans SC', 'Noto Sans CJK SC', system-ui, sans-serif;
+  --rd-serif: 'Instrument Serif', 'Songti SC', serif;
+  --rd-gx: clamp(16px, 3.5vw, 40px);
+  --rd-gy: calc(clamp(16px, 3.5vh, 32px) + env(safe-area-inset-top));
+  --rd-t-state: .24s;
+  --rd-ease: cubic-bezier(.2, .7, .2, 1);
+}
+
+/* ---------- 舞台底色 / 光晕 / 压暗 ---------- */
+#page-radio.radio-page { background: var(--rd-bg); color: var(--rd-ink); font-family: var(--rd-sans); }
+#page-radio .radio-stage { background: var(--rd-bg); }
+#page-radio .radio-globe-wrap { background: transparent; }
+#page-radio .rd-glow {
+  position: absolute; z-index: 1; pointer-events: none; border-radius: 50%;
+  width: min(84vw, 1120px); height: min(84vw, 1120px);
+  left: calc(18vw - min(42vw, 560px));
+  top: calc(90vh - min(42vw, 560px));
+  background: radial-gradient(circle, var(--glow-c, rgba(143, 163, 156, .42)) 0%, transparent 62%);
+  opacity: .55; filter: blur(14px);
+  animation: rd-glow-breathe 3.2s var(--rd-ease) infinite alternate;
+}
+@keyframes rd-glow-breathe { from { opacity: .5; } to { opacity: .85; } }
+#page-radio .rd-scrim {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(110% 100% at 0 100%, #0c1816f5, #0c1816d6 34%, #0c181600 70%);
+}
+
+/* ---------- 顶部：品牌 + 时钟 / 胶囊栏 ---------- */
+#page-radio .radio-topbar {
+  position: absolute; inset: var(--rd-gy) var(--rd-gx) auto var(--rd-gx);
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 0; z-index: 7; pointer-events: none;
+}
+#page-radio .radio-topbar > * { pointer-events: auto; }
+#page-radio .radio-top-left { display: flex; align-items: center; gap: 9px; }
+#page-radio .radio-brand b {
+  font: 650 20px/1 var(--rd-sans); letter-spacing: -.025em; color: var(--rd-ink);
+  text-shadow: none;
+}
+#page-radio .radio-fab {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid #f5f1e833; background: #101f1d80;
+  color: var(--rd-ink); font-size: 14px;
+}
+#page-radio .radio-fab.on { color: var(--rd-signal); border-color: var(--rd-signal); }
+#page-radio .radio-count {
+  position: absolute; left: 0; top: 34px;
+  font: 400 11px/1 var(--rd-mono); letter-spacing: .06em; color: var(--rd-dim);
+  background: none; border: 0; padding: 0;
+}
+#page-radio .radio-views { display: none; gap: 6px; padding: 3px; border-radius: 999px; background: #101f1d80; border: 1px solid #f5f1e81a; }
+#page-radio .radio-view { border: 0; background: transparent; color: var(--rd-dim); font: 400 13px var(--rd-sans); padding: 6px 13px; border-radius: 999px; }
+#page-radio .radio-view.on { background: var(--rd-ink); color: var(--rd-ink-dark); font-weight: 500; }
+#page-radio.sky .radio-views { display: inline-flex; }
+#page-radio.sky .radio-top-right { display: flex; align-items: center; gap: 10px; }
+#page-radio:not(.sky) .radio-top-right { display: none; }
+
+/* 时钟：sans 空心大号 */
+#page-radio .radio-clock {
+  position: absolute; right: var(--rd-gx); top: calc(var(--rd-gy) + 62px);
+  z-index: 6; text-align: right; display: none; flex-direction: column; align-items: flex-end;
+  pointer-events: none;
+}
+#page-radio .radio-clock b {
+  font: 400 clamp(56px, 7vw, 112px)/.9 var(--rd-sans);
+  letter-spacing: -.06em; font-variant-numeric: tabular-nums;
+  color: transparent; -webkit-text-stroke: 1px #f5f1e838; text-shadow: none;
+}
+#page-radio .radio-clock span {
+  font: 400 10.5px var(--rd-mono); letter-spacing: .16em; text-transform: uppercase;
+  color: #b3c1b799; margin-top: 10px;
+}
+#page-radio:not(.sky) .radio-clock { display: flex; }
+#page-radio.sky .radio-clock { display: none; }
+
+/* ---------- 准星 + 调谐文案 ---------- */
+#page-radio .radio-cross {
+  width: 80px; height: 80px; margin: -40px 0 0 -40px; opacity: 1;
+  display: block; pointer-events: none; z-index: 5;
+}
+#page-radio .radio-cross .rd-cross-svg { width: 80px; height: 80px; display: block; overflow: visible; }
+#page-radio .radio-cross .reticle-orbit { transform-origin: 40px 40px; animation: rd-orbit 9s linear infinite; }
+@keyframes rd-orbit { to { transform: rotate(360deg); } }
+#page-radio .radio-cross i, #page-radio .radio-cross span { display: none; }
+#page-radio .radio-lock-meta { display: none; }
+#page-radio .rd-tune {
+  position: absolute; left: 96px; top: 16px; white-space: nowrap;
+  display: flex; flex-direction: column; gap: 2px;
+  text-align: left; pointer-events: none;
+}
+#page-radio .rd-tune em {
+  font: 500 11.5px var(--rd-mono); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--rd-dim); font-style: normal;
+}
+#page-radio .rd-tune b {
+  font: 400 17px/1.2 var(--rd-sans); font-weight: 600; color: var(--rd-ink);
+  text-shadow: 0 1px 12px #091311cc;
+}
+
+/* ---------- 左下：正在播放信息 ---------- */
+#page-radio .radio-panel {
+  position: absolute; left: var(--rd-gx); right: var(--rd-gx);
+  bottom: clamp(76px, 10vh, 100px); z-index: 6;
+  padding: 0; background: none; display: block;
+}
+#page-radio .radio-info { width: min(520px, calc(100vw - 32px)); text-shadow: 0 1px 14px #09131199; }
+#page-radio .radio-info-top { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
+#page-radio .radio-status {
+  order: 1; font: 500 11.5px var(--rd-mono); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--rd-dim); background: none; border: 0; padding: 0 0 0 14px;
+  margin: 0 0 12px; position: relative; border-radius: 0;
+}
+#page-radio .radio-status::before {
+  content: ''; position: absolute; left: 0; top: 50%; width: 8px; height: 1px; background: var(--rd-faint);
+}
+#page-radio .radio-now-country {
+  order: 2; font: 400 14px var(--rd-sans); color: var(--rd-dim);
+  letter-spacing: 0; text-transform: none; margin-top: 10px;
+}
+#page-radio .radio-now-name {
+  order: 3; margin: 0; font: 600 clamp(32px, 3.1vw, 44px)/1.04 var(--rd-sans);
+  letter-spacing: -.045em; color: var(--rd-ink) !important; text-shadow: none;
+}
+#page-radio .radio-now-sub {
+  order: 4; margin-top: 6px; font: 400 10.5px var(--rd-mono);
+  letter-spacing: .1em; text-transform: uppercase; color: #b3c1b7bf;
+}
+#page-radio .radio-songline {
+  order: 5; margin-top: 16px; padding-left: 12px; border-left: 1px solid #f5f1e82e;
+  display: none; align-items: center; gap: 8px; font-size: 14px; color: var(--rd-dim);
+}
+#page-radio.sky .radio-songline { display: flex; }
+#page-radio .radio-songlabel { font: 400 11px var(--rd-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--rd-dim); }
+#page-radio .radio-now-song { color: var(--rd-ink); font-size: 14px; }
+#page-radio .radio-services { order: 6; display: none; flex-wrap: wrap; gap: 14px; margin-top: 6px; }
+#page-radio.sky .radio-services { display: flex; }
+#page-radio .radio-services a { color: #b3c1b7cc; font-size: 12px; text-decoration: none; }
+#page-radio .radio-services a:hover { color: var(--rd-ink); }
+
+/* ---------- 播放控制行 ---------- */
+#page-radio .radio-controls { margin-top: 20px; width: min(520px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 10px; }
+#page-radio .radio-dialrow { display: flex; align-items: center; gap: 16px; }
+#page-radio .radio-dial { display: none; }
+#page-radio .radio-play-btn {
+  order: 1; width: 60px; height: 60px; border-radius: 50%;
+  background: #f36b451f; border: 1.5px solid #f36b45e6; color: var(--rd-signal);
+  box-shadow: 0 0 30px -6px #f36b458c; font-size: 18px; font-weight: 400;
+  display: grid; place-items: center; cursor: pointer;
+}
+#page-radio .radio-play-btn svg, #page-radio .radio-play-btn .rd-ic { width: 20px; height: 20px; fill: currentColor; }
+#page-radio .radio-nav {
+  order: 2; width: 36px; height: 44px; border: 0; background: none;
+  color: var(--rd-dim); font-size: 16px; display: grid; place-items: center;
+}
+#page-radio .radio-nav:hover { color: var(--rd-ink); }
+#page-radio .radio-nav.rd-next { order: 3; width: auto; gap: 6px; padding: 0 4px; color: var(--rd-ink); font: 400 15px var(--rd-sans); }
+#page-radio .radio-enter {
+  order: 5; margin-left: auto; height: 44px; border: 0; background: none;
+  color: var(--rd-dim); font: 400 13px var(--rd-sans); padding: 0 4px;
+}
+#page-radio .radio-enter:hover { color: var(--rd-ink); }
+#page-radio .radio-song-fav { border: 0; background: none; color: var(--rd-dim); font-size: 14px; }
+#page-radio .radio-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font: 400 11px var(--rd-mono); color: var(--rd-dim);
+}
+#page-radio .radio-hint { font: 400 11px var(--rd-mono); letter-spacing: .04em; color: var(--rd-dim); }
+#page-radio .radio-vol { display: inline-flex; align-items: center; gap: 8px; color: var(--rd-dim); font-size: 11px; }
+#page-radio .radio-vol input { width: 72px; }
+#page-radio .radio-spec i { background: var(--rd-signal); }
+
+/* ---------- 底部流派筛选条 ---------- */
+#page-radio .radio-chips {
+  position: absolute; left: var(--rd-gx); right: var(--rd-gx);
+  bottom: clamp(14px, 2.6vh, 24px); z-index: 7;
+  display: flex; gap: 6px; padding: 2px 0; overflow-x: auto; background: none;
+  -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, #000 92%, transparent);
+}
+#page-radio .radio-chip-btn {
+  flex: 0 0 auto; height: 34px; padding: 0 13px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 7px;
+  background: #1c3430d1; border: 1px solid #f5f1e81a; color: var(--rd-dim);
+  font: 400 13px var(--rd-sans); backdrop-filter: blur(8px);
+}
+#page-radio .radio-chip-btn i { width: 8px; height: 8px; }
+#page-radio .radio-chip-btn small { font: 400 11px var(--rd-mono); color: var(--rd-dim); }
+#page-radio .radio-chip-btn.on { background: var(--rd-ink); border-color: transparent; color: var(--rd-ink-dark); font-weight: 500; }
+#page-radio .radio-chip-btn.on small { color: var(--rd-ink-dark); }
+
+/* ---------- 右下键盘提示 ---------- */
+#page-radio .radio-hints {
+  right: var(--rd-gx); bottom: clamp(14px, 2.6vh, 24px); left: auto; top: auto;
+  position: absolute; z-index: 6; display: none; flex-direction: column; align-items: flex-end;
+  gap: 2px; font: 400 10.5px/1.7 var(--rd-mono); color: #b3c1b799; text-align: right;
+  pointer-events: none;
+}
+#page-radio .radio-hints b { color: var(--rd-dim); font-weight: 500; }
+@media (min-width: 900px) { #page-radio .radio-hints { display: flex; } }
+@media (max-width: 560px) { #page-radio .radio-hints { display: none; } }
+
+/* ---------- 入场页 ---------- */
+#page-radio .rd-intro {
+  position: absolute; inset: 0; z-index: 20; cursor: default;
+  background: linear-gradient(#0c181600 42%, #0c18169e 70%, #0c1816f2 100%),
+              linear-gradient(#0c18168c, #0c181600 24%);
+  transition: opacity var(--rd-t-state) var(--rd-ease);
+}
+#page-radio .rd-intro.gone { opacity: 0; pointer-events: none; }
+#page-radio .rd-intro-brand { position: absolute; left: var(--rd-gx); top: calc(var(--rd-gy) + 52px); }
+#page-radio .rd-poem { display: block; font: 400 21px/1.15 var(--rd-serif); color: #f5f1e89e; }
+#page-radio .rd-poem-by { display: block; margin-top: 8px; font: 400 10.5px var(--rd-mono); letter-spacing: .12em; color: #f5f1e866; }
+#page-radio .rd-intro-now { position: absolute; left: var(--rd-gx); bottom: clamp(76px, 10vh, 100px); width: min(560px, calc(100vw - 2 * var(--rd-gx))); }
+#page-radio .rd-k {
+  display: flex; align-items: center; gap: 10px;
+  font: 500 11.5px var(--rd-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--rd-dim);
+}
+#page-radio .rd-k i { width: 6px; height: 6px; border-radius: 50%; background: var(--rd-signal); box-shadow: 0 0 0 4px #f36b452e; }
+#page-radio .rd-intro-name {
+  margin: 14px 0 10px; font: 400 clamp(44px, 4.6vw, 66px)/1 var(--rd-serif);
+  letter-spacing: -.015em; color: var(--rd-ink); white-space: pre-line;
+}
+#page-radio .rd-intro-place { color: #f5f1e8d9; font-size: 15px; }
+#page-radio .rd-intro-meta { margin-top: 6px; font: 400 10.5px var(--rd-mono); letter-spacing: .1em; text-transform: uppercase; color: #b3c1b7bf; }
+#page-radio .rd-intro-acts { display: flex; align-items: center; gap: 22px; margin-top: 26px; }
+#page-radio .rd-cta {
+  height: 56px; padding: 0 28px; border-radius: 999px; border: 0; cursor: pointer;
+  background: var(--rd-signal); color: #1a0f0a; font: 500 17px var(--rd-sans);
+  display: inline-flex; align-items: center; gap: 10px;
+  transition: transform var(--rd-t-press, .12s) var(--rd-ease);
+}
+#page-radio .rd-cta:active { transform: scale(.97); }
+#page-radio .rd-lnk {
+  border: 0; background: none; padding: 0; cursor: pointer;
+  color: var(--rd-dim); font: 400 13px var(--rd-sans);
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--rd-faint);
+}
+#page-radio .rd-lnk:hover { color: var(--rd-ink); }
+#page-radio .rd-credit {
+  position: absolute; right: var(--rd-gx); bottom: clamp(14px, 2.6vh, 24px);
+  font: 400 10.5px var(--rd-mono); letter-spacing: .06em; color: #f5f1e866;
+}
+
+/* ---------- 手机适配 ---------- */
+@media (max-width: 560px) {
+  #page-radio .rd-intro-now { left: 28px; right: 28px; width: auto; bottom: calc(52px + env(safe-area-inset-bottom)); }
+  #page-radio .rd-intro-name { font-size: 44px; }
+  #page-radio .rd-intro-acts { flex-direction: column; align-items: stretch; gap: 14px; }
+  #page-radio .rd-intro-acts .rd-cta { height: 56px; justify-content: center; }
+  #page-radio .rd-poem { display: none; }
+  #page-radio .rd-credit { left: 20px; right: 20px; text-align: center; font-size: 9.5px; }
+  #page-radio .rd-tune { display: none; }
+  #page-radio .radio-now-name { font-size: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #page-radio .rd-glow { animation: none; }
+  #page-radio .radio-cross .reticle-orbit { animation: none; }
+}
+
+
+/* intro 期间隐藏主界面（对应 .pre 状态） */
+#page-radio.pre .radio-panel,
+#page-radio.pre .radio-chips,
+#page-radio.pre .radio-hints,
+#page-radio.pre .radio-clock,
+#page-radio.pre .radio-top-right,
+#page-radio.pre .radio-labels,
+#page-radio.pre .radio-cross,
+#page-radio.pre .radio-dial { opacity: 0; transition: opacity .18s var(--rd-ease); }
+#page-radio.pre .radio-globe-wrap { opacity: .5; transition: opacity .3s var(--rd-ease); }
+#page-radio .radio-panel,
+#page-radio .radio-chips,
+#page-radio .radio-hints,
+#page-radio .radio-clock,
+#page-radio .radio-top-right,
+#page-radio .radio-labels,
+#page-radio .radio-cross { transition: opacity .6s var(--rd-ease) .2s; }
