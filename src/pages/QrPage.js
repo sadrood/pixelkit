@@ -202,6 +202,9 @@ export class QrPage {
                   <option value="2400">2400</option>
                 </select>
               </label>
+              <label title="勾选后页面预览也按物理尺寸显示（需先校准屏幕），10/15/20mil 能直接看出大小差别">
+                <input type="checkbox" id="qr-phys-preview" /> 预览按物理尺寸
+              </label>
               <span class="qr-presets">
                 <button type="button" class="btn btn-sm qr-preset" data-qr-preset="10,mil">10 mil</button>
                 <button type="button" class="btn btn-sm qr-preset" data-qr-preset="20,mil">20 mil</button>
@@ -593,6 +596,16 @@ export class QrPage {
         this._refreshPhysHint();
       });
     });
+    document.getElementById('qr-phys-preview')?.addEventListener('change', (e) => {
+      if (e.target.checked && !this._screenMmPerPx()) {
+        e.target.checked = false;
+        this._physPreviewPending = true;
+        this.toast?.show('先校准屏幕，再按物理尺寸预览', 'error');
+        this._openQrCalib();
+        return;
+      }
+      this._applyDisplaySize();
+    });
     // 文本 / 容错会改变模块数（总模块数 = 整码 / 单模块），提示跟着更新
     const physHintOnChange = () => { if (document.getElementById('qr-size-mode')?.value === 'phys') this._refreshPhysHint(); };
     document.getElementById('qr-text')?.addEventListener('input', physHintOnChange);
@@ -748,6 +761,7 @@ export class QrPage {
       img.dataset.filename = out.phys
         ? `qrcode-${out.phys.label}.${out.ext}`
         : `qrcode-${Date.now()}.${out.ext}`;
+      this._applyDisplaySize();   // 物理预览开启时按新的模块数/物理尺寸重算预览大小
       const dl = document.getElementById('qr-download');
       if (dl) dl.textContent = `⬇ 下载 ${out.ext.toUpperCase()}`;
       document.getElementById('qr-gen-result').style.display = '';
@@ -967,6 +981,8 @@ export class QrPage {
     if (!(rawValue > 0)) { box.textContent = '请输入大于 0 的物理尺寸'; return; }
     const geom = this._physGeometry(this._physPreviewModules(), { ...this._physSettings(), value: rawValue });
     box.textContent = this._physHintText(geom);
+    // 预览按物理尺寸开启时，改 mil 值立即反映到主预览
+    if (document.getElementById('qr-phys-preview')?.checked) this._applyDisplaySize();
     // 第一次切到物理尺寸时 qrcode 库可能还没加载：加载完用真实模块数再刷一次
     if (!this._qrLib && !this._physHintPending) {
       this._physHintPending = true;
@@ -1016,7 +1032,9 @@ export class QrPage {
     const sel = document.getElementById('qr-display-size');
     const customWrap = document.getElementById('qr-display-custom-wrap');
     if (customWrap) customWrap.style.display = sel?.value === 'custom' ? '' : 'none';
-    const px = this._displaySizePx();
+    // 勾了「预览按物理尺寸」且已校准 → 主预览直接用物理像素，10/15/20mil 肉眼可见差别
+    const physPreview = Boolean(document.getElementById('qr-phys-preview')?.checked) && this._screenMmPerPx() > 0;
+    const px = physPreview ? this._qrExportPx() : this._displaySizePx();
     // 只调「生成结果」这几个图；解码预览、记录弹窗保持原样
     ['qr-img', 'sl-qr', 'qr-file-img'].forEach((id) => {
       const img = document.getElementById(id);
@@ -1226,6 +1244,12 @@ export class QrPage {
     try { localStorage.setItem('pixelkit_screen_mm_per_px', String(mmPerPx)); } catch { /* ignore */ }
     this._closeQrCalib();
     this.toast?.show('屏幕已校准', 'success');
+    if (this._physPreviewPending) {
+      this._physPreviewPending = false;
+      const cb = document.getElementById('qr-phys-preview');
+      if (cb) cb.checked = true;
+      this._applyDisplaySize();
+    }
     this._refreshZoomPhys();
   }
 
