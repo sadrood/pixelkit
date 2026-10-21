@@ -242,7 +242,7 @@ export class RadioPage {
     const loading = this.$('radio-globe-loading');
     if (!el || this._loadingGeo || this._globe) return;
     this._loadingGeo = true;
-    this.bootShow('Loading stations…');
+    this.bootShow('正在加载电台…');
     try {
       await this.loadCountryNames();
       // 先加载核心台库（约 500KB，先出图），完整台库随后后台补全
@@ -457,7 +457,7 @@ export class RadioPage {
     const sub = this.$('radio-now-sub');
     const flag = this.flagOf(s.cc);
     const city = (s.state || '').replace(/\s+/g, ' ').trim();
-    const place = [city ? city.toUpperCase() + ', ' : '', s.country || s.cc].filter(Boolean).join(' ');
+    const place = [city ? city + ' · ' : '', this.zhCountry(s.cc) || s.country || s.cc].filter(Boolean).join(' ');
     if (country) country.textContent = place || '未知地区';
     if (name) name.textContent = s.name || '未命名电台';
     if (sub) {
@@ -867,7 +867,7 @@ export class RadioPage {
         list.innerHTML = clusters.map((c, k) => {
           const dy = (k % 2 === 0 ? -62 : 44) + (k % 3) * 8;
           const dx = (k % 2 === 0 ? -1 : 1) * (16 + (k % 3) * 12);
-          return '<span class="nebula-cluster-label" style="left:' + Math.round(c.x + dx) + 'px;top:' + Math.round(c.y + dy) + 'px"><b>' + this.esc((this.ccNames && this.ccNames[c.name]) || (this.genres && this.genres[c.i]) || c.name || '') + '</b><span>' + c.count.toLocaleString('zh-CN') + ' 个电台</span></span>';
+          return '<span class="nebula-cluster-label" style="left:' + Math.round(c.x + dx) + 'px;top:' + Math.round(c.y + dy) + 'px"><b>' + this.esc(this.zhCountry(c.name) || c.name || '') + '</b><span>' + c.count.toLocaleString('zh-CN') + ' 个电台</span></span>';
         }).join('');
         if (leaders) leaders.innerHTML = '';
         return;
@@ -981,19 +981,19 @@ export class RadioPage {
     const place = this.$('rd-intro-place');
     const meta = this.$('rd-intro-meta');
     const cta = this.$('rd-continue');
-    if (k) k.textContent = seen ? '欢迎回来 · 上次听到' : 'Loading stations…';
-    if (name) name.textContent = seen ? (target.name || '') : 'Listen somewhere new.';
+    if (k) k.textContent = seen ? '欢迎回来 · 上次听到' : '正在加载电台…';
+    if (name) name.textContent = seen ? (target.name || '') : '去一个没听过的地方';
     if (place && seen) {
       const flag = this.flagOf(target.cc);
       const city = (target.state || '').replace(/\s+/g, ' ').trim();
-      place.textContent = [city ? city.toUpperCase() + ', ' : '', target.country].filter(Boolean).join(' ');
+      place.textContent = [city ? city + ' · ' : '', this.zhCountry(target.cc) || target.country].filter(Boolean).join(' ');
     }
     if (meta) {
       const genre = this.genres && target.g != null ? this.genres[target.g] : '';
       const lang = this.langs && target.l != null ? this.langs[target.l] : '';
       meta.textContent = [genre, lang, target.bitrate ? target.bitrate + ' KBPS' : '码率未知'].filter(Boolean).join(' · ');
     }
-    if (cta) cta.textContent = seen ? 'Continue listening' : 'Explore the sky';
+    if (cta) cta.textContent = seen ? '继续收听' : '进入星图';
     this.index = this.geoStations.indexOf(target);
     box.hidden = false;
     box.classList.remove('gone');
@@ -1252,6 +1252,10 @@ export class RadioPage {
   }
   stopViz() { if (this._vizRaf) { cancelAnimationFrame(this._vizRaf); this._vizRaf = 0; } }
 
+  zhCountry(cc) {
+    try { if (!this._dn) this._dn = new Intl.DisplayNames(['zh-CN'], { type: 'region' }); return this._dn.of(String(cc || '').toUpperCase()) || cc; } catch { return cc; }
+  }
+
   /* ==================== 设置面板 ==================== */
   getSettings() {
     try { return Object.assign({ autotune: true, autodive: true, reduce: false, hints: true }, JSON.parse(localStorage.getItem('pk_radio_settings') || '{}')); }
@@ -1416,7 +1420,7 @@ export class RadioPage {
     t.textContent = hh + ':' + mm;
     if (w && st) {
       const city = (st.state || '').replace(/\s+/g, ' ').trim().toUpperCase();
-      const head = city ? city + ' · ' + st.country : st.country;
+      const head = city ? city + ' · ' + (this.zhCountry(st.cc) || st.country) : (this.zhCountry(st.cc) || st.country);
       w.textContent = [head, '当地时间'].filter(Boolean).join(' · ');
     }
   }

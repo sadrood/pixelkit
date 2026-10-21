@@ -4208,3 +4208,4 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 @supports not ((mask-image: linear-gradient(#000, #000)) or (-webkit-mask-image: linear-gradient(#000, #000))) {
   #page-radio .radio-chips { -webkit-mask-image: none; mask-image: none; }
 }
+#page-radio .rd-intro-name { font: 400 clamp(32px, 3.6vw, 50px)/1.12 var(--rd-serif) !important; letter-spacing: -.01em; max-width: min(760px, 88vw); }

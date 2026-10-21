@@ -115,6 +115,27 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         const bin = atob(mask);
         const bits = new Uint8Array(bin.length);
         for (let i = 0; i < bin.length; i++) bits[i] = bin.charCodeAt(i);
+        // 陆地/海洋贴图（数据来自 land-mask，可辨认大陆轮廓）
+        const cv = document.createElement('canvas');
+        cv.width = cols; cv.height = rows;
+        const lctx = cv.getContext('2d');
+        const img = lctx.createImageData(cols, rows);
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const idx = r * cols + c;
+            const land = (bits[idx >> 3] >> (idx & 7)) & 1;
+            const o = idx * 4;
+            if (land) { img.data[o] = 34; img.data[o + 1] = 74; img.data[o + 2] = 62; img.data[o + 3] = 255; }
+            else { img.data[o] = 7; img.data[o + 1] = 16; img.data[o + 2] = 14; img.data[o + 3] = 255; }
+          }
+        }
+        lctx.putImageData(img, 0, 0);
+        const landTex = new THREE.CanvasTexture(cv);
+        landTex.colorSpace = THREE.SRGBColorSpace;
+        landTex.anisotropy = 4;
+        earth.material.map = landTex;
+        earth.material.color.set(0xffffff);
+        earth.material.needsUpdate = true;
         const cells = [];
         // 0.5° 掩膜隔点取样（约 1°），约 1.9 万个陆地点
         for (let r = 0; r < rows; r += 2) {
@@ -371,19 +392,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     if (hi !== hoverIndex) {
       hoverIndex = hi;
       canvas.style.cursor = hi >= 0 ? 'pointer' : 'grab';
-      if (hi >= 0) {
-        const arr = pointGeo.attributes.position.array;
-        if (!hoverRing) {
-          hoverRing = new THREE.Mesh(
-            new THREE.RingGeometry(0.02, 0.027, 28),
-            new THREE.MeshBasicMaterial({ color: 0xffe2b8, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false })
-          );
-          world.add(hoverRing);
-        }
-        hoverRing.position.set(arr[hi * 3], arr[hi * 3 + 1], arr[hi * 3 + 2]);
-        hoverRing.lookAt(hoverRing.position.clone().multiplyScalar(2));
-        hoverRing.visible = true;
-      } else if (hoverRing) hoverRing.visible = false;
+
       try { onHover(hi >= 0 ? pointsList[hi] : null, e.clientX, e.clientY); } catch { /* ignore */ }
     } else if (hi >= 0) {
       try { onHover(pointsList[hi], e.clientX, e.clientY); } catch { /* ignore */ }
@@ -409,7 +418,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   let wheelTimer = null;
   const onWheel = (e) => {
     e.preventDefault();
-    camera.position.z = Math.max(1.4, Math.min(6.0, camera.position.z + (e.deltaY > 0 ? 0.2 : -0.2)));
+    camera.position.z = Math.max(0.62, Math.min(6.0, camera.position.z + (e.deltaY > 0 ? 0.2 : -0.2)));
     lastInteract = Date.now();
     applyZoomLevel();
     // 松手停稳 650ms：把最近的一颗星「吸」过来（自动对焦/锁定）
