@@ -1643,7 +1643,8 @@ export class RadioPage {
   autoTuneFromCrosshair() {
     try { if (!this.getSettings().autotune) return; } catch { /* ignore */ }
     if (!this._globe || !this.geoStations.length) return;
-    const i = this._globe.pickCenter ? this._globe.pickCenter() : -1;
+    const picker = this.view === 'nebula' ? this._neb3d : this._globe;
+    const i = picker && picker.pickCenter ? picker.pickCenter() : -1;
     if (i < 0) { this.setHint('准星没对准电台，再拖一点'); return; }
     if (i === this.index) { this.setHint('已锁定 · ' + this.geoStations[i].name); return; }
     this.setIndex(i, true);

@@ -279,10 +279,16 @@ export async function createNebula3D(container, stations, opts = {}) {
   };
   // 跟随鼠标的黑洞已停用：黑洞属于「粒子唱片/星盘」下方
   const setHole = () => { if (points) points.material.uniforms.uHoleOn.value = 0; };
+  let wheelTimer = null;
   const onWheel = (e) => {
     e.preventDefault();
     camDist = Math.max(0.7, Math.min(46, camDist * (e.deltaY > 0 ? 1.12 : 0.89)));
     lastInteract = Date.now();
+    if (wheelTimer) clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(() => {
+      wheelTimer = null;
+      if (!dragging && settleCb) { try { settleCb(); } catch { /* ignore */ } }
+    }, 700);
   };
   canvas.addEventListener('pointermove', (e) => { if (e.buttons === 0) setHole(e.clientX, e.clientY); });
   canvas.addEventListener('pointerleave', () => { if (points) points.material.uniforms.uHoleOn.value = 0; });
