@@ -1431,30 +1431,13 @@ export class RadioPage {
       for (const s2 of arr) {
         if (s2.prec > 0) continue;
         const h = hash(String(s2.id || s2.name));
-        // 优先围绕本国一个真实（有精确坐标的）台散开 0.4~0.9°，保证在本国国土上
-        if (precise.length < 8 && cells.length >= 4) {
-          const cell = cells[h % cells.length];
-          s2.lat = cell[0] + (((h >>> 8) % 1000) / 1000 - 0.5) * 0.8;
-          s2.lon = cell[1] + (((h >>> 18) % 1000) / 1000 - 0.5) * 0.8;
-          moved++;
-          continue;
-        }
-        const seed = precise[h % precise.length];
+        // 规格书 §4.1：只有国家级信息时不得虚构城市位置 → 统一落在国家质心附近（≤0.12°）
         const ang = ((h >>> 9) % 4096) / 4096 * Math.PI * 2;
-        const rr = 0.35 + ((h >>> 21) % 1000) / 1000 * 0.6;
-        let placed = false;
-        for (let k = 0; k < 6; k++) {
-          const q = k === 0 ? 1 : Math.pow(0.65, k);
-          const la = seed.lat + Math.sin(ang) * rr * q;
-          const lo = seed.lon + Math.cos(ang) * rr * q / Math.max(0.3, Math.cos(seed.lat * Math.PI / 180));
-          if (this.isLand(la, lo)) { s2.lat = la; s2.lon = ((lo + 540) % 360) - 180; placed = true; moved++; break; }
-        }
-        if (!placed && cells.length >= 4) {
-          const cell = cells[h % cells.length];
-          s2.lat = cell[0];
-          s2.lon = cell[1];
-          moved++;
-        }
+        const rr = ((h >>> 21) % 1000) / 1000 * 0.12;
+        s2.lat = lat0 + Math.sin(ang) * rr;
+        s2.lon = lon0 + Math.cos(ang) * rr / Math.max(0.3, Math.cos(lat0 * Math.PI / 180));
+        s2.approx = true;
+        moved++;
       }
     }
     try {
