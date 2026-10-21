@@ -108,6 +108,9 @@ export class RadioPage {
     } catch { /* ignore */ }
     // 地球风格切换（点阵 / 写实）
     this.$('rd-settings-close')?.addEventListener('click', () => this.closeSettings());
+    this.$('rd-favs-export')?.addEventListener('click', () => this.exportFavs());
+    this.$('rd-favs-import')?.addEventListener('click', () => this.$('rd-favs-file')?.click());
+    this.$('rd-favs-file')?.addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; this.importFavs(f); e.target.value = ''; });
     this.$('rd-static-close')?.addEventListener('click', () => this.closeStatic());
     document.querySelectorAll('#page-radio .rd-credit-link').forEach((a) => {
       a.addEventListener('click', (e) => { e.preventDefault(); this.openStatic(a.dataset.page || 'about'); });
@@ -1335,6 +1338,56 @@ export class RadioPage {
 
   zhCountry(cc) {
     try { if (!this._dn) this._dn = new Intl.DisplayNames(['zh-CN'], { type: 'region' }); return this._dn.of(String(cc || '').toUpperCase()) || cc; } catch { return cc; }
+  }
+
+  /* ==================== 收藏/进度 导出导入 ==================== */
+  exportFavs() {
+    const favIds = [...(this.favs || [])];
+    const stations = (this.geoStations || []).filter((x) => favIds.includes(String(x.id)));
+    const payload = {
+      app: 'pixelkit-radio',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      favorites: stations.map((x) => ({ id: x.id, name: x.name, url: x.url, cc: x.cc, g: x.g, l: x.l, bitrate: x.bitrate })),
+      progress: {
+        lastStationId: (this.current || {}).id || null,
+        volume: this.volume == null ? 0.8 : this.volume,
+        view: this.view,
+      },
+    };
+    try {
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'pixelkit-radio-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+      this.setHint('已导出 ' + stations.length + ' 个收藏');
+    } catch { this.setHint('导出失败', true); }
+  }
+
+  async importFavs(file) {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      const list = Array.isArray(data) ? data : (data.favorites || []);
+      let added = 0;
+      for (const it of list) {
+        const id = String((it && it.id) || '');
+        if (!id) continue;
+        if (!this.favs.has(id)) { this.favs.add(id); added++; }
+      }
+      try { localStorage.setItem('pk_radio_favs', JSON.stringify([...this.favs])); } catch { /* ignore */ }
+      this.updateFavUI(); this.updateFavCount();
+      const prog = data && data.progress;
+      if (prog) {
+        if (prog.lastStationId) { try { localStorage.setItem('pk_radio_station', String(prog.lastStationId)); } catch { /* ignore */ } }
+        if (typeof prog.volume === 'number' && this.audio) { this.volume = prog.volume; this.audio.volume = prog.volume; }
+      }
+      this.setHint('导入完成，新增 ' + added + ' 个收藏');
+      this.openSaved();
+    } catch (e) { this.setHint('导入失败：文件格式不对', true); }
   }
 
   /* ==================== Genres 流派面板 ==================== */

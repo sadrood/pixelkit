@@ -4398,3 +4398,7 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .rd-genres .rd-record-inner::-webkit-scrollbar-thumb,
 #page-radio .rd-settings .rd-record-inner::-webkit-scrollbar-thumb,
 #page-radio .rd-static .rd-record-inner::-webkit-scrollbar-thumb { background: #f5f1e833; border-radius: 3px; }
+#page-radio .rd-srow-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+#page-radio .rd-actions-btns { display: flex; gap: 8px; flex: 0 0 auto; }
+#page-radio .rd-mini-btn { height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid #f5f1e833; background: #f5f1e80a; color: var(--rd-ink); font: 400 12px var(--rd-sans); cursor: pointer; }
+#page-radio .rd-mini-btn:hover { border-color: #f5f1e880; background: #f5f1e814; }
