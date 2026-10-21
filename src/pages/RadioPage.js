@@ -240,6 +240,12 @@ export class RadioPage {
         }
       }, 4000);
     }
+    try {
+      const cores = navigator.hardwareConcurrency || 8;
+      const mem = navigator.deviceMemory || 4;
+      this._lowEnd = cores <= 4 || mem <= 2;
+      if (this._lowEnd) console.log('[radio] 低端机模式：粒子分档');
+    } catch { this._lowEnd = false; }
     this.ensureSpaceBackground();
     this.loadFilters();
     this.loadListStations();
@@ -280,6 +286,7 @@ export class RadioPage {
         tooltipEl: this.$('radio-globe-tip'),
         onPick: (s) => this.onGlobePick(s),
         onHover: (s, x, y) => this.onHover(s, x, y),
+        lowEnd: !!this._lowEnd,
       };
       try {
         // 首选自研 Three.js 3D 地球（贴图 + 大气 + 飞线 + 分级光点 + 飞入动画）
@@ -737,6 +744,7 @@ export class RadioPage {
               genres: this.genres,
               onPick: (st) => this.onGlobePick(st),
               onHover: (st, x, y) => this.onHover(st, x, y),
+              lowEnd: !!this._lowEnd,
             });
             this._neb3d.onSettle?.(() => {
               try { const i = this._neb3d.pickCenter(); if (i >= 0) this.setIndex(i, true); } catch { /* ignore */ }

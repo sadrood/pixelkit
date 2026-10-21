@@ -12,6 +12,7 @@ const POINT_COLORS = ['#8FA39C', '#E8A9A0', '#D99A7E', '#7FC8C0', '#9DB4D6', '#D
 
 export async function createRadioGlobe(container, stations, opts = {}) {
   const THREE = await import(/* @vite-ignore */ THREE_URL);
+  const lowEnd = Boolean(opts && opts.lowEnd);
   const mobile = window.matchMedia('(max-width: 720px)').matches;
   const onPick = opts.onPick || (() => {});
   const onHover = opts.onHover || (() => {});
@@ -25,7 +26,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   camera.position.set(0, 0.15, START_Z);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowEnd ? 1.25 : 2));
   renderer.setClearColor(0x000000, 0);
   if ('outputColorSpace' in renderer && THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
   const canvas = renderer.domElement;
@@ -35,7 +36,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
 
   // Bloom：把渲染结果画到模糊叠加层（低成本辉光）
   const bloom = document.createElement('canvas');
-  bloom.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen;filter:blur(14px) saturate(1.2);opacity:.32;z-index:0';
+  bloom.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen;filter:blur(12px) saturate(1.15);opacity:.22;z-index:0';
   container.style.position = 'absolute';
   container.style.inset = '0';
   container.appendChild(bloom);
@@ -347,7 +348,9 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         const power = (s.pop || 0) * 10 + (s.bitrate >= 128 ? 6 : s.bitrate >= 64 ? 4 : s.bitrate ? 2 : 0);
         return power >= minPower;
       });
-      buildPoints(strong.length > 1200 ? strong : stations, 0.55);
+      let pick = strong.length > 1200 ? strong : stations;
+      if (lowEnd && pick.length > 14000) { pick = pick.slice().sort((a, b) => (b.pop || 0) - (a.pop || 0)).slice(0, 14000); }
+      buildPoints(pick, 0.55);
       if (points) { points.material.size = lvl === 0 ? (mobile ? 0.016 : 0.009) : (mobile ? 0.022 : 0.014); points.material.opacity = lvl === 0 ? 0.42 : 0.62; }
       if (landLayer) landLayer.visible = true;
     }

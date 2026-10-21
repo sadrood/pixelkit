@@ -18,6 +18,7 @@ const GENRE_TINTS = [
 export async function createNebula3D(container, stations, opts = {}) {
   const THREE = await threePromise;
   const mobile = window.matchMedia('(max-width: 720px)').matches;
+  const lowEnd = Boolean(opts.lowEnd);
   const onPick = opts.onPick || (() => {});
   const onHover = opts.onHover || (() => {});
 
@@ -113,6 +114,7 @@ export async function createNebula3D(container, stations, opts = {}) {
   let stationsRef = [];
   let posArr = null;
   let counts = new Array(nGenre).fill(0);
+  let drawnCount = 0;
   let skyClusters = [];
 
   function rebuild(list) {
@@ -157,6 +159,7 @@ export async function createNebula3D(container, stations, opts = {}) {
     }
     for (let i = 0; i < n; i++) {
       const s = stationsRef[i];
+      if (lowEnd && (i % 3) !== 0) { size[i] = 0; phase[i] = 0; continue; }
       const g = (s.g || 0) % nGenre;
       counts[g] += 1;
       const ccGroup = countryCenters.get(s.cc || '??') || { v: new THREE.Vector3(0, 0, 0), n };
@@ -182,6 +185,8 @@ export async function createNebula3D(container, stations, opts = {}) {
       size[i] = 0.17 + ((h >>> 17) % 100) / 100 * 0.26;
       phase[i] = ((h >>> 7) % 1000) / 1000 * Math.PI * 2;
     }
+    drawnCount = 0;
+    for (let i = 0; i < count; i++) if (size[i] > 0) drawnCount += 1;
     posArr = pos;
     if (points) { scene.remove(points); points.geometry.dispose(); points.material.dispose(); }
     const geo = new THREE.BufferGeometry();
@@ -474,7 +479,7 @@ export async function createNebula3D(container, stations, opts = {}) {
       lastInteract = Date.now();
     },
     getClusterLabels,
-    debug() { return { mode: 'nebula3d', n: stationsRef.length, camDist, camYaw, camPitch }; },
+    debug() { return { mode: 'nebula3d', n: stationsRef.length, drawn: drawnCount, camDist, camYaw, camPitch }; },
     dispose() {
       disposed = true;
       cancelAnimationFrame(raf);
