@@ -1946,19 +1946,43 @@ export class RadioPage {
   renderSearchList(kw) {
     const list = this.$('radio-q-list');
     if (!list) return;
-    const k = kw.toLowerCase();
-    if (!k) { list.hidden = true; list.innerHTML = ''; return; }
-    const hits = [];
-    for (let i = 0; i < this.geoStations.length && hits.length < 12; i++) {
+    const raw = String(kw || '').trim();
+    if (!raw) { list.hidden = true; list.innerHTML = ''; return; }
+    const norm = (t) => String(t || '').toLowerCase().replace(/[\s\-_.,·/|()（）\[\]【】]+/g, '');
+    const key = norm(raw);
+    const isLatin = /^[a-z0-9]+$/i.test(key);
+    const subseq = (hay, needle) => {
+      let i = 0;
+      for (let j = 0; j < hay.length && i < needle.length; j++) if (hay[j] === needle[i]) i++;
+      return i === needle.length;
+    };
+    const scored = [];
+    for (let i = 0; i < this.geoStations.length; i++) {
       const s = this.geoStations[i];
-      const hay = (s.name + ' ' + (s.country || '') + ' ' + (s.cc || '') + ' ' + (s.tags || []).join(',')).toLowerCase();
-      if (hay.includes(k)) hits.push({ s, i });
+      const cc = String(s.cc || '').toUpperCase();
+      const zh = this.zhCountry ? this.zhCountry(cc) : '';
+      const genre = this.genres && s.g != null ? this.genres[s.g] : '';
+      const genreEn = this.genresEn && s.g != null ? this.genresEn[s.g] : '';
+      const name = String(s.name || '');
+      const nameN = norm(name);
+      const hayRaw = (name + ' ' + (s.country || '') + ' ' + cc + ' ' + zh + ' ' + genre + ' ' + genreEn + ' ' + (s.tags || []).join(',')).toLowerCase();
+      const hayN = norm(hayRaw);
+      let score = -1;
+      if (nameN.startsWith(key)) score = 0;
+      else if (nameN.includes(key)) score = 1;
+      else if (hayN.includes(key)) score = 2;
+      else if (isLatin && key.length >= 3 && subseq(nameN, key)) score = 3;
+      if (score < 0) continue;
+      scored.push({ s, i, score, pop: s.pop || 0 });
+      if (scored.length > 400) break;
     }
+    scored.sort((a, b) => (a.score - b.score) || (b.pop - a.pop));
+    const hits = scored.slice(0, 12);
     if (!hits.length) { list.innerHTML = '<div class="radio-q-empty">没有匹配的电台</div>'; list.hidden = false; return; }
-    list.innerHTML = hits.map(({ s, i }) => `<button class="radio-q-item" data-i="${i}" type="button">
-      <b>${this.esc(s.name)}</b>
-      <small>${this.esc([s.country, s.cc, (s.tags || []).slice(0, 2).join(' / ')].filter(Boolean).join(' · '))}</small>
-    </button>`).join('');
+    list.innerHTML = hits.map(({ s }) => '<button class="radio-q-item" data-i="' + this.geoStations.indexOf(s) + '" type="button">' +
+      '<b>' + this.esc(s.name) + '</b>' +
+      '<small>' + this.esc([this.zhCountry(s.cc) || s.country, (this.genres && s.g != null ? this.genres[s.g] : ''), (s.tags || []).slice(0, 1).join('')].filter(Boolean).join(' · ')) + '</small>' +
+      '</button>').join('');
     list.hidden = false;
     list.querySelectorAll('.radio-q-item').forEach((el) => {
       el.onclick = () => {
