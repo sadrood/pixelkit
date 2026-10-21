@@ -109,6 +109,7 @@ export class RadioPage {
     } catch { /* ignore */ }
     // 地球风格切换（点阵 / 写实）
     this.$('rd-settings-close')?.addEventListener('click', () => this.closeSettings());
+    this.$('rd-data-info')?.addEventListener('click', () => { this.closeSettings(); this.openStatic('about'); });
     this.$('rd-favs-export')?.addEventListener('click', () => this.exportFavs());
     this.$('rd-favs-import')?.addEventListener('click', () => this.$('rd-favs-file')?.click());
     this.$('rd-favs-file')?.addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; this.importFavs(f); e.target.value = ''; });
@@ -401,7 +402,7 @@ export class RadioPage {
     if (typeof x === 'number') this._hoverX = x;
     if (typeof y === 'number') this._hoverY = y;
     if (!station) { tip.style.display = 'none'; return; }
-    tip.textContent = station.name || '';
+    tip.textContent = (station.name || '') + ' · ' + this.precLabel(station);
     tip.style.display = 'block';
     const stage = this.$('radio-globe-wrap');
     const rect = stage ? stage.getBoundingClientRect() : { left: 0, top: 0 };
@@ -505,7 +506,7 @@ export class RadioPage {
     if (sub) {
       const genre = this.genres && s.g != null ? (this.genres[s.g] || '') : '';
       const lang = this.langs && s.l != null ? (this.langs[s.l] || '') : '';
-      sub.textContent = [genre, lang, s.bitrate ? s.bitrate + ' KBPS' : '码率未知'].filter(Boolean).join(' · ');
+      sub.textContent = [genre, lang, s.bitrate ? s.bitrate + ' KBPS' : '码率未知', this.precLabel(s)].filter(Boolean).join(' · ');
     }
     const tuneName = this.$('rd-tune-name');
     if (tuneName) tuneName.textContent = s.name || '';
@@ -1339,6 +1340,14 @@ export class RadioPage {
 
   zhCountry(cc) {
     try { if (!this._dn) this._dn = new Intl.DisplayNames(['zh-CN'], { type: 'region' }); return this._dn.of(String(cc || '').toUpperCase()) || cc; } catch { return cc; }
+  }
+
+  /** 坐标精度说明（诚实标注数据可信度） */
+  precLabel(st) {
+    const p = st && st.prec;
+    if (p >= 2) return '城市级坐标';
+    if (p === 1) return '州省近似坐标';
+    return '国家级近似坐标';
   }
 
   /* ==================== 收藏/进度 导出导入 ==================== */

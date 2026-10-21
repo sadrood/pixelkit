@@ -108,6 +108,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
 
   /* ---------- 陆地点阵（球面细点纹理，RoamDial 观感） ---------- */
   let landLayer = null;
+  let landOutline = null;
   fetch('/data/land-mask.json', { cache: 'force-cache' })
     .then((r) => r.json())
     .then((m) => {
@@ -138,6 +139,51 @@ export async function createRadioGlobe(container, stations, opts = {}) {
           depthWrite: false, sizeAttenuation: true,
         }));
         world.add(landLayer);
+
+        // 海岸线等值线（marching squares，与电台/陆地点同一投影）
+        try {
+          const segs = [];
+          const bitAt = (cc, rr) => {
+            if (rr < 0 || rr >= rows || cc < 0 || cc >= cols) return 0;
+            const idx2 = rr * cols + cc;
+            return (bits[idx2 >> 3] >> (idx2 & 7)) & 1;
+          };
+          const toV = (lat, lon) => {
+            const v = toVec3(lat, lon, EARTH_R * 1.02);
+            return [v.x, v.y, v.z];
+          };
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              const tl = bitAt(c, r), tr = bitAt(c + 1, r), br = bitAt(c + 1, r + 1), bl = bitAt(c, r + 1);
+              if (tl === tr && tr === br && br === bl) continue;
+              const latTop = 90 - r * step, latBot = 90 - (r + 1) * step;
+              const lonL = -180 + c * step, lonM = lonL + step / 2, lonR = lonL + step;
+              const latM = (latTop + latBot) / 2;
+              const pts = [];
+              if (tl !== tr) pts.push([latTop, lonM]);
+              if (tr !== br) pts.push([latM, lonR]);
+              if (br !== bl) pts.push([latBot, lonM]);
+              if (bl !== tl) pts.push([latM, lonL]);
+              if (pts.length >= 2) {
+                const a = toV(pts[0][0], pts[0][1]);
+                const b2 = toV(pts[1][0], pts[1][1]);
+                segs.push(a[0], a[1], a[2], b2[0], b2[1], b2[2]);
+                if (pts.length === 4) {
+                  const c2 = toV(pts[2][0], pts[2][1]);
+                  const d2 = toV(pts[3][0], pts[3][1]);
+                  segs.push(c2[0], c2[1], c2[2], d2[0], d2[1], d2[2]);
+                }
+              }
+            }
+          }
+          if (segs.length) {
+            const lg = new THREE.BufferGeometry();
+            lg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(segs), 3));
+            landOutline = new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x9fd6c0, transparent: true, opacity: 0.45, depthWrite: false }));
+            world.add(landOutline);
+            console.log('[radio] 海岸线：' + (segs.length / 6) + ' 段');
+          }
+        } catch (e) { console.warn('海岸线失败', e); }
         console.log('[radio] 陆地点阵：' + n + ' 点');
 
       } catch (e) { /* ignore */ }
@@ -319,6 +365,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       buildPoints(near.length > 60 ? near : stations, 3.2);
       if (points) { points.material.size = mobile ? 0.009 : 0.006; points.material.opacity = 0.5; }
       if (landLayer) landLayer.visible = false;
+      if (landOutline) landOutline.visible = false;
       return;
     }
     if (lvl === 2) {
@@ -353,6 +400,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       buildPoints(pick, 0.55);
       if (points) { points.material.size = lvl === 0 ? (mobile ? 0.016 : 0.009) : (mobile ? 0.022 : 0.014); points.material.opacity = lvl === 0 ? 0.42 : 0.62; }
       if (landLayer) landLayer.visible = true;
+      if (landOutline) landOutline.visible = true;
     }
   }
   applyZoomLevel();
