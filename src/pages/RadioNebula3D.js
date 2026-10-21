@@ -247,12 +247,23 @@ export async function createNebula3D(container, stations, opts = {}) {
   const ndc = new THREE.Vector2();
   const tmpV = new THREE.Vector3();
 
+  const pointers = new Map();
+  let pinchStart = 0, pinchD0 = 0;
   const onDown = (e) => {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinchStart = Math.hypot(a.x - b.x, a.y - b.y); pinchD0 = camDist; dragging = false; return; }
     dragging = true; moved = 0; lastX = e.clientX; lastY = e.clientY;
     lastInteract = Date.now(); canvas.style.cursor = 'grabbing';
     try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
   };
   const onMove = (e) => {
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size >= 2) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchStart > 0 && d > 0) { camDist = Math.max(0.7, Math.min(46, pinchD0 * (pinchStart / d))); lastInteract = Date.now(); }
+      return;
+    }
     if (!dragging) {
       // 悬停提示
       const i = pickAt(e.clientX, e.clientY, true);
@@ -268,6 +279,9 @@ export async function createNebula3D(container, stations, opts = {}) {
     lastInteract = Date.now();
   };
   const onUp = (e) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size === 1) { const p1 = [...pointers.values()][0]; lastX = p1.x; lastY = p1.y; dragging = true; return; }
+    pinchStart = 0;
     dragging = false; canvas.style.cursor = 'grab';
     if (moved >= 6) {
       if (settleTimer) clearTimeout(settleTimer);

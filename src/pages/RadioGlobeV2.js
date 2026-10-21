@@ -372,13 +372,28 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     const hits = raycaster.intersectObject(points, false);
     return hits.length ? hits[0].index : -1;
   };
+  const pointers = new Map();
+  let pinchStart = 0, pinchZ0 = 0;
   const onDown = (e) => {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinchStart = Math.hypot(a.x - b.x, a.y - b.y); pinchZ0 = camera.position.z; dragging = false; return; }
     dragging = true;
     focusTarget = null; moved = 0; lastX = e.clientX; lastY = e.clientY;
     lastInteract = Date.now(); canvas.style.cursor = 'grabbing';
     try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
   };
   const onMove = (e) => {
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size >= 2) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchStart > 0 && d > 0) {
+        camera.position.z = Math.max(1.28, Math.min(6, pinchZ0 * (pinchStart / d)));
+        applyZoomLevel();
+        lastInteract = Date.now();
+      }
+      return;
+    }
     if (dragging) {
       const dx = e.clientX - lastX, dy = e.clientY - lastY;
       moved += Math.abs(dx) + Math.abs(dy);
@@ -403,6 +418,9 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     }
   };
   const onUp = (e) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size === 1) { const p1 = [...pointers.values()][0]; lastX = p1.x; lastY = p1.y; dragging = true; return; }
+    pinchStart = 0;
     dragging = false; canvas.style.cursor = 'grab';
     if (moved >= 6) {
       if (settleTimer) clearTimeout(settleTimer);

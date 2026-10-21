@@ -318,6 +318,14 @@ export class RadioPage {
           });
         }
       } catch { /* ignore */ }
+      // 移动端/桌面：双击进入（介绍页）或锁定播放（工作区）
+      try {
+        this.$('radio-stage')?.addEventListener('dblclick', () => {
+          const box = this.$('rd-intro');
+          if (box && !box.hidden) { this.$('rd-continue')?.click(); return; }
+          this.autoTuneFromCrosshair();
+        });
+      } catch { /* ignore */ }
       this.loadFullStations();
       // 预热星云模块（用户切过去时不用等）
       import('./RadioNebula3D.js').catch(() => {});
