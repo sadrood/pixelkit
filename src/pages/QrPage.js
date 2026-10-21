@@ -1301,6 +1301,14 @@ export class QrPage {
     return this._displaySizePx();
   }
 
+  _isDarkColor(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+    if (!m) return false;
+    const n = parseInt(m[1], 16);
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    return (0.299 * r + 0.587 * g + 0.114 * b) < 128;
+  }
+
   _openQrBg() {
     if (!this._lastDataUrl) { this.toast?.show('先生成二维码', 'error'); return; }
     const box = document.getElementById('qr-bg');
@@ -1308,9 +1316,13 @@ export class QrPage {
     const { w, h } = this._qrBgDims();
     const px = this._qrExportPx();
     const phys = document.getElementById('qr-size-mode')?.value === 'phys' && this._screenMmPerPx() > 0;
+    const bg = document.getElementById('qr-bg-color')?.value || '#ffffff';
+    const darkNote = this._isDarkColor(bg) && (Number(document.getElementById('qr-margin')?.value) || 0) === 0
+      ? ' 深色背景下会自动在二维码外加 2 个模块的白边（静区），否则扫码器/解码器识别不了。'
+      : '';
     const desc = document.getElementById('qr-bg-desc');
     if (desc) {
-      desc.textContent = `画布 = 当前屏幕 ${w}×${h}px；二维码 ${px}px（${phys ? '按物理尺寸' : '按显示大小'}，居中），其余填充背景色。存相册全屏看时二维码保持这个大小${phys ? '（即 20mil 的物理大小）' : ''}。`;
+      desc.textContent = `画布 = 当前屏幕 ${w}×${h}px；二维码 ${px}px（${phys ? '按物理尺寸' : '按显示大小'}，居中），其余填充背景色。存相册全屏看时二维码保持这个大小${phys ? '（即 20mil 的物理大小）' : ''}。${darkNote}`;
     }
     box.classList.add('open');
     box.setAttribute('aria-hidden', 'false');
@@ -1342,8 +1354,20 @@ export class QrPage {
     const bg = document.getElementById('qr-bg-color')?.value || '#ffffff';
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, w, h);
+    const x = Math.round((w - qrDev) / 2);
+    const y = Math.round((h - qrDev) / 2);
+    // 深色背景 + 无留白：二维码外面补 2 个模块白边（静区），否则解码器识别不了
+    const marginVal = Number(document.getElementById('qr-margin')?.value) || 0;
+    const totalModules = this._lastTotal || ((this._lastModules || 21) + 8);
+    const quiet = this._isDarkColor(bg) && marginVal === 0
+      ? Math.max(1, Math.round((qrDev / totalModules) * 2))
+      : 0;
+    if (quiet > 0) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x - quiet, y - quiet, qrDev + quiet * 2, qrDev + quiet * 2);
+    }
     ctx.imageSmoothingEnabled = false;   // 保持二维码模块边缘清晰
-    ctx.drawImage(img, Math.round((w - qrDev) / 2), Math.round((h - qrDev) / 2), qrDev, qrDev);
+    ctx.drawImage(img, x, y, qrDev, qrDev);
     const a = document.createElement('a');
     a.href = canvas.toDataURL('image/png');
     a.download = `qrcode-screen-${px}px-${String(bg).replace('#', '')}.png`;
