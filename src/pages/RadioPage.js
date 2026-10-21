@@ -370,7 +370,7 @@ export class RadioPage {
     if (i >= 0) { this.index = i; this.syncSlider(); }
     this.playStation(station);
     this.openDial(station);
-    try { this._globe?.focus?.(station); } catch { /* ignore */ }
+    try { this._globe?.focus?.(this.resolveGeoStation(station)); } catch { /* ignore */ }
     try { if (this.view === 'nebula') this._neb3d?.flyToStation?.(station); else this._globe?.zoomTo?.(1.45, 0.4); } catch { /* ignore */ }
   }
 
@@ -454,7 +454,7 @@ export class RadioPage {
     const s = this.geoStations[idx];
     this.setNowPlaying(s);
     // 预览（play=false）时不移动镜头，保持初始的全球视角；切台才聚焦
-    try { this._globe?.setSelected(s); if (play) this._globe?.focus?.(s); } catch { /* ignore */ }
+    try { this._globe?.setSelected(s); if (play) this._globe?.focus?.(this.resolveGeoStation(s)); } catch { /* ignore */ }
     if (play) { try { this.playTuneStatic('switch'); } catch { /* ignore */ } }
     this.syncSlider();
     this.setHint(`第 ${idx + 1} / ${n} 个 · ${[s.country, s.codec, s.bitrate ? s.bitrate + 'kbps' : ''].filter(Boolean).join(' · ')}`);

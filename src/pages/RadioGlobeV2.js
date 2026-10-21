@@ -550,6 +550,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     mode: 'custom3d',
     focus(station) {
       if (!station || !isFinite(station.lat) || !isFinite(station.lon)) return;
+      if (Math.abs(station.lat) < 0.01 && Math.abs(station.lon) < 0.01) return; // 无坐标不要对准 0,0 海上
       // 平滑转过去，让这台出现在准星附近（一次动画，不会持续旋转）
       const theta = (station.lon + 180) * Math.PI / 180;
       focusTarget = {
