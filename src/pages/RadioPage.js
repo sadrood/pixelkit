@@ -1434,10 +1434,24 @@ export class RadioPage {
     const zh = this.zhCountry ? this : this;
     if (kind === 'privacy') {
       if (title) title.textContent = '隐私';
-      if (body) body.innerHTML = '<p><b>数据</b>：电台目录来自 Radio Browser 公共 API，地理数据来自 GeoNames。</p><p><b>本地存储</b>：音量、收藏、上次收听、视图偏好只存在你的浏览器 localStorage（pk_radio_* 键），不会上传。</p><p><b>音频</b>：音频流由各电台服务器直接提供，我们只做代理中转，不保存节目内容。</p><p><b>统计</b>：不使用第三方统计脚本。</p>';
+      if (body) body.innerHTML =
+        '<p><b>数据来源</b>：电台目录来自 <b>Radio Browser</b> 公共 API（社区维护），国家/地区名称参考 <b>GeoNames</b>，陆地轮廓基于 Natural Earth 50m 数据。本站不拥有这些数据。</p>' +
+        '<p><b>本地存储</b>：只保存在你的浏览器 localStorage，键名前缀 <code>pk_radio_</code>（音量、收藏、上次收听、上次固定、视图偏好、设置 <code>pk_radio_settings</code>）。不会上传到服务器，换设备需用「设置 → 收藏与进度」导出/导入。</p>' +
+        '<p><b>音频</b>：音频流由各电台服务器直接提供，本站仅做 CORS/跨域代理中转，不解码、不缓存、不录音、不分析节目内容。</p>' +
+        '<p><b>日志</b>：服务器仅保留常规访问日志与接口错误日志，用于排查问题，不用于用户画像。</p>' +
+        '<p><b>统计与账号</b>：无第三方统计脚本、无广告、无账号体系、无跨站跟踪。</p>' +
+        '<p><b>坐标精度</b>：34,540 个电台中 9,025 个有真实经纬度、4,156 个仅有州/省级近似、21,359 个仅有国家级近似；近似电台不用于宣称具体城市位置。</p>' +
+        '<p><b>免责声明</b>：电台内容版权归各电台/版权方所有；如权利人认为存在侵权，请联系站点管理员下线相关条目。</p>' +
+        '<p style="color:#b3c1b7;font-size:12px">更新于 2026-10-21 · RoamSky</p>';
     } else {
       if (title) title.textContent = '关于';
-      if (body) body.innerHTML = '<p><b>RoamSky</b> 是一个「随机听世界」的电台漫游工具：星图与地球上每个光点都是一个真实电台。</p><p>拖动星图、滚轮拉近，准星停稳会自动收听最近的电台；按 <b>G</b> 可在星图与地球之间切换。</p><p>电台目录来自 <b>Radio Browser</b>，地理信息来自 <b>GeoNames</b>。</p>';
+      if (body) body.innerHTML =
+        '<p><b>RoamSky</b> 是一个「随机听世界」的电台漫游工具：星图与地球上每个光点都是一个真实电台，拖动/缩放/准星停稳即可收听。</p>' +
+        '<p><b>怎么玩</b>：拖动星图或地球旋转，滚轮/双指缩放；准星停稳 0.7–1.1 秒自动锁定最近的电台并播放；按 <b>G</b> 在星图与地球间切换，<b>/</b> 搜索，<b>F</b> 收藏，<b>空格</b> 播放/暂停。</p>' +
+        '<p><b>数据规模</b>：34,540 个电台 / 167 个国家与地区；其中 9,025 个有真实坐标（城市级），4,156 个州/省级近似，21,359 个国家级近似。</p>' +
+        '<p><b>数据来源</b>：Radio Browser（目录与流地址）、GeoNames（地名），Natural Earth（陆地轮廓）。本站为个人项目，与上述组织无隶属关系。</p>' +
+        '<p><b>技术</b>：前端原生 ES Module + Three.js（自研点云地球与 3D 星云），后端 Node.js 提供音频代理与目录缓存。</p>' +
+        '<p style="color:#b3c1b7;font-size:12px">版本 v' + (this._version || '1.0.0') + ' · 更新于 2026-10-21</p>';
     }
     box.hidden = false;
     requestAnimationFrame(() => box.classList.add('shown'));
