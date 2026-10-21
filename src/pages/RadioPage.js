@@ -897,8 +897,11 @@ export class RadioPage {
       for (let k = 0; k < Math.min(MAX, labels.length); k++) {
         const l = labels[k];
         if (l.x < -30 || l.x > w + 30 || l.y < -30 || l.y > h + 30) continue;
-        const angle = -2.2 + k * (Math.PI * 2 / MAX) * 0.85;
-        const radius = 208 + (k % 3) * 52 + Math.floor(k / 3) * 16;
+        // 先按角度排序，再沿环均匀摆放：引线不交叉、标签不重叠
+        labels.sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+        const spot = labels.indexOf(l);
+        const angle = -Math.PI / 2 + spot * (Math.PI * 2 / Math.min(MAX, labels.length));
+        const radius = 200 + (spot % 3) * 56;
         const lx = cx + Math.cos(angle) * radius;
         const ly = cy + Math.sin(angle) * radius * 0.72;
         // 避开底部信息面板 / 顶部按钮区 / 中央调谐文字区

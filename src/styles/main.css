@@ -2976,6 +2976,27 @@ body::before {
 #page-qr .qr-calib-range-label input { flex: 1; accent-color: var(--primary); }
 #page-qr .qr-calib-value { font-size: 12px; color: var(--text-muted); }
 #page-qr .qr-calib-actions { display: flex; gap: 10px; justify-content: flex-end; }
+/* 2026-10-21：整屏背景图导出（二维码保持大小，其余填白/黑背景） */
+#page-qr .qr-bg {
+  display: none; position: fixed; inset: 0; z-index: 3100;
+  background: rgba(0, 0, 0, .72); backdrop-filter: blur(4px);
+  align-items: center; justify-content: center; padding: 20px;
+}
+#page-qr .qr-bg.open { display: flex; }
+#page-qr .qr-bg-box {
+  width: 100%; max-width: 520px; padding: 20px; border-radius: 14px;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 12px;
+}
+#page-qr .qr-bg-box h3 { font-size: 16px; }
+#page-qr .qr-bg-box p { font-size: 13px; line-height: 1.6; color: var(--text-secondary); }
+#page-qr .qr-bg-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); }
+#page-qr .qr-bg-row label { display: inline-flex; align-items: center; gap: 8px; }
+#page-qr .qr-bg-row input[type="color"] {
+  width: 34px; height: 26px; padding: 0; border: 1px solid var(--border);
+  border-radius: 6px; background: none; cursor: pointer;
+}
+#page-qr .qr-bg-actions { display: flex; gap: 10px; justify-content: flex-end; }
 @media (max-width: 720px) {
   #page-qr .qr-zoom { padding: 14px; gap: 12px; }
   #page-qr .qr-zoom-bar { gap: 10px; padding: 8px 12px; }
@@ -2983,6 +3004,7 @@ body::before {
   #page-qr .qr-zoom-note { display: none; }
   #page-qr .qr-calib-box { padding: 16px; }
   #page-qr .qr-calib-bar { height: 84px; }
+  #page-qr .qr-bg-box { padding: 16px; }
 }
 /* ============================================================================
    2026-10-13：批量解码 / 批量扫码（参考草料二维码）

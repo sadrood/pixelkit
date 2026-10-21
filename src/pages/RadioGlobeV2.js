@@ -345,7 +345,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         const power = (s.pop || 0) * 10 + (s.bitrate >= 128 ? 6 : s.bitrate >= 64 ? 4 : s.bitrate ? 2 : 0);
         return power >= minPower;
       });
-      buildPoints(strong.length > 1200 ? strong : stations);
+      buildPoints(strong.length > 1200 ? strong : stations, 0.55);
       if (points) points.material.size = lvl === 0 ? (mobile ? 0.02 : 0.012) : (mobile ? 0.028 : 0.018);
       if (landLayer) landLayer.visible = true;
     }

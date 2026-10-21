@@ -279,6 +279,7 @@ export class QrPage {
             <button class="btn btn-sm" id="qr-download">⬇ 下载 PNG</button>
             <button class="btn btn-sm" id="qr-save-gen">💾 存记录</button>
             <button class="btn btn-sm" id="qr-zoom-open">⛶ 单独显示</button>
+            <button class="btn btn-sm" id="qr-bg-open" title="整屏画布，二维码保持当前显示大小，其余填白/黑背景">🖼 背景画布</button>
           </div>
         </div>
       </div>
@@ -487,6 +488,23 @@ export class QrPage {
         </div>
       </div>
 
+      <!-- 2026-10-21：整屏背景图导出（二维码保持显示大小，其余填背景色，相册/壁纸用） -->
+      <div class="qr-bg" id="qr-bg" aria-hidden="true">
+        <div class="qr-bg-box">
+          <h3>导出整屏背景图</h3>
+          <p id="qr-bg-desc"></p>
+          <div class="qr-bg-row">
+            <label>背景色 <input type="color" id="qr-bg-color" value="#ffffff" /></label>
+            <button type="button" class="btn btn-sm" id="qr-bg-white">纯白</button>
+            <button type="button" class="btn btn-sm" id="qr-bg-black">纯黑</button>
+          </div>
+          <div class="qr-bg-actions">
+            <button type="button" class="btn btn-sm btn-primary" id="qr-bg-download">下载 PNG</button>
+            <button type="button" class="btn btn-sm" id="qr-bg-cancel">取消</button>
+          </div>
+        </div>
+      </div>
+
       <!-- 2026-10-21：屏幕校准（物体比对 / 按屏幕对角线推算），用于「按物理尺寸显示」 -->
       <div class="qr-calib" id="qr-calib" aria-hidden="true">
         <div class="qr-calib-box">
@@ -616,8 +634,22 @@ export class QrPage {
     });
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
+      if (document.getElementById('qr-bg')?.classList.contains('open')) { this._closeQrBg(); return; }
       if (document.getElementById('qr-calib')?.classList.contains('open')) { this._closeQrCalib(); return; }
       this._closeQrZoom();
+    });
+    // 2026-10-21：整屏背景图（二维码保持显示大小，其余填白/黑背景，相册/壁纸用）
+    document.getElementById('qr-bg-open')?.addEventListener('click', () => this._openQrBg());
+    document.getElementById('qr-bg-cancel')?.addEventListener('click', () => this._closeQrBg());
+    document.getElementById('qr-bg-download')?.addEventListener('click', () => this._downloadQrBg());
+    document.getElementById('qr-bg')?.addEventListener('click', (e) => {
+      if (e.target.id === 'qr-bg') this._closeQrBg();
+    });
+    document.getElementById('qr-bg-white')?.addEventListener('click', () => {
+      const c = document.getElementById('qr-bg-color'); if (c) c.value = '#ffffff';
+    });
+    document.getElementById('qr-bg-black')?.addEventListener('click', () => {
+      const c = document.getElementById('qr-bg-color'); if (c) c.value = '#000000';
     });
 
     // 生成一维码
@@ -1056,7 +1088,8 @@ export class QrPage {
 
   _syncBodyLock() {
     const open = document.getElementById('qr-zoom')?.classList.contains('open')
-      || document.getElementById('qr-calib')?.classList.contains('open');
+      || document.getElementById('qr-calib')?.classList.contains('open')
+      || document.getElementById('qr-bg')?.classList.contains('open');
     document.body.style.overflow = open ? 'hidden' : '';
   }
 
@@ -1240,6 +1273,83 @@ export class QrPage {
     if (perModule < 1) { text += ' · ⚠ 每模块 <1 屏幕像素，无法显示/扫描'; warn = true; }
     else if (perModule < 2) { text += ' · ⚠ 每模块不足 2px，可能扫不出'; warn = true; }
     if (note) { note.textContent = text; note.classList.toggle('is-warn', warn); }
+  }
+
+  /* ---------- 整屏背景图导出（二维码保持大小，其余填背景色，相册/壁纸用） ---------- */
+  _qrBgDims() {
+    const dpr = window.devicePixelRatio || 1;
+    return {
+      dpr,
+      w: Math.round((window.screen?.width || window.innerWidth) * dpr),
+      h: Math.round((window.screen?.height || window.innerHeight) * dpr),
+    };
+  }
+
+  /** 导出用的二维码屏幕 CSS px：物理尺寸模式且已校准时用物理尺寸，否则用「显示大小」 */
+  _qrExportPx() {
+    if (document.getElementById('qr-size-mode')?.value === 'phys') {
+      const mmPerPx = this._screenMmPerPx();
+      if (mmPerPx) {
+        const total = this._lastTotal || ((this._lastModules || 21) + 8);
+        const s = this._physSettings();
+        const unitMm = { mil: 0.0254, mm: 1, inch: 25.4 }[s.unit] || 0.0254;
+        const inputMm = Math.max(0, Number(s.value) || 0) * unitMm;
+        const wholeMm = s.basis === 'whole' ? inputMm : inputMm * total;
+        return Math.max(1, Math.round(wholeMm / mmPerPx));
+      }
+    }
+    return this._displaySizePx();
+  }
+
+  _openQrBg() {
+    if (!this._lastDataUrl) { this.toast?.show('先生成二维码', 'error'); return; }
+    const box = document.getElementById('qr-bg');
+    if (!box) return;
+    const { w, h } = this._qrBgDims();
+    const px = this._qrExportPx();
+    const phys = document.getElementById('qr-size-mode')?.value === 'phys' && this._screenMmPerPx() > 0;
+    const desc = document.getElementById('qr-bg-desc');
+    if (desc) {
+      desc.textContent = `画布 = 当前屏幕 ${w}×${h}px；二维码 ${px}px（${phys ? '按物理尺寸' : '按显示大小'}，居中），其余填充背景色。存相册全屏看时二维码保持这个大小${phys ? '（即 20mil 的物理大小）' : ''}。`;
+    }
+    box.classList.add('open');
+    box.setAttribute('aria-hidden', 'false');
+    this._syncBodyLock();
+  }
+
+  _closeQrBg() {
+    const box = document.getElementById('qr-bg');
+    if (!box || !box.classList.contains('open')) return;
+    box.classList.remove('open');
+    box.setAttribute('aria-hidden', 'true');
+    this._syncBodyLock();
+  }
+
+  async _downloadQrBg() {
+    if (!this._lastDataUrl) return;
+    const { dpr, w, h } = this._qrBgDims();
+    const px = this._qrExportPx();
+    const qrDev = Math.max(1, Math.round(px * dpr));
+    const img = await new Promise((ok, no) => {
+      const im = new Image();
+      im.onload = () => ok(im);
+      im.onerror = () => no(new Error('二维码图片加载失败'));
+      im.src = this._lastDataUrl;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    const bg = document.getElementById('qr-bg-color')?.value || '#ffffff';
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+    ctx.imageSmoothingEnabled = false;   // 保持二维码模块边缘清晰
+    ctx.drawImage(img, Math.round((w - qrDev) / 2), Math.round((h - qrDev) / 2), qrDev, qrDev);
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `qrcode-screen-${px}px-${String(bg).replace('#', '')}.png`;
+    a.click();
+    this.toast?.show(`已导出 ${w}×${h} 背景图（二维码 ${px}px）`, 'success');
+    this._closeQrBg();
   }
 
   /* ==================== 批量解码 / 批量扫码（2026-10-13 参考草料二维码增补）====================
