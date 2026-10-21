@@ -1,3 +1,9 @@
+/*
+ * PixelKit 主题 token 规则：
+ * - 语义色请使用 var(--rd-*)；带透明度的颜色（如 #f5f1e833）保留字面量，
+ *   因为 var() 不能拼接 alpha 后缀。
+ * - 新增样式优先使用 token，避免再出现硬编码颜色。
+ */
 /* ========== PixelKit v3 — Deep Midnight Theme ========== */
 :root {
   /* 深邃午夜蓝渐变暗色（默认） */
@@ -3732,14 +3738,14 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 }
 
 :root {
-  --rd-bg: #101f1d;
-  --rd-surface: #1c3430;
-  --rd-panel: #1c3430d1;
-  --rd-ink: #f5f1e8;
-  --rd-dim: #b3c1b7;
+  --rd-bg: var(--rd-bg);
+  --rd-surface: var(--rd-surface);
+  --rd-panel: var(--rd-panel-solid);
+  --rd-ink: var(--rd-ink);
+  --rd-dim: var(--rd-dim);
   --rd-faint: #f5f1e829;
-  --rd-signal: #f36b45;
-  --rd-ink-dark: #172d2a;
+  --rd-signal: var(--rd-signal);
+  --rd-ink-dark: var(--rd-ink-dark);
   --rd-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'PingFang SC', 'Noto Sans SC', monospace;
   --rd-sans: 'Inter', 'PingFang SC', 'Noto Sans SC', 'Noto Sans CJK SC', system-ui, sans-serif;
   --rd-serif: 'Instrument Serif', 'Songti SC', serif;
@@ -3782,7 +3788,7 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 }
 #page-radio .radio-fab {
   width: 36px; height: 36px; border-radius: 50%;
-  border: 1px solid #f5f1e833; background: #101f1d80;
+  border: 1px solid var(--rd-line-strong); background: #101f1d80;
   color: var(--rd-ink); font-size: 14px;
 }
 #page-radio .radio-fab.on { color: var(--rd-signal); border-color: var(--rd-signal); }
@@ -3791,7 +3797,7 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
   font: 400 11px/1 var(--rd-mono); letter-spacing: .06em; color: var(--rd-dim);
   background: none; border: 0; padding: 0;
 }
-#page-radio .radio-views { display: none; gap: 6px; padding: 3px; border-radius: 999px; background: #101f1d80; border: 1px solid #f5f1e81a; }
+#page-radio .radio-views { display: none; gap: 6px; padding: 3px; border-radius: 999px; background: #101f1d80; border: 1px solid var(--rd-line); }
 #page-radio .radio-view { border: 0; background: transparent; color: var(--rd-dim); font: 400 13px var(--rd-sans); padding: 6px 13px; border-radius: 999px; }
 #page-radio .radio-view.on { background: var(--rd-ink); color: var(--rd-ink-dark); font-weight: 500; }
 #page-radio.sky .radio-views { display: inline-flex; }
@@ -3886,7 +3892,7 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .radio-dial { display: none; }
 #page-radio .radio-play-btn {
   order: 1; width: 60px; height: 60px; border-radius: 50%;
-  background: #f36b451f; border: 1.5px solid #f36b45e6; color: var(--rd-signal);
+  background: var(--rd-signal-soft); border: 1.5px solid var(--rd-signal-border); color: var(--rd-signal);
   box-shadow: 0 0 30px -6px #f36b458c; font-size: 18px; font-weight: 400;
   display: grid; place-items: center; cursor: pointer;
 }
@@ -3923,7 +3929,7 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .radio-chip-btn {
   flex: 0 0 auto; height: 34px; padding: 0 13px; border-radius: 999px;
   display: inline-flex; align-items: center; gap: 7px;
-  background: #1c3430d1; border: 1px solid #f5f1e81a; color: var(--rd-dim);
+  background: var(--rd-panel-solid); border: 1px solid var(--rd-line); color: var(--rd-dim);
   font: 400 13px var(--rd-sans); backdrop-filter: blur(8px);
 }
 #page-radio .radio-chip-btn i { width: 8px; height: 8px; }
@@ -4078,7 +4084,7 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 }
 #page-radio .rd-record-close {
   position: absolute; right: -6px; top: -6px; width: 40px; height: 40px; border-radius: 50%;
-  border: 1px solid #f5f1e833; background: #101f1d99; color: var(--rd-ink); font-size: 20px; cursor: pointer;
+  border: 1px solid var(--rd-line-strong); background: #101f1d99; color: var(--rd-ink); font-size: 20px; cursor: pointer;
 }
 #page-radio .rd-vinyl-wrap { position: relative; flex: 0 0 auto; }
 #page-radio .rd-vinyl {
@@ -4100,7 +4106,7 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .rd-vinyl-label {
   position: absolute; inset: 30%; border-radius: 50%;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  background: var(--glow-c, #8FA39C); color: #101f1d; text-align: center; overflow: hidden;
+  background: var(--glow-c, #8FA39C); color: var(--rd-bg); text-align: center; overflow: hidden;
   box-shadow: inset 0 0 20px #00000055;
 }
 #page-radio .rd-vinyl-label b { font: 500 10px var(--rd-mono); letter-spacing: .18em; opacity: .75; }
@@ -4181,7 +4187,7 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .rd-blackhole i {
   position: absolute; inset: 38px; border-radius: 50%;
   background: radial-gradient(circle, #000 0 38%, #050807 58%, transparent 70%);
-  box-shadow: 0 0 60px 22px #000a, 0 0 90px 40px #f36b451f;
+  box-shadow: 0 0 60px 22px #000a, 0 0 90px 40px var(--rd-signal-soft);
   animation: rd-bh-pulse 3.2s var(--rd-ease) infinite alternate;
 }
 #page-radio .rd-blackhole b {
@@ -4216,9 +4222,9 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .rd-settings-rows { display: flex; flex-direction: column; gap: 2px; width: 100%; }
 #page-radio .rd-srow {
   display: flex; align-items: center; justify-content: space-between; gap: 18px;
-  padding: 14px 4px; border-bottom: 1px solid #f5f1e81a; font-size: 14px; color: var(--rd-ink);
+  padding: 14px 4px; border-bottom: 1px solid var(--rd-line); font-size: 14px; color: var(--rd-ink);
 }
-#page-radio .rd-srow input { width: 18px; height: 18px; accent-color: #f36b45; }
+#page-radio .rd-srow input { width: 18px; height: 18px; accent-color: var(--rd-signal); }
 #page-radio .rd-settings-note { font: 400 10.5px var(--rd-mono); color: #f5f1e866; letter-spacing: .06em; margin: 4px 0 0; }
 #page-radio.reduce-motion .rd-intro.enter *,
 #page-radio.reduce-motion .radio-cross .reticle-orbit,
@@ -4307,7 +4313,7 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 /* 粒子唱片：画布替换黑胶，黑洞在下面 */
 #page-radio .rd-vinyl { display: none; }
 #page-radio .rd-viz { display: block; width: clamp(220px, 26vw, 320px); height: clamp(220px, 26vw, 320px); position: relative; z-index: 1; }
-#page-radio .rd-viz-mode { position: absolute; left: 50%; bottom: -34px; transform: translateX(-50%); border: 1px solid #f5f1e833; background: #101f1d99; color: var(--rd-dim); font: 400 11px var(--rd-mono); letter-spacing: .08em; padding: 6px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+#page-radio .rd-viz-mode { position: absolute; left: 50%; bottom: -34px; transform: translateX(-50%); border: 1px solid var(--rd-line-strong); background: #101f1d99; color: var(--rd-dim); font: 400 11px var(--rd-mono); letter-spacing: .08em; padding: 6px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
 #page-radio .rd-viz-mode:hover { color: var(--rd-ink); border-color: #f5f1e880; }
 
 #page-radio .rd-credit-link { color: #f5f1e8aa; text-decoration: underline; text-underline-offset: 2px; text-decoration-color: #f5f1e840; pointer-events: auto; }
@@ -4331,7 +4337,7 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .rd-static-body b { color: var(--rd-ink); font-weight: 600; }
 
 #page-radio .rd-genres-list { display: flex; flex-direction: column; gap: 2px; }
-#page-radio .rd-genre-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 6px; border-bottom: 1px solid #f5f1e81a; background: none; border-left: 0; border-right: 0; border-top: 0; color: var(--rd-ink); font: 400 14px var(--rd-sans); cursor: pointer; text-align: left; }
+#page-radio .rd-genre-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 6px; border-bottom: 1px solid var(--rd-line); background: none; border-left: 0; border-right: 0; border-top: 0; color: var(--rd-ink); font: 400 14px var(--rd-sans); cursor: pointer; text-align: left; }
 #page-radio .rd-genre-row:hover { background: #f5f1e80a; }
 #page-radio .rd-genre-row small { font: 400 11px var(--rd-mono); color: var(--rd-dim); }
 #page-radio .rd-genre-row i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 9px; }
@@ -4379,7 +4385,7 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .rd-srow {
   min-height: 48px;
   padding: 12px 8px;
-  border-bottom: 1px solid #f5f1e81a;
+  border-bottom: 1px solid var(--rd-line);
   font: 400 14px/1.4 var(--rd-sans);
   color: var(--rd-ink);
   background: transparent;
@@ -4397,8 +4403,8 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .rd-static .rd-record-inner::-webkit-scrollbar { width: 6px; }
 #page-radio .rd-genres .rd-record-inner::-webkit-scrollbar-thumb,
 #page-radio .rd-settings .rd-record-inner::-webkit-scrollbar-thumb,
-#page-radio .rd-static .rd-record-inner::-webkit-scrollbar-thumb { background: #f5f1e833; border-radius: 3px; }
+#page-radio .rd-static .rd-record-inner::-webkit-scrollbar-thumb { background: var(--rd-line-strong); border-radius: 3px; }
 #page-radio .rd-srow-actions { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 #page-radio .rd-actions-btns { display: flex; gap: 8px; flex: 0 0 auto; }
-#page-radio .rd-mini-btn { height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid #f5f1e833; background: #f5f1e80a; color: var(--rd-ink); font: 400 12px var(--rd-sans); cursor: pointer; }
+#page-radio .rd-mini-btn { height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--rd-line-strong); background: #f5f1e80a; color: var(--rd-ink); font: 400 12px var(--rd-sans); cursor: pointer; }
 #page-radio .rd-mini-btn:hover { border-color: #f5f1e880; background: #f5f1e814; }

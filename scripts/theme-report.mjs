@@ -1,0 +1,11 @@
+import fs from 'fs';
+const css = fs.readFileSync('src/styles/main.css','utf8');
+const sel = [...css.matchAll(/([^{}]+)\{/g)].map(m=>m[1].trim()).filter(s=>s && !s.startsWith('@') && !s.startsWith('/*'));
+const norm = sel.map(s=>s.replace(/\s+/g,' ').replace(/:[\w-]+/g,''));
+const dup = new Map();
+for (const s of norm) dup.set(s,(dup.get(s)||0)+1);
+const top = [...dup.entries()].filter(([,n])=>n>2).sort((a,b)=>b[1]-a[1]).slice(0,20);
+const hard = (css.match(/#[0-9a-fA-F]{3,8}\b/g)||[]).length;
+console.log('选择器总数', sel.length, '| 重复>2 的选择器', top.length);
+for (const [s,n] of top) console.log('  ' + n + 'x  ' + s.slice(0,80));
+console.log('剩余硬编码颜色数量', hard);
