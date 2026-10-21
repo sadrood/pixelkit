@@ -140,6 +140,8 @@ export class RadioPage {
     this.$('radio-auto')?.addEventListener('click', () => this.toggleAutoTour());
     this.$('radio-sheet-toggle')?.addEventListener('click', () => this.toggleSheet());
     this.$('radio-sheet-close')?.addEventListener('click', () => this.toggleSheet(false));
+    this.$('rd-genres-close')?.addEventListener('click', () => this.closeGenres());
+    this.$('radio-chips')?.addEventListener('click', (e) => { const chip = e.target.closest('.radio-chip-btn'); if (chip && (chip.dataset.cat === 'all' || chip.dataset.g === '-1')) { e.preventDefault(); e.stopPropagation(); this.openGenres(); } }, true);
     this.$('radio-search')?.addEventListener('input', () => this.renderList());
     this.$('radio-country')?.addEventListener('change', () => this.loadListStations());
     this.$('radio-tag')?.addEventListener('change', () => this.loadListStations());
@@ -174,6 +176,8 @@ export class RadioPage {
         const sheet = this.$('radio-sheet');
         const sb = this.$('radio-searchbox');
         const dial = this.$('radio-dial');
+        const genresBox = this.$('rd-genres');
+        if (genresBox && !genresBox.hidden) { this.closeGenres(); return; }
         const staticBox = this.$('rd-static');
         if (staticBox && !staticBox.hidden) { this.closeStatic(); return; }
         const setBox = this.$('rd-settings');
@@ -1263,6 +1267,26 @@ export class RadioPage {
 
   zhCountry(cc) {
     try { if (!this._dn) this._dn = new Intl.DisplayNames(['zh-CN'], { type: 'region' }); return this._dn.of(String(cc || '').toUpperCase()) || cc; } catch { return cc; }
+  }
+
+  /* ==================== Genres 流派面板 ==================== */
+  openGenres() {
+    const box = this.$('rd-genres');
+    const list = this.$('rd-genres-list');
+    if (!box || !list) return;
+    const pal = ['#8FA39C', '#E8A9A0', '#D99A7E', '#7FC8C0', '#9DB4D6', '#D8B26E', '#E2C35A', '#B7A3D9', '#C8B49A', '#EDE3CC', '#A9C08A'];
+    const counts = new Array((this.genres || []).length).fill(0);
+    for (const st of (this.geoStations || [])) { const g = st.g || 0; if (g < counts.length) counts[g] += 1; }
+    list.innerHTML = (this.genres || []).map((name, g) => '<button class="rd-genre-row" data-g="' + g + '" type="button"><span><i style="background:' + pal[g % pal.length] + '"></i>' + this.esc(name) + '</span><small>' + (counts[g] || 0).toLocaleString('zh-CN') + '</small></button>').join('') + '<button class="rd-genre-row" data-g="-1" type="button"><span><i style="background:#f36b45"></i>全部流派</span><small>' + this.geoStations.length.toLocaleString('zh-CN') + '</small></button>';
+    list.querySelectorAll('.rd-genre-row').forEach((el) => { el.onclick = () => { const g = Number(el.dataset.g); this.genreFilter = g; try { this.buildChips(); this.applyFilter && this.applyFilter(); } catch { /* ignore */ } try { this.setView('nebula'); } catch { /* ignore */ } this.closeGenres(); }; });
+    box.hidden = false;
+    requestAnimationFrame(() => box.classList.add('shown'));
+  }
+  closeGenres() {
+    const box = this.$('rd-genres');
+    if (!box) return;
+    box.classList.remove('shown');
+    setTimeout(() => { if (!box.classList.contains('shown')) box.hidden = true; }, 260);
   }
 
   /* ==================== About / Privacy ==================== */

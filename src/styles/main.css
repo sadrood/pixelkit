@@ -4213,3 +4213,9 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .rd-static-body { color: var(--rd-dim); font-size: 14px; line-height: 1.9; }
 #page-radio .rd-static-body p { margin: 0 0 10px; }
 #page-radio .rd-static-body b { color: var(--rd-ink); font-weight: 600; }
+
+#page-radio .rd-genres-list { display: flex; flex-direction: column; gap: 2px; }
+#page-radio .rd-genre-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 6px; border-bottom: 1px solid #f5f1e81a; background: none; border-left: 0; border-right: 0; border-top: 0; color: var(--rd-ink); font: 400 14px var(--rd-sans); cursor: pointer; text-align: left; }
+#page-radio .rd-genre-row:hover { background: #f5f1e80a; }
+#page-radio .rd-genre-row small { font: 400 11px var(--rd-mono); color: var(--rd-dim); }
+#page-radio .rd-genre-row i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 9px; }
