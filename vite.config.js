@@ -29,6 +29,7 @@ function onnxWasmPlugin() {
 }
 
 export default defineConfig({
+  define: { __BUILD_TIME__: JSON.stringify(new Date().toISOString()) },
   plugins: [react(), onnxWasmPlugin()],
   root: '.',
   // onnxruntime-web 内部用动态 URL 加载 .wasm，不能被 Vite 预构建/静态分析破坏

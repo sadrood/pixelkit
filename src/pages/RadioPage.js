@@ -25,6 +25,7 @@ export class RadioPage {
     this._nowTimer = null;
     this._hls = null;
     this._pendingPlay = null;
+    this._version = '2.0.0';
   }
 
   $(id) { return document.getElementById(id); }
@@ -1483,6 +1484,11 @@ export class RadioPage {
     const s2 = this.getSettings();
     const set = (id, val) => { const el = this.$(id); if (el) el.checked = !!val; };
     set('rd-set-autotune', s2.autotune); set('rd-set-autodive', s2.autodive); set('rd-set-reduce', s2.reduce); set('rd-set-hints', s2.hints);
+    try {
+      const note = box.querySelector('.rd-settings-note');
+      const bt = (typeof __BUILD_TIME__ !== 'undefined') ? new Date(__BUILD_TIME__).toLocaleString('zh-CN', { hour12: false }).slice(0, 17) : '';
+      if (note) note.textContent = '设置保存在本机 localStorage（pk_radio_settings）· 版本 v' + this._version + (bt ? ' · 构建 ' + bt : '');
+    } catch { /* ignore */ }
     box.hidden = false;
     requestAnimationFrame(() => box.classList.add('shown'));
     const onChange = () => this.saveSettings({
