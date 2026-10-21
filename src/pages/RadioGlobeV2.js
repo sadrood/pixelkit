@@ -308,7 +308,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       const c = centerLatLon();
       const cos = Math.cos(c.lat * Math.PI / 180);
       const near = stations.filter((s) => {
-        if (!(s.prec > 0)) return false; // 城市级只显示有真实坐标的电台
+        if (!(s.prec > 1)) return false; // 城市级只显示有真实坐标的电台（州/省级近似不当作城市）
         const dLat = s.lat - c.lat;
         const dLng = ((s.lon - c.lon + 540) % 360) - 180;
         return Math.abs(dLat) <= 3.2 && Math.abs(dLng) * cos <= 3.2;

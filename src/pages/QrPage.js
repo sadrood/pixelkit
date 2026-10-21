@@ -14,6 +14,8 @@ import jsQR from 'jsqr';
    ============================================================================ */
 export const QR_PHYS_UNIT_MM = { mil: 0.0254, mm: 1, inch: 25.4 };
 export const QR_PHYS_MAX_PX = 4096;
+// 屏幕校准基准：银行卡 / 身份证短边 54mm（手机上比 85.6mm 长边好放）
+const QR_CALIB_MM = 54;
 
 export function qrPhysGeometry({ modules, value, unit = 'mil', basis = 'module', dpi = 600, margin = 4 } = {}) {
   const n = Math.max(1, Math.round(Number(modules) || 21));
@@ -111,6 +113,8 @@ export class QrPage {
     this.toast = toast;
     this._inited = false;
     this.records = [];
+    this._lastModules = 21;   // 最近一次生成的二维码模块数（单独显示按物理尺寸换算要用）
+    this._lastTotal = 29;     // 最近一次的整码模块数（模块 + 白边）
     // 浏览器用户标识：与 AgentPage / FileSharePage 共用同一套，保证「谁的记录展示给谁」
     this.userId = localStorage.getItem('pixelkit_user_id');
     if (!this.userId) {
@@ -227,6 +231,14 @@ export class QrPage {
                 <option value="svg">SVG（矢量·可无限放大）</option>
               </select>
             </label>
+            <label title="二维码四周留白（模块数）。0 = 无白边最省空间；打印或深色背景建议 2–4">留白：
+              <select id="qr-margin">
+                <option value="0" selected>0（无白边）</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="4">4（标准）</option>
+              </select>
+            </label>
             <label>容错：
               <select id="qr-ecc">
                 <option value="L">L（7%）</option>
@@ -258,10 +270,11 @@ export class QrPage {
           </div>
         </div>
         <div class="qr-result" id="qr-gen-result" style="display:none;">
-          <img id="qr-img" class="qr-img" alt="二维码" />
+          <img id="qr-img" class="qr-img" alt="二维码" title="点击单独显示 / 调整显示大小" />
           <div class="qr-result-actions">
             <button class="btn btn-sm" id="qr-download">⬇ 下载 PNG</button>
             <button class="btn btn-sm" id="qr-save-gen">💾 存记录</button>
+            <button class="btn btn-sm" id="qr-zoom-open">⛶ 单独显示</button>
           </div>
         </div>
       </div>
@@ -447,6 +460,54 @@ export class QrPage {
           <div class="qr-records-empty">暂无记录，去生成或解码一条吧～</div>
         </div>
       </div>
+
+      <!-- 2026-10-21：单独显示二维码（全屏只看二维码，可指定显示大小） -->
+      <div class="qr-zoom" id="qr-zoom" aria-hidden="true">
+        <button type="button" class="qr-zoom-close" id="qr-zoom-close" title="关闭（Esc）">✕</button>
+        <div class="qr-zoom-stage" id="qr-zoom-stage">
+          <div class="qr-zoom-frame" id="qr-zoom-frame">
+            <img id="qr-zoom-img" class="qr-zoom-img" alt="二维码" />
+          </div>
+        </div>
+        <div class="qr-zoom-bar">
+          <span class="qr-zoom-title">单独显示</span>
+          <label>大小
+            <input type="range" id="qr-zoom-range" min="128" max="1024" step="8" value="512" />
+          </label>
+          <label><input type="number" id="qr-zoom-num" min="32" max="1024" step="8" value="512" /> px</label>
+          <button type="button" class="btn btn-sm" id="qr-zoom-fit">适应屏幕</button>
+          <label title="按「物理尺寸」设置显示真实大小；首次需用银行卡短边校准屏幕"><input type="checkbox" id="qr-zoom-phys" /> 按物理尺寸</label>
+          <button type="button" class="btn btn-sm" id="qr-zoom-calib">校准屏幕</button>
+          <span class="qr-zoom-note" id="qr-zoom-phys-note"></span>
+          <span class="qr-zoom-note" id="qr-zoom-note">屏幕像素大小（不是打印物理尺寸）</span>
+        </div>
+      </div>
+
+      <!-- 2026-10-21：屏幕校准（银行卡短边 54mm），用于「按物理尺寸显示」 -->
+      <div class="qr-calib" id="qr-calib" aria-hidden="true">
+        <div class="qr-calib-box">
+          <h3>校准屏幕</h3>
+          <p>把校准物贴在屏幕上，拖动滑块，让下面两条竖线正好卡住它的左右两边。竖线就是边界，可以拖到很宽，不会被框限制。</p>
+          <label class="qr-calib-target-label">校准物：
+            <select id="qr-calib-target">
+              <option value="54" selected>银行卡 / 身份证 短边 54mm</option>
+              <option value="85.6">银行卡 / 身份证 长边 85.6mm（屏幕够宽再选）</option>
+              <option value="25">1 元硬币 直径 25mm</option>
+            </select>
+          </label>
+          <div class="qr-calib-stage">
+            <div class="qr-calib-bar" id="qr-calib-bar"></div>
+          </div>
+          <label class="qr-calib-range-label">宽度
+            <input type="range" id="qr-calib-range" min="80" max="600" step="1" value="204" />
+          </label>
+          <div class="qr-calib-value" id="qr-calib-value"></div>
+          <div class="qr-calib-actions">
+            <button type="button" class="btn btn-sm btn-primary" id="qr-calib-save">保存校准</button>
+            <button type="button" class="btn btn-sm" id="qr-calib-cancel">取消</button>
+          </div>
+        </div>
+      </div>
     `;
   }
 
@@ -500,6 +561,32 @@ export class QrPage {
       this._saveDisplaySize();
     });
     this._restoreDisplaySize();
+
+    // 2026-10-21：单独显示二维码 —— 全屏只看二维码，滑块/数字框指定显示大小（px）
+    document.getElementById('qr-zoom-open')?.addEventListener('click', () => this._openQrZoom());
+    document.getElementById('qr-img')?.addEventListener('click', () => this._openQrZoom());
+    document.getElementById('qr-zoom-close')?.addEventListener('click', () => this._closeQrZoom());
+    document.getElementById('qr-zoom')?.addEventListener('click', (e) => {
+      if (e.target.id === 'qr-zoom' || e.target.id === 'qr-zoom-stage') this._closeQrZoom();
+    });
+    document.getElementById('qr-zoom-range')?.addEventListener('input', (e) => this._setDisplaySize(e.target.value));
+    document.getElementById('qr-zoom-num')?.addEventListener('input', (e) => this._setDisplaySize(e.target.value));
+    document.getElementById('qr-zoom-fit')?.addEventListener('click', () => this._fitQrZoom());
+    // 2026-10-21：按物理尺寸显示（需先用银行卡短边 54mm 校准屏幕）
+    document.getElementById('qr-zoom-phys')?.addEventListener('change', (e) => this._toggleQrPhys(e.target.checked));
+    document.getElementById('qr-zoom-calib')?.addEventListener('click', () => this._openQrCalib());
+    document.getElementById('qr-calib-range')?.addEventListener('input', () => this._updateCalibBar());
+    document.getElementById('qr-calib-target')?.addEventListener('change', () => this._updateCalibBar());
+    document.getElementById('qr-calib-save')?.addEventListener('click', () => this._saveQrCalib());
+    document.getElementById('qr-calib-cancel')?.addEventListener('click', () => this._closeQrCalib());
+    document.getElementById('qr-calib')?.addEventListener('click', (e) => {
+      if (e.target.id === 'qr-calib') this._closeQrCalib();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (document.getElementById('qr-calib')?.classList.contains('open')) { this._closeQrCalib(); return; }
+      this._closeQrZoom();
+    });
 
     // 生成一维码
     document.getElementById('barcode-gen-btn').addEventListener('click', () => this.generateBarcode());
@@ -577,18 +664,21 @@ export class QrPage {
     const style = document.getElementById('qr-style')?.value || 'square';
     const eye = document.getElementById('qr-eye')?.value || 'square';
     const format = document.getElementById('qr-format')?.value || 'png';
+    const margin = Number(document.getElementById('qr-margin')?.value ?? 4) || 0;
     const useGradient = Boolean(document.getElementById('qr-gradient')?.checked);
     const dark2 = document.getElementById('qr-dark2')?.value || dark;
     try {
       /* 2026-10-13：改成**客户端**渲染（原来走后端 /api/qr/generate）。
          好处：① 不占服务器配额、零延迟；② 可以本地做样式/格式（后端只有纯黑方块 PNG）。
          qrcode 包提供 create() 拿到模块矩阵，剩下用 canvas 自己画。 */
-      const out = await this._renderQr({ text, size, sizeMode, phys, dark, light, ecc, style, eye, format, useGradient, dark2 });
+      const out = await this._renderQr({ text, size, sizeMode, phys, margin, dark, light, ecc, style, eye, format, useGradient, dark2 });
       this._lastText = text;
       this._lastDataUrl = out.dataUrl;
       this._lastExt = out.ext;
       this._lastBarcode = false;   // 切回普通二维码时别沿用一维码的下载前缀
       this._lastPhys = out.phys || null;   // 物理尺寸信息（下载文件名 / 提示用）
+      this._lastModules = out.modules || 21;
+      this._lastTotal = out.total || (this._lastModules + margin * 2);
       const img = document.getElementById('qr-img');
       img.src = out.dataUrl;
       img.dataset.filename = out.phys
@@ -620,12 +710,13 @@ export class QrPage {
    * 说明：这是"太阳码**风格**"的美化二维码（圆形点阵+圆形定位点），
    *      扫码内容由你填写；微信官方小程序码（真·太阳码）必须调微信接口，需要小程序 AppID/Secret。
    */
-  async _renderQr({ text, size, sizeMode = 'px', phys = null, dark, light, ecc, style, eye, format, useGradient, dark2 }) {
+  async _renderQr({ text, size, sizeMode = 'px', phys = null, margin: marginOpt = 4, dark, light, ecc, style, eye, format, useGradient, dark2 }) {
     const QRCode = await this._loadQrLib();
     const qr = QRCode.create(text, { errorCorrectionLevel: ecc });
     const n = qr.modules.size;
     const data = qr.modules.data;          // 位矩阵：data[y * n + x]
-    const margin = 4;
+    // 2026-10-21：白边（留白）可调，默认 0 不再强行加 4 模块白边；打印/深底可手动选 2/4
+    const margin = Math.min(8, Math.max(0, Math.round(Number(marginOpt))));
     const total = n + margin * 2;
     // 2026-10-21：物理尺寸口径 → 用几何换算得到画布像素；px 模式 geom 为 null，完全走原有逻辑
     const geom = (sizeMode === 'phys' && phys && Number(phys.value) > 0) ? this._physGeometry(n, phys) : null;
@@ -720,7 +811,7 @@ export class QrPage {
         + gradDef + `<rect width="${px}" height="${px}" fill="${light}"/>` + body + '</svg>';
       const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
       const note = geom ? this._physNote('svg', geom) : 'SVG 是矢量图，放大不糊';
-      return { dataUrl, ext: 'svg', note, phys: geom || null };
+      return { dataUrl, ext: 'svg', note, phys: geom || null, modules: n, total };
     }
 
     // 2026-10-21：物理尺寸模式用几何换算出的 px（每模块整数像素）；px 模式仍是原来的 size
@@ -744,7 +835,7 @@ export class QrPage {
     // 只有 PNG 能写 pHYs DPI 元数据；JPG/WebP 不写，note 里说明
     if (geom && format === 'png') dataUrl = pngDataUrlWithDpi(dataUrl, geom.dpi);
     const note = geom ? this._physNote(format, geom) : (format === 'jpg' ? 'JPG 不支持透明，背景已填色' : '');
-    return { dataUrl, ext: format, note, phys: geom || null };
+    return { dataUrl, ext: format, note, phys: geom || null, modules: n, total };
   }
 
   /* ==================== 物理尺寸（2026-10-21）====================
@@ -767,11 +858,13 @@ export class QrPage {
 
   _physSettings() {
     const raw = Number(document.getElementById('qr-phys-value')?.value);
+    const marginRaw = Number(document.getElementById('qr-margin')?.value);
     return {
       value: Number.isFinite(raw) && raw > 0 ? raw : 10,
       unit: document.getElementById('qr-phys-unit')?.value || 'mil',
       basis: document.getElementById('qr-phys-basis')?.value || 'module',
       dpi: Number(document.getElementById('qr-phys-dpi')?.value) || 600,
+      margin: Number.isFinite(marginRaw) ? marginRaw : 4,
     };
   }
 
@@ -857,6 +950,12 @@ export class QrPage {
       img.style.width = `${px}px`;
       img.style.height = 'auto';      // 保持二维码正方形比例，窄屏交给 max-width
     });
+    // 单独显示开着时同步（滑块、图、数字框）；物理尺寸模式下由校准换算接管，不覆盖
+    const zoom = document.getElementById('qr-zoom');
+    if (zoom?.classList.contains('open') && !document.getElementById('qr-zoom-phys')?.checked) {
+      this._applyZoomSize(px);
+      this._syncZoomControls(px);
+    }
   }
 
   _saveDisplaySize() {
@@ -882,6 +981,178 @@ export class QrPage {
       }
     } catch { /* ignore */ }
     this._applyDisplaySize();
+  }
+
+  /* ==================== 单独显示二维码（2026-10-21）====================
+     生成后「单独显示」：全屏只看二维码 + 指定显示大小。
+     · 不勾「按物理尺寸」：大小 = 屏幕 CSS 像素（32–1024），和「显示大小」共用设置；
+     · 勾「按物理尺寸」：先用银行卡短边 54mm 校准屏幕得到 mm/px，再把「物理尺寸」设置
+       换算成屏幕像素 —— 这是屏幕上近似 1:1 显示 10mil/20mil 的唯一办法（误差取决于校准）。 */
+  _openQrZoom() {
+    if (!this._lastDataUrl) { this.toast?.show('先生成二维码', 'error'); return; }
+    const box = document.getElementById('qr-zoom');
+    const img = document.getElementById('qr-zoom-img');
+    if (!box || !img) return;
+    img.src = this._lastDataUrl;
+    const px = this._displaySizePx();
+    this._syncZoomControls(px);
+    this._applyZoomSize(px);
+    box.classList.add('open');
+    box.setAttribute('aria-hidden', 'false');
+    this._syncBodyLock();
+    document.getElementById('qr-zoom-close')?.focus();
+    this._refreshZoomPhys();     // 上次勾了「按物理尺寸」就继续按物理尺寸显示
+  }
+
+  _closeQrZoom() {
+    const box = document.getElementById('qr-zoom');
+    if (!box || !box.classList.contains('open')) return;
+    box.classList.remove('open');
+    box.setAttribute('aria-hidden', 'true');
+    this._syncBodyLock();
+  }
+
+  _syncBodyLock() {
+    const open = document.getElementById('qr-zoom')?.classList.contains('open')
+      || document.getElementById('qr-calib')?.classList.contains('open');
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+
+  _syncZoomControls(px) {
+    const range = document.getElementById('qr-zoom-range');
+    const num = document.getElementById('qr-zoom-num');
+    if (range) range.value = String(px);
+    if (num && document.activeElement !== num) num.value = String(px);
+  }
+
+  _applyZoomSize(px) {
+    const img = document.getElementById('qr-zoom-img');
+    if (!img) return;
+    img.style.width = `${px}px`;
+    img.style.height = 'auto';      // 正方形按宽度走，窄屏由 CSS max-width 收
+  }
+
+  /** 单独显示里的滑块/数字框改大小：写回「显示大小」设置，主预览与单显一起变 */
+  _setDisplaySize(raw) {
+    if (document.getElementById('qr-zoom-phys')?.checked) return;  // 物理尺寸模式下不让滑块改写
+    const n = Math.min(1024, Math.max(32, Math.round(Number(raw) || 256)));
+    const sel = document.getElementById('qr-display-size');
+    const custom = document.getElementById('qr-display-custom');
+    if (sel) sel.value = 'custom';
+    if (custom) custom.value = String(n);
+    this._applyDisplaySize();   // 主预览 + 活码/文件结果 + 自定义框显隐 + 单显同步
+    this._applyZoomSize(n);
+    this._syncZoomControls(n);
+    this._saveDisplaySize();
+  }
+
+  _fitQrZoom() {
+    if (document.getElementById('qr-zoom-phys')?.checked) return;
+    const px = Math.max(128, Math.min(1024, Math.floor(Math.min(window.innerWidth * 0.92, window.innerHeight * 0.72))));
+    this._setDisplaySize(px);
+  }
+
+  /* ---------- 屏幕校准（银行卡短边 54mm，结果存 localStorage） ---------- */
+  _screenMmPerPx() {
+    const v = Number(localStorage.getItem('pixelkit_screen_mm_per_px'));
+    return v > 0 ? v : 0;
+  }
+
+  _calibMm() {
+    const v = Number(document.getElementById('qr-calib-target')?.value);
+    return v > 0 ? v : QR_CALIB_MM;
+  }
+
+  _openQrCalib() {
+    const box = document.getElementById('qr-calib');
+    if (!box) return;
+    box.classList.add('open');
+    box.setAttribute('aria-hidden', 'false');
+    const boxEl = box.querySelector('.qr-calib-box');
+    const range = document.getElementById('qr-calib-range');
+    if (range) {
+      // 校准条可以铺到弹窗能容纳的最大宽度（不再被固定 560px 的框住）
+      const max = Math.max(160, Math.min(1400, Math.floor((boxEl?.clientWidth || window.innerWidth) - 8)));
+      range.max = String(max);
+      const saved = this._screenMmPerPx();
+      const mm = this._calibMm();
+      const w = saved > 0 ? Math.round(mm / saved) : Math.round(mm / (25.4 / 96));
+      range.value = String(Math.min(max, Math.max(60, w)));
+    }
+    this._updateCalibBar();
+    this._syncBodyLock();
+  }
+
+  _closeQrCalib() {
+    const box = document.getElementById('qr-calib');
+    if (!box || !box.classList.contains('open')) return;
+    box.classList.remove('open');
+    box.setAttribute('aria-hidden', 'true');
+    this._syncBodyLock();
+  }
+
+  _updateCalibBar() {
+    const w = Number(document.getElementById('qr-calib-range')?.value) || 204;
+    const mm = this._calibMm();
+    const bar = document.getElementById('qr-calib-bar');
+    if (bar) bar.style.width = `${w}px`;
+    const val = document.getElementById('qr-calib-value');
+    if (val) val.textContent = `当前 ${w}px ↔ ${mm}mm（1 CSS px ≈ ${(mm / w).toFixed(4)}mm）`;
+  }
+
+  _saveQrCalib() {
+    const w = Number(document.getElementById('qr-calib-range')?.value) || 0;
+    if (!(w > 40)) return;
+    try { localStorage.setItem('pixelkit_screen_mm_per_px', String(this._calibMm() / w)); } catch { /* ignore */ }
+    this._closeQrCalib();
+    this.toast?.show('屏幕已校准', 'success');
+    this._refreshZoomPhys();
+  }
+
+  /* ---------- 单独显示：按物理尺寸（校准后把 mil/mm 换成屏幕 px） ---------- */
+  _toggleQrPhys(on) {
+    if (on && !this._screenMmPerPx()) {
+      const cb = document.getElementById('qr-zoom-phys');
+      if (cb) cb.checked = false;
+      this.toast?.show('先校准屏幕，再按物理尺寸显示', 'error');
+      this._openQrCalib();
+      return;
+    }
+    this._refreshZoomPhys();
+  }
+
+  _refreshZoomPhys() {
+    const cb = document.getElementById('qr-zoom-phys');
+    const on = !!cb?.checked;
+    const range = document.getElementById('qr-zoom-range');
+    const num = document.getElementById('qr-zoom-num');
+    const fit = document.getElementById('qr-zoom-fit');
+    if (range) range.disabled = on;
+    if (num) num.disabled = on;
+    if (fit) fit.disabled = on;
+    const note = document.getElementById('qr-zoom-phys-note');
+    if (!on) {
+      if (note) { note.textContent = ''; note.classList.remove('is-warn'); }
+      this._applyZoomSize(this._displaySizePx());
+      return;
+    }
+    const mmPerPx = this._screenMmPerPx();
+    if (!mmPerPx) { if (cb) cb.checked = false; this._applyZoomSize(this._displaySizePx()); return; }
+    const total = this._lastTotal || ((this._lastModules || 21) + 8);
+    const s = this._physSettings();
+    const unitMm = { mil: 0.0254, mm: 1, inch: 25.4 }[s.unit] || 0.0254;
+    const inputMm = Math.max(0, Number(s.value) || 0) * unitMm;
+    const wholeMm = s.basis === 'whole' ? inputMm : inputMm * total;
+    const px = Math.max(1, Math.round(wholeMm / mmPerPx));
+    this._applyZoomSize(px);
+    const perModule = px / total;
+    const shownPx = Math.floor(Math.min(window.innerWidth * 0.92, window.innerHeight * 0.72));
+    let text = `${s.value}${s.unit}${s.basis === 'whole' ? ' 整码宽' : '/模块'} · 整码 ${wholeMm.toFixed(2)}mm · 屏幕 ${px}px`;
+    let warn = false;
+    if (px > shownPx) { text += ` · ⚠ 超出屏幕，已收窄到约 ${shownPx}px（不再 1:1）`; warn = true; }
+    if (perModule < 1) { text += ' · ⚠ 每模块 <1 屏幕像素，无法显示/扫描'; warn = true; }
+    else if (perModule < 2) { text += ' · ⚠ 每模块不足 2px，可能扫不出'; warn = true; }
+    if (note) { note.textContent = text; note.classList.toggle('is-warn', warn); }
   }
 
   /* ==================== 批量解码 / 批量扫码（2026-10-13 参考草料二维码增补）====================
@@ -1128,10 +1399,12 @@ export class QrPage {
     const v = (id) => document.getElementById(id)?.value;
     // 2026-10-21：尺寸口径 + 物理尺寸参数跟着 opts 走，批量生成 / 活码自动继承
     const sizeMode = v('qr-size-mode') === 'phys' ? 'phys' : 'px';
+    const margin = Number(v('qr-margin') ?? 4);
     return {
       size: Number(v('qr-size')) || 512,
       sizeMode,
       phys: sizeMode === 'phys' ? this._physSettings() : null,
+      margin: Number.isFinite(margin) ? margin : 4,
       dark: v('qr-dark') || '#000000',
       light: v('qr-light') || '#ffffff',
       ecc: v('qr-ecc') || 'M',
