@@ -779,6 +779,7 @@ export class RadioPage {
 
   /** 收藏视图：把收藏的台列进抽屉 */
   showFavSheet() {
+    try { if (this.openSaved) { this.openSaved(); return; } } catch { /* ignore */ }
     const list = [...(this.favs || [])];
     const items = [];
     for (const id of list) {
@@ -1274,11 +1275,26 @@ export class RadioPage {
     const box = this.$('rd-genres');
     const list = this.$('rd-genres-list');
     if (!box || !list) return;
+    const titleEl = this.$('rd-genres-title'); if (titleEl) titleEl.textContent = '流派';
     const pal = ['#8FA39C', '#E8A9A0', '#D99A7E', '#7FC8C0', '#9DB4D6', '#D8B26E', '#E2C35A', '#B7A3D9', '#C8B49A', '#EDE3CC', '#A9C08A'];
     const counts = new Array((this.genres || []).length).fill(0);
     for (const st of (this.geoStations || [])) { const g = st.g || 0; if (g < counts.length) counts[g] += 1; }
     list.innerHTML = (this.genres || []).map((name, g) => '<button class="rd-genre-row" data-g="' + g + '" type="button"><span><i style="background:' + pal[g % pal.length] + '"></i>' + this.esc(name) + '</span><small>' + (counts[g] || 0).toLocaleString('zh-CN') + '</small></button>').join('') + '<button class="rd-genre-row" data-g="-1" type="button"><span><i style="background:#f36b45"></i>全部流派</span><small>' + this.geoStations.length.toLocaleString('zh-CN') + '</small></button>';
     list.querySelectorAll('.rd-genre-row').forEach((el) => { el.onclick = () => { const g = Number(el.dataset.g); this.genreFilter = g; try { this.buildChips(); this.applyFilter && this.applyFilter(); } catch { /* ignore */ } try { this.setView('nebula'); } catch { /* ignore */ } this.closeGenres(); }; });
+    box.hidden = false;
+    requestAnimationFrame(() => box.classList.add('shown'));
+  }
+  openSaved() {
+    const box = this.$('rd-genres');
+    const list = this.$('rd-genres-list');
+    if (!box || !list) return;
+    const title = this.$('rd-genres-title'); if (title) title.textContent = '收藏';
+    const favs = (this.geoStations || []).filter((st) => this.isFav && this.isFav(st.id));
+    if (!favs.length) { list.innerHTML = '<p style="color:#b3c1b7;font-size:14px;padding:12px 4px">还没有收藏。播放时点 ♡ 收藏，或按 F。</p>'; }
+    else {
+      list.innerHTML = favs.map((st) => '<button class="rd-genre-row" data-id="' + this.esc(st.id) + '" type="button"><span>' + this.esc(st.name || '') + '</span><small>' + this.esc(this.zhCountry ? this.zhCountry(st.cc) : (st.country || st.cc)) + '</small></button>').join('');
+      list.querySelectorAll('.rd-genre-row').forEach((el) => { el.onclick = () => { const id = el.dataset.id; const i = this.geoStations.findIndex((x) => String(x.id) === String(id)); if (i >= 0) { this.setIndex(i, true); } this.closeGenres(); }; });
+    }
     box.hidden = false;
     requestAnimationFrame(() => box.classList.add('shown'));
   }

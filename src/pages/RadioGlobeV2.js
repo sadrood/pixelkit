@@ -211,7 +211,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       // 信号强度（pop 0–9 + 码率）：弱的暗，只在大地图时出现
       const power = (s.pop || 0) * 10 + (s.bitrate >= 128 ? 6 : s.bitrate >= 64 ? 4 : s.bitrate ? 2 : 0);
       const strength = Math.min(1, 0.22 + power / 100);
-      const k = strength * (zoomLevel >= 2 ? 0.62 : zoomLevel === 1 ? 0.8 : 0.55);
+      const k = strength * (zoomLevel >= 2 ? 0.62 : zoomLevel === 1 ? 0.62 : 0.42);
       col[i * 3] = r0 * k;
       col[i * 3 + 1] = g0 * k;
       col[i * 3 + 2] = b0 * k;
