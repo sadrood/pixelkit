@@ -187,7 +187,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   let pointsList = [];
   let zoomLevel = 1;
 
-  function buildPoints(list) {
+  function buildPoints(list, spreadK = 0) {
     pointsList = list.slice();
     if (points) { world.remove(points); points.geometry.dispose(); points.material.dispose(); }
     const n = list.length;
@@ -195,7 +195,15 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     const col = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
       const s = list[i];
-      const v = toVec3(s.lat, s.lon, EARTH_R * 1.006);
+      let v = toVec3(s.lat, s.lon, EARTH_R * 1.006);
+      if (spreadK) {
+        // 城市级：按台 ID 哈希在切平面上散开，避免所有台叠在一点
+        let hh = 0; const sid = String(s.id || s.name || i);
+        for (let k = 0; k < sid.length; k++) hh = (hh * 31 + sid.charCodeAt(k)) >>> 0;
+        const ox = (((hh >>> 3) % 1000) / 1000 - 0.5) * 0.012 * spreadK;
+        const oy = (((hh >>> 13) % 1000) / 1000 - 0.5) * 0.012 * spreadK;
+        v = new THREE.Vector3(v.x + ox, v.y + oy, v.z).normalize().multiplyScalar(EARTH_R * 1.006);
+      }
       pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
       tmpC.set(POINT_COLORS[(s.g || 0) % POINT_COLORS.length]);
       // 规格书：不要未经验证的夜间灯光染色，直接使用 genre 色
@@ -317,6 +325,19 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     const lvl = z > 4.0 ? 0 : z > 2.05 ? 1 : 2;
     if (lvl === zoomLevel) return;
     zoomLevel = lvl;
+    if (z < 1.25) {
+      const c = centerLatLon();
+      const cos = Math.cos(c.lat * Math.PI / 180);
+      const near = stations.filter((s) => {
+        const dLat = s.lat - c.lat;
+        const dLng = ((s.lon - c.lon + 540) % 360) - 180;
+        return Math.abs(dLat) <= 3.2 && Math.abs(dLng) * cos <= 3.2;
+      });
+      buildPoints(near.length > 60 ? near : stations, 3.2);
+      if (points) { points.material.size = mobile ? 0.009 : 0.006; points.material.opacity = 0.5; }
+      if (landLayer) landLayer.visible = false;
+      return;
+    }
     if (lvl === 2) {
       const c = centerLatLon();
       const cos = Math.cos(c.lat * Math.PI / 180);
