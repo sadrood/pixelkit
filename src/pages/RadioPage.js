@@ -900,6 +900,16 @@ export class RadioPage {
           if (this._neb3d && this._neb3d.getClusterLabels) clusters = this._neb3d.getClusterLabels();
           else if (this._globe.getNebulaLabels) clusters = this._globe.getNebulaLabels();
         } catch { clusters = []; }
+        {
+          const keep = [];
+          const sorted = clusters.slice().sort((a, b) => (b.count || 0) - (a.count || 0));
+          for (const c of sorted) {
+            if (keep.some((q) => Math.hypot(q.x - c.x, q.y - c.y) < 96)) continue;
+            keep.push(c);
+            if (keep.length >= 12) break;
+          }
+          clusters = keep;
+        }
         list.innerHTML = clusters.map((c, k) => {
           const dy = (k % 2 === 0 ? -62 : 44) + (k % 3) * 8;
           const dx = (k % 2 === 0 ? -1 : 1) * (16 + (k % 3) * 12);
@@ -914,6 +924,21 @@ export class RadioPage {
       const cur = this.current ? this.current.name : '';
       const w = box.clientWidth || 1, h = box.clientHeight || 1;
       const cx = w / 2, cy = h / 2;
+      // 遮挡避让：UI 元素 + 已放置标签
+      let occ = [];
+      try {
+        const base = box.getBoundingClientRect();
+        const add = (el, pad = 10) => {
+          if (!el || el.hidden) return;
+          const r = el.getBoundingClientRect();
+          if (!r.width || !r.height) return;
+          occ.push({ x1: r.left - base.left - pad, y1: r.top - base.top - pad, x2: r.right - base.left + pad, y2: r.bottom - base.top + pad });
+        };
+        add(this.$('radio-panel')); add(this.$('radio-clock')); add(this.$('radio-topbar'));
+        add(this.$('radio-chips')); add(this.$('radio-hints'));
+      } catch { /* ignore */ }
+      const hitBox = (r) => occ.some((b) => !(r.x2 < b.x1 || r.x1 > b.x2 || r.y2 < b.y1 || r.y1 > b.y2));
+      const maxLabels = (this._globe && this._globe.debug && this._globe.debug().cameraZ < 1.9) ? 5 : 8;
       // roamdial 式：候选台围绕准星环形绽开（越近的台半径越小），并画引线指回星点
       const out = [];
       let lines = '';
@@ -933,6 +958,10 @@ export class RadioPage {
         if (Math.abs(ly - cy) < 120 && lx > cx + 70 && lx < cx + 640) continue;
         // 避开左下正在播放面板
         if (lx < cx - 60 && ly > h - 300) continue;
+        const tw = Math.min(230, String(l.name || '').length * 7.2 + 16);
+        const rect = { x1: lx - 4, y1: ly - 11, x2: lx + tw, y2: ly + 11 };
+        if (hitBox(rect)) continue;
+        occ.push(rect);
         lines += '<line x1="' + Math.round(l.x) + '" y1="' + Math.round(l.y) + '" x2="' + Math.round(lx) + '" y2="' + Math.round(ly) + '" stroke="rgba(255,230,200,.28)" stroke-width="1"/>';
         out.push('<span class="radio-label' + (l.name === cur ? ' hot' : '') + '" style="left:' + Math.round(lx) + 'px;top:' + Math.round(ly) + 'px">' + this.esc(l.name) + '</span>');
         if (out.length >= 8) break;
