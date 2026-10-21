@@ -598,15 +598,18 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       if (!pointsList.length) return -1;
       const c = centerLatLon();
       const cos = Math.cos(c.lat * Math.PI / 180);
-      let best = -1, bestD = 1e9;
+      // §5.2 命中优先级：距离最近的优先；距离接近（<1.2°）时信号更强的优先
+      let best = -1, bestGeo = 1e9;
       for (let i = 0; i < pointsList.length; i++) {
         const s = pointsList[i];
         const dLat = s.lat - c.lat;
         const dLng = ((s.lon - c.lon + 540) % 360) - 180;
-        const d = dLat * dLat + (dLng * cos) * (dLng * cos);
-        if (d < bestD) { bestD = d; best = i; }
+        const deg = Math.sqrt(dLat * dLat + (dLng * cos) * (dLng * cos)) * 180 / Math.PI;
+        if (deg > 25) continue;
+        const score = deg - (s.pop || 0) * 0.18;
+        if (score < bestGeo) { bestGeo = score; best = i; }
       }
-      return Math.sqrt(bestD) * 180 / Math.PI <= 25 ? best : -1;
+      return best;
     },
     getLabels(limit = 8) {
       if (!pointsList.length || !pointGeo) return [];

@@ -4209,3 +4209,7 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
   #page-radio .radio-chips { -webkit-mask-image: none; mask-image: none; }
 }
 #page-radio .rd-intro-name { font: 400 clamp(32px, 3.6vw, 50px)/1.12 var(--rd-serif) !important; letter-spacing: -.01em; max-width: min(760px, 88vw); }
+
+#page-radio .rd-static-body { color: var(--rd-dim); font-size: 14px; line-height: 1.9; }
+#page-radio .rd-static-body p { margin: 0 0 10px; }
+#page-radio .rd-static-body b { color: var(--rd-ink); font-weight: 600; }

@@ -108,6 +108,10 @@ export class RadioPage {
     } catch { /* ignore */ }
     // 地球风格切换（点阵 / 写实）
     this.$('rd-settings-close')?.addEventListener('click', () => this.closeSettings());
+    this.$('rd-static-close')?.addEventListener('click', () => this.closeStatic());
+    document.querySelectorAll('#page-radio .rd-credit-link').forEach((a) => {
+      a.addEventListener('click', (e) => { e.preventDefault(); this.openStatic(a.dataset.page || 'about'); });
+    });
     this.$('radio-globe-style')?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.openSettings();
@@ -170,6 +174,8 @@ export class RadioPage {
         const sheet = this.$('radio-sheet');
         const sb = this.$('radio-searchbox');
         const dial = this.$('radio-dial');
+        const staticBox = this.$('rd-static');
+        if (staticBox && !staticBox.hidden) { this.closeStatic(); return; }
         const setBox = this.$('rd-settings');
         if (setBox && !setBox.hidden) this.closeSettings();
         else if (rec && !rec.hidden) this.closeRecord();
@@ -919,7 +925,8 @@ export class RadioPage {
           id: d.id[i], name: d.name[i], url: d.url[i], cc,
           country: this.ccNames[cc] || cc,
           tags: String(d.tags[i] || '').split(',').filter(Boolean),
-          lat: d.lat[i] / 100, lon: d.lng[i] / 100,
+          lat: Math.max(-89.9, Math.min(89.9, d.lat[i] / 100)),
+        lon: ((((d.lng[i] / 100) + 540) % 360) - 180),
           bitrate: d.br[i] || 0, codec: '',
           g: d.g[i] | 0, l: d.l[i] | 0, prec: d.prec[i] | 0, pop: d.pop[i] | 0,
         };
@@ -1256,6 +1263,30 @@ export class RadioPage {
 
   zhCountry(cc) {
     try { if (!this._dn) this._dn = new Intl.DisplayNames(['zh-CN'], { type: 'region' }); return this._dn.of(String(cc || '').toUpperCase()) || cc; } catch { return cc; }
+  }
+
+  /* ==================== About / Privacy ==================== */
+  openStatic(kind) {
+    const box = this.$('rd-static');
+    if (!box) return;
+    const title = this.$('rd-static-title');
+    const body = this.$('rd-static-body');
+    const zh = this.zhCountry ? this : this;
+    if (kind === 'privacy') {
+      if (title) title.textContent = '隐私';
+      if (body) body.innerHTML = '<p><b>数据</b>：电台目录来自 Radio Browser 公共 API，地理数据来自 GeoNames。</p><p><b>本地存储</b>：音量、收藏、上次收听、视图偏好只存在你的浏览器 localStorage（pk_radio_* 键），不会上传。</p><p><b>音频</b>：音频流由各电台服务器直接提供，我们只做代理中转，不保存节目内容。</p><p><b>统计</b>：不使用第三方统计脚本。</p>';
+    } else {
+      if (title) title.textContent = '关于';
+      if (body) body.innerHTML = '<p><b>RoamSky</b> 是一个「随机听世界」的电台漫游工具：星图与地球上每个光点都是一个真实电台。</p><p>拖动星图、滚轮拉近，准星停稳会自动收听最近的电台；按 <b>G</b> 可在星图与地球之间切换。</p><p>电台目录来自 <b>Radio Browser</b>，地理信息来自 <b>GeoNames</b>。</p>';
+    }
+    box.hidden = false;
+    requestAnimationFrame(() => box.classList.add('shown'));
+  }
+  closeStatic() {
+    const box = this.$('rd-static');
+    if (!box) return;
+    box.classList.remove('shown');
+    setTimeout(() => { if (!box.classList.contains('shown')) box.hidden = true; }, 260);
   }
 
   /* ==================== 设置面板 ==================== */
