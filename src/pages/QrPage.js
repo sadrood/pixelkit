@@ -169,7 +169,11 @@ export class QrPage {
                   <option value="256">256</option>
                   <option value="512" selected>512</option>
                   <option value="1024">1024</option>
+                  <option value="custom">自定义…</option>
                 </select>
+              </label>
+              <label id="qr-size-custom-wrap" style="display:none;">宽
+                <input type="number" id="qr-size-custom" min="16" max="4096" step="1" value="60" /> px
               </label>
             </span>
             <!-- 2026-10-21：物理尺寸（打印常用 10mil/20mil 单模块，也支持整码宽 mm/inch） -->
@@ -483,25 +487,45 @@ export class QrPage {
         </div>
       </div>
 
-      <!-- 2026-10-21：屏幕校准（银行卡短边 54mm），用于「按物理尺寸显示」 -->
+      <!-- 2026-10-21：屏幕校准（物体比对 / 按屏幕对角线推算），用于「按物理尺寸显示」 -->
       <div class="qr-calib" id="qr-calib" aria-hidden="true">
         <div class="qr-calib-box">
           <h3>校准屏幕</h3>
-          <p>把校准物贴在屏幕上，拖动滑块，让下面两条竖线正好卡住它的左右两边。竖线就是边界，可以拖到很宽，不会被框限制。</p>
-          <label class="qr-calib-target-label">校准物：
-            <select id="qr-calib-target">
-              <option value="54" selected>银行卡 / 身份证 短边 54mm</option>
-              <option value="85.6">银行卡 / 身份证 长边 85.6mm（屏幕够宽再选）</option>
-              <option value="25">1 元硬币 直径 25mm</option>
+          <label class="qr-calib-mode-label">校准方式：
+            <select id="qr-calib-mode">
+              <option value="object" selected>物体比对（银行卡 / 硬币，最准）</option>
+              <option value="screen">按屏幕尺寸推算（输入对角线英寸）</option>
             </select>
           </label>
-          <div class="qr-calib-stage">
-            <div class="qr-calib-bar" id="qr-calib-bar"></div>
+          <div class="qr-calib-group" id="qr-calib-object">
+            <p>把校准物贴在屏幕上，拖动滑块，让下面两条竖线正好卡住它的左右两边。</p>
+            <label class="qr-calib-target-label">校准物：
+              <select id="qr-calib-target">
+                <option value="54" selected>银行卡 / 身份证 短边 54mm</option>
+                <option value="85.6">银行卡 / 身份证 长边 85.6mm（屏幕够宽再选）</option>
+                <option value="25">1 元硬币 直径 25mm</option>
+              </select>
+            </label>
+            <div class="qr-calib-stage">
+              <div class="qr-calib-bar" id="qr-calib-bar"></div>
+            </div>
+            <label class="qr-calib-range-label">宽度
+              <input type="range" id="qr-calib-range" min="80" max="600" step="1" value="204" />
+            </label>
+            <div class="qr-calib-value" id="qr-calib-value"></div>
           </div>
-          <label class="qr-calib-range-label">宽度
-            <input type="range" id="qr-calib-range" min="80" max="600" step="1" value="204" />
-          </label>
-          <div class="qr-calib-value" id="qr-calib-value"></div>
+          <div class="qr-calib-group" id="qr-calib-screen" style="display:none;">
+            <p>不知道屏幕对角线时，可在「设置 → 关于手机」或电脑显示器参数里查（如 6.1、6.7、15.6、24）。浏览器缩放请保持 100%。</p>
+            <label class="qr-calib-diag-label">屏幕对角线：
+              <input type="number" id="qr-calib-diag" min="3" max="120" step="0.1" placeholder="如 6.1" list="qr-calib-diag-list" /> 英寸
+            </label>
+            <datalist id="qr-calib-diag-list">
+              <option value="5.5"></option><option value="6.1"></option><option value="6.5"></option>
+              <option value="6.7"></option><option value="6.8"></option><option value="11"></option>
+              <option value="13.3"></option><option value="15.6"></option><option value="24"></option>
+            </datalist>
+            <div class="qr-calib-value" id="qr-calib-screen-value"></div>
+          </div>
           <div class="qr-calib-actions">
             <button type="button" class="btn btn-sm btn-primary" id="qr-calib-save">保存校准</button>
             <button type="button" class="btn btn-sm" id="qr-calib-cancel">取消</button>
@@ -528,6 +552,12 @@ export class QrPage {
     document.getElementById('qr-save-gen').addEventListener('click', () => this.saveRecord(this._lastText, 'generate'));
 
     // 2026-10-21：物理尺寸控件 —— 口径切换显隐两组，任意输入实时刷新提示
+    // 2026-10-21：输出尺寸支持自定义像素（下载文件就是这么多 px，与「显示大小」无关）
+    document.getElementById('qr-size')?.addEventListener('change', () => {
+      const sel = document.getElementById('qr-size');
+      const wrap = document.getElementById('qr-size-custom-wrap');
+      if (wrap) wrap.style.display = sel?.value === 'custom' ? '' : 'none';
+    });
     document.getElementById('qr-size-mode')?.addEventListener('change', () => this._applySizeMode());
     ['qr-phys-value', 'qr-phys-unit', 'qr-phys-basis', 'qr-phys-dpi'].forEach((id) => {
       const el = document.getElementById(id);
@@ -577,6 +607,8 @@ export class QrPage {
     document.getElementById('qr-zoom-calib')?.addEventListener('click', () => this._openQrCalib());
     document.getElementById('qr-calib-range')?.addEventListener('input', () => this._updateCalibBar());
     document.getElementById('qr-calib-target')?.addEventListener('change', () => this._updateCalibBar());
+    document.getElementById('qr-calib-mode')?.addEventListener('change', () => this._toggleCalibMode());
+    document.getElementById('qr-calib-diag')?.addEventListener('input', () => this._updateCalibScreenPreview());
     document.getElementById('qr-calib-save')?.addEventListener('click', () => this._saveQrCalib());
     document.getElementById('qr-calib-cancel')?.addEventListener('click', () => this._closeQrCalib());
     document.getElementById('qr-calib')?.addEventListener('click', (e) => {
@@ -645,7 +677,7 @@ export class QrPage {
     const hint = document.getElementById('qr-gen-hint');
     if (!text) { this.toast?.show('请输入文字或数字', 'error'); return; }
     hint.textContent = '生成中…';
-    const size = Number(document.getElementById('qr-size').value) || 512;
+    const size = this._outputSizePx();
     // 2026-10-21：尺寸口径（px / 物理尺寸），phys 模式下用物理参数渲染并写 DPI 元数据
     const sizeMode = document.getElementById('qr-size-mode')?.value === 'phys' ? 'phys' : 'px';
     let phys = null;
@@ -931,6 +963,16 @@ export class QrPage {
   /* ==================== 预览显示大小（2026-10-21）====================
      只改页面上 <img> 的 CSS 尺寸：下载文件仍按「输出尺寸 / 物理尺寸」生成，
      像素和打印尺寸都不变；窄屏由 CSS max-width 收窄，不撑破容器。 */
+  /** 下载图片的实际像素：输出尺寸 select 或自定义输入（16–4096） */
+  _outputSizePx() {
+    const sel = document.getElementById('qr-size');
+    if (sel?.value === 'custom') {
+      const n = Math.round(Number(document.getElementById('qr-size-custom')?.value) || 512);
+      return Math.min(4096, Math.max(16, n));
+    }
+    return Number(sel?.value) || 512;
+  }
+
   _displaySizePx() {
     const mode = document.getElementById('qr-display-size')?.value || '256';
     if (mode !== 'custom') return Number(mode) || 256;
@@ -1063,18 +1105,56 @@ export class QrPage {
     return v > 0 ? v : QR_CALIB_MM;
   }
 
+  _calibMode() {
+    return document.getElementById('qr-calib-mode')?.value === 'screen' ? 'screen' : 'object';
+  }
+
+  _toggleCalibMode() {
+    const mode = this._calibMode();
+    const obj = document.getElementById('qr-calib-object');
+    const scr = document.getElementById('qr-calib-screen');
+    if (obj) obj.style.display = mode === 'screen' ? 'none' : '';
+    if (scr) scr.style.display = mode === 'screen' ? '' : 'none';
+    if (mode === 'screen') this._updateCalibScreenPreview();
+  }
+
+  /** 按屏幕对角线（英寸）+ screen.width/height（CSS px）推算 mm/CSS px，无需放物体 */
+  _updateCalibScreenPreview() {
+    const diag = Number(document.getElementById('qr-calib-diag')?.value);
+    const sw = window.screen?.width || window.innerWidth;
+    const sh = window.screen?.height || window.innerHeight;
+    const val = document.getElementById('qr-calib-screen-value');
+    if (!(diag > 0)) {
+      if (val) val.textContent = `当前屏幕 ${sw}×${sh} CSS px，请输入对角线英寸（如 6.1）`;
+      return 0;
+    }
+    const mmPerPx = diag * 25.4 / Math.hypot(sw, sh);
+    if (val) {
+      val.textContent = `当前屏幕 ${sw}×${sh} CSS px · ${diag}″ → 1 CSS px ≈ ${mmPerPx.toFixed(4)}mm（整屏约 ${Math.round(sw * mmPerPx)}×${Math.round(sh * mmPerPx)}mm）`;
+    }
+    return mmPerPx;
+  }
+
   _openQrCalib() {
     const box = document.getElementById('qr-calib');
     if (!box) return;
     box.classList.add('open');
     box.setAttribute('aria-hidden', 'false');
+    this._toggleCalibMode();
+    // 已有校准值就反推对角线预填，方便查看/微调
+    const saved = this._screenMmPerPx();
+    const diagEl = document.getElementById('qr-calib-diag');
+    if (diagEl && saved > 0 && !diagEl.value) {
+      const sw = window.screen?.width || window.innerWidth;
+      const sh = window.screen?.height || window.innerHeight;
+      diagEl.value = String(Number((saved * Math.hypot(sw, sh) / 25.4).toFixed(1)));
+    }
     const boxEl = box.querySelector('.qr-calib-box');
     const range = document.getElementById('qr-calib-range');
     if (range) {
       // 校准条可以铺到弹窗能容纳的最大宽度（不再被固定 560px 的框住）
       const max = Math.max(160, Math.min(1400, Math.floor((boxEl?.clientWidth || window.innerWidth) - 8)));
       range.max = String(max);
-      const saved = this._screenMmPerPx();
       const mm = this._calibMm();
       const w = saved > 0 ? Math.round(mm / saved) : Math.round(mm / (25.4 / 96));
       range.value = String(Math.min(max, Math.max(60, w)));
@@ -1101,9 +1181,16 @@ export class QrPage {
   }
 
   _saveQrCalib() {
-    const w = Number(document.getElementById('qr-calib-range')?.value) || 0;
-    if (!(w > 40)) return;
-    try { localStorage.setItem('pixelkit_screen_mm_per_px', String(this._calibMm() / w)); } catch { /* ignore */ }
+    let mmPerPx = 0;
+    if (this._calibMode() === 'screen') {
+      mmPerPx = this._updateCalibScreenPreview();
+      if (!(mmPerPx > 0)) { this.toast?.show('请输入屏幕对角线（英寸）', 'error'); return; }
+    } else {
+      const w = Number(document.getElementById('qr-calib-range')?.value) || 0;
+      if (!(w > 40)) return;
+      mmPerPx = this._calibMm() / w;
+    }
+    try { localStorage.setItem('pixelkit_screen_mm_per_px', String(mmPerPx)); } catch { /* ignore */ }
     this._closeQrCalib();
     this.toast?.show('屏幕已校准', 'success');
     this._refreshZoomPhys();
@@ -1401,7 +1488,7 @@ export class QrPage {
     const sizeMode = v('qr-size-mode') === 'phys' ? 'phys' : 'px';
     const margin = Number(v('qr-margin') ?? 4);
     return {
-      size: Number(v('qr-size')) || 512,
+      size: this._outputSizePx(),
       sizeMode,
       phys: sizeMode === 'phys' ? this._physSettings() : null,
       margin: Number.isFinite(margin) ? margin : 4,

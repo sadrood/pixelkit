@@ -1429,13 +1429,22 @@ export class RadioPage {
         if (Math.abs(dLat) <= rad && Math.abs(dLon) * cosLat <= rad) cells.push([la, lo]);
       }
       for (const s2 of arr) {
-        if (s2.prec > 0) continue;
+        // 近似定位的电台不要都堆在中心：按哈希在其所在区域（州/国家）内散开，并校验落在陆地
+        if (s2.prec > 1) continue;
         const h = hash(String(s2.id || s2.name));
-        // 规格书 §4.1：只有国家级信息时不得虚构城市位置 → 统一落在国家质心附近（≤0.12°）
         const ang = ((h >>> 9) % 4096) / 4096 * Math.PI * 2;
-        const rr = ((h >>> 21) % 1000) / 1000 * 0.12;
-        s2.lat = lat0 + Math.sin(ang) * rr;
-        s2.lon = lon0 + Math.cos(ang) * rr / Math.max(0.3, Math.cos(lat0 * Math.PI / 180));
+        const baseR = s2.prec === 1 ? 1.0 : 1.2;
+        const rr = (0.25 + ((h >>> 21) % 1000) / 1000 * 0.75) * baseR;
+        const lat0s = s2.prec === 1 ? s2.lat : lat0;
+        const lon0s = s2.prec === 1 ? s2.lon : lon0;
+        let placed = false;
+        for (let k = 0; k < 5; k++) {
+          const q = k === 0 ? 1 : Math.pow(0.6, k);
+          const la = lat0s + Math.sin(ang) * rr * q;
+          const lo = lon0s + Math.cos(ang) * rr * q / Math.max(0.3, Math.cos(lat0s * Math.PI / 180));
+          if (this.isLand(la, lo)) { s2.lat = la; s2.lon = ((lo + 540) % 360) - 180; placed = true; break; }
+        }
+        if (!placed) { s2.lat = lat0s; s2.lon = lon0s; }
         s2.approx = true;
         moved++;
       }
