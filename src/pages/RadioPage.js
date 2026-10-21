@@ -853,7 +853,8 @@ export class RadioPage {
         const tune = this.$('rd-tune');
         if (tune) {
           const fixed = best <= 140;
-          tune.textContent = fixed ? '已锁定' : '调谐中 · 最近 ' + (isFinite(best) ? Math.round(best) : '—') + ' PX';
+          if (!isFinite(best) || best > 900) { tune.textContent = '移动准星寻找电台'; }
+          else tune.textContent = fixed ? '已锁定' : '调谐中 · 最近 ' + Math.round(best) + ' PX';
           if (fixed && nearest) { const n = this.$('rd-tune-name'); if (n) n.textContent = nearest; }
           else if (this.view === 'nebula') { const n = this.$('rd-tune-name'); if (n) n.textContent = ''; }
         }
@@ -884,6 +885,7 @@ export class RadioPage {
       const MAX = 10;
       for (let k = 0; k < Math.min(MAX, labels.length); k++) {
         const l = labels[k];
+        if (l.x < -30 || l.x > w + 30 || l.y < -30 || l.y > h + 30) continue;
         const angle = -2.2 + k * (Math.PI * 2 / MAX) * 0.85;
         const radius = 208 + (k % 3) * 52 + Math.floor(k / 3) * 16;
         const lx = cx + Math.cos(angle) * radius;
