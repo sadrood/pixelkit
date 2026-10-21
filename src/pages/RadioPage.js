@@ -370,6 +370,7 @@ export class RadioPage {
     if (i >= 0) { this.index = i; this.syncSlider(); }
     this.playStation(station);
     this.openDial(station);
+    try { this._globe?.focus?.(station); } catch { /* ignore */ }
     try { if (this.view === 'nebula') this._neb3d?.flyToStation?.(station); else this._globe?.zoomTo?.(1.45, 0.4); } catch { /* ignore */ }
   }
 

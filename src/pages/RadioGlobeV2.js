@@ -372,7 +372,8 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     return hits.length ? hits[0].index : -1;
   };
   const onDown = (e) => {
-    dragging = true; moved = 0; lastX = e.clientX; lastY = e.clientY;
+    dragging = true;
+    focusTarget = null; moved = 0; lastX = e.clientX; lastY = e.clientY;
     lastInteract = Date.now(); canvas.style.cursor = 'grabbing';
     try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
   };
@@ -547,8 +548,13 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   return {
     mode: 'custom3d',
     focus(station) {
-      // 只标记选中，不再自动旋转地球（用户反馈放大后地球会乱转）
-      if (!station) return;
+      if (!station || !isFinite(station.lat) || !isFinite(station.lon)) return;
+      // 平滑转过去，让这台出现在准星附近（一次动画，不会持续旋转）
+      const theta = (station.lon + 180) * Math.PI / 180;
+      focusTarget = {
+        y: Math.PI / 2 - theta,
+        x: Math.max(-0.9, Math.min(0.9, -(station.lat || 0) * Math.PI / 180 * 0.9)),
+      };
       lastInteract = Date.now();
     },
     /** 介绍页期间：保持远景、隐藏点云，等用户点「开始收听」再飞入 */
@@ -691,7 +697,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       return filtered.length;
     },
     getFiltered() { return pointsList.slice(); },
-    debug() { return { mode: 'custom3d', zoomLevel, points: pointsList.length, cameraZ: +camera.position.z.toFixed(2) }; },
+    debug() { return { mode: 'custom3d', zoomLevel, points: pointsList.length, cameraZ: +camera.position.z.toFixed(2), rotY: +world.rotation.y.toFixed(3), rotX: +world.rotation.x.toFixed(3) }; },
     dispose() {
       disposed = true;
       cancelAnimationFrame(raf);
