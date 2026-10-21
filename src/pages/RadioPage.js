@@ -151,7 +151,8 @@ export class RadioPage {
     this.audio?.addEventListener('timeupdate', () => { if (this.audio && this.audio.currentTime > 0.2) this.clearStall(); });
     this.audio?.addEventListener('pause', () => { this.setPlayingUI(false); try { this.updateRecord(); } catch { /* ignore */ } });
     this.audio?.addEventListener('error', () => this.onAudioError());
-    this.audio?.addEventListener('stalled', () => { /* 等看门狗 */ });
+    this.audio?.addEventListener('stalled', () => this.armStall());
+    this.audio?.addEventListener('suspend', () => { if (this.audio && !this.audio.paused) this.armStall(); });
 
     // 键盘：← → 换台，空格暂停，F 收藏，Enter 进入，/ 搜索（仅本页激活时）
     document.addEventListener('keydown', (e) => {
@@ -560,7 +561,7 @@ export class RadioPage {
     }, 9000);
   }
 
-  async playStation(s) {
+  async playStation(s, opts) {
     if (!s || !s.url) { this.toast?.show?.('这个电台没有可用音频地址', 'error'); return; }
     this.current = s;
     this.autoNextCount = 0;
@@ -581,13 +582,13 @@ export class RadioPage {
           const Hls = await this.ensureHls();
           if (Hls && Hls.isSupported && Hls.isSupported()) {
             this._hls = new Hls({ enableWorker: true, lowLatencyMode: false });
-            this._hls.loadSource(s.url);
+            this._hls.loadSource(s.url + (opts && opts.bust ? (s.url.includes('?') ? '&' : '?') + '_r=' + Date.now() : ''));
             this._hls.attachMedia(this.audio);
             hlsOk = true;
           }
         } catch { /* 加载失败就退回原生 */ }
       }
-      if (!hlsOk) this.audio.src = '/api/radio/stream?u=' + encodeURIComponent(s.url);
+      if (!hlsOk) this.audio.src = '/api/radio/stream?u=' + encodeURIComponent(s.url) + (opts && opts.bust ? '&_r=' + Date.now() : '');
     } catch { /* ignore */ }
     this.armStall();
     try {
@@ -631,9 +632,19 @@ export class RadioPage {
     this.clearStall();
     this.setPlayingUI(false);
     if (!this.current) return;
-    if (this.autoNextCount >= 5) { this.setHint('这个台打不开，换一个试试', true); return; }
+    const s = this.current;
+    const key = String(s.id || s.url || '');
+    if (!this._retried) this._retried = new Set();
+    // 第一次失败：换线路（加缓存破坏参数）重试同一台
+    if (!this._retried.has(key)) {
+      this._retried.add(key);
+      this.setHint('信号不稳，正在换线路重试：' + (s.name || ''), true);
+      setTimeout(() => { try { this.playStation(s, { bust: true }); } catch { /* ignore */ } }, 500);
+      return;
+    }
+    if (this.autoNextCount >= 5) { this.setHint('连续多个台打不开，可能是网络受限，稍后再试', true); this.updateStatus('网络受限'); return; }
     this.autoNextCount += 1;
-    this.setHint('这个台连不上，自动换下一个…', true);
+    this.setHint('「' + (s.name || '该台') + '」不可用，自动跳过…', true);
     setTimeout(() => {
       if (this.index >= 0 && this.geoStations.length) this.setIndex(this.index + 1, true);
       else this.step(1);
