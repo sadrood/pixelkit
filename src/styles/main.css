@@ -2890,6 +2890,20 @@ body::before {
 }
 #page-qr .qr-options input[type="checkbox"] { display: inline-block; margin: 0; vertical-align: middle; }
 #page-qr .qr-options select { display: inline-block; }
+/* 2026-10-21：二维码物理尺寸（mil / mm / inch；打印店常用 10mil/20mil 单模块） */
+#page-qr .qr-options .qr-size-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+#page-qr .qr-options #qr-size-phys-wrap { flex: 1 1 100%; }
+#page-qr .qr-options input[type="number"] {
+  display: inline-block; width: 70px; padding: 5px 8px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text); font-family: inherit; font-size: 13px;
+}
+#page-qr .qr-options .qr-presets { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+#page-qr .qr-options .qr-preset { padding: 4px 9px; font-size: 11px; line-height: 1.5; border-radius: 6px; }
+#page-qr .qr-options #qr-phys-hint { flex: 1 0 100%; white-space: normal; }
+/* 2026-10-21：预览显示大小（只改页面显示，不影响下载像素）；窄屏不撑破容器 */
+#page-qr #qr-img, #page-qr #sl-qr, #page-qr #qr-file-img { max-width: 100%; }
+#page-qr .qr-options #qr-display-custom-wrap input[type="number"] { width: 72px; }
 /* ============================================================================
    2026-10-13：批量解码 / 批量扫码（参考草料二维码）
    ============================================================================ */

@@ -1,6 +1,107 @@
 import JsBarcode from 'jsbarcode';
 import jsQR from 'jsqr';
 
+/* ============================================================================
+   2026-10-21：二维码物理尺寸（打印口径）
+   用户诉求：能定制「10mil / 20mil」这种打印尺寸。打印店说尺寸一般按两种口径：
+     · 单模块（basis=module）：一个二维码小方块 10mil，整码大小 = 10mil × 总模块数
+     · 整码宽（basis=whole）：整个二维码宽 20mm，再反推每个模块多大
+   1 mil = 0.0254 mm，1 inch = 25.4 mm；total = 模块数 + 2×margin（margin=4，即 8 个模块）。
+   栅格像素要保证「每模块整数像素」否则边缘发虚：
+     px = round((整码mm / 25.4 × dpi) / total) × total
+   最低 total（即 1px/模块），上限 4096；被夹取时只给 warning 提示，不阻断生成。
+   抽成纯函数并导出，方便自检脚本 import 直接验证换算数值。
+   ============================================================================ */
+export const QR_PHYS_UNIT_MM = { mil: 0.0254, mm: 1, inch: 25.4 };
+export const QR_PHYS_MAX_PX = 4096;
+
+export function qrPhysGeometry({ modules, value, unit = 'mil', basis = 'module', dpi = 600, margin = 4 } = {}) {
+  const n = Math.max(1, Math.round(Number(modules) || 21));
+  const total = n + margin * 2;
+  const dpiN = Number(dpi) || 600;
+  const unitKey = Object.prototype.hasOwnProperty.call(QR_PHYS_UNIT_MM, unit) ? unit : 'mil';
+  const basisKey = basis === 'whole' ? 'whole' : 'module';
+  const inputMm = Math.max(0, Number(value) || 0) * QR_PHYS_UNIT_MM[unitKey];
+  let moduleMm, wholeMm;
+  if (basisKey === 'whole') { wholeMm = inputMm; moduleMm = wholeMm / total; }
+  else { moduleMm = inputMm; wholeMm = moduleMm * total; }
+
+  const warnings = [];
+  // 每模块像素先算再取整（整码宽 basis 下由整码像素反推）
+  let modulePx = Math.round((wholeMm / 25.4) * dpiN / total);
+  if (modulePx < 1) {
+    modulePx = 1;
+    warnings.push(`输出像素已压到最低 ${total}×${total}px（每模块 1px）`);
+  }
+  let px = modulePx * total;
+  if (px > QR_PHYS_MAX_PX) {
+    modulePx = Math.max(1, Math.floor(QR_PHYS_MAX_PX / total));
+    px = modulePx * total;
+    warnings.push(`输出像素超过 ${QR_PHYS_MAX_PX}，已限制为 ${px}×${px}px`);
+  }
+  // 下面三条是可扫性提示（白色小字，不阻断）；数值按打印经验给的阈值
+  if (moduleMm < 0.25) warnings.push(`模块仅 ${moduleMm.toFixed(3)}mm（<0.25mm），打印后可能扫不出`);
+  if (modulePx < 3) warnings.push(`每模块仅 ${modulePx}px（<3px），建议降低 DPI 或加大尺寸`);
+  if (wholeMm < 10) warnings.push(`整码仅 ${wholeMm.toFixed(2)}mm（<10mm），太小可能扫不出`);
+
+  const valueNum = Number(Number(value).toFixed(4));   // 去掉 10.0 这种尾巴，文件名/提示更干净
+  const label = `${Number.isFinite(valueNum) ? valueNum : 0}${unitKey}${basisKey === 'whole' ? '-whole' : ''}-${dpiN}dpi`;
+  return { n, total, value: Number.isFinite(valueNum) ? valueNum : 0, unit: unitKey, basis: basisKey, dpi: dpiN, wholeMm, moduleMm, modulePx, px, warnings, label };
+}
+
+/* 2026-10-21：PNG 物理 DPI 元数据（pHYs 块）。
+   canvas.toDataURL() 生成的 PNG 不写 DPI，打印软件只能按 96dpi 猜，10mil/模块就会印错尺寸；
+   这里手写 pHYs 块把 DPI 写进去（单位：像素/米）。CRC32 按 PNG 规范（反射多项式 0xEDB88320）。
+   只处理 PNG；JPG/WebP 不写，并在结果提示里说明。 */
+function pngCrc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) {
+    c ^= bytes[i];
+    for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xEDB88320 & -(c & 1));
+  }
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function bytesToBase64(bytes) {
+  // 大图（4096²）的字节数组分块转字符串，避免 String.fromCharCode.apply 参数过多爆栈
+  let s = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    s += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(s);
+}
+
+export function pngDataUrlWithDpi(dataUrl, dpi) {
+  try {
+    const prefix = 'data:image/png;base64,';
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith(prefix)) return dataUrl;
+    const ppuOfMeter = Math.max(1, Math.round(Number(dpi) / 0.0254));   // 每米像素数：600dpi ≈ 23622
+    const bin = atob(dataUrl.slice(prefix.length));
+    const src = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) src[i] = bin.charCodeAt(i);
+    if (src.length < 33) return dataUrl;
+    // PNG 签名（8 字节）+ 第一个块必须是 IHDR（长度 13 → 块共 25 字节，33 字节处结束）
+    if (!(src[0] === 0x89 && src[1] === 0x50 && src[2] === 0x4e && src[3] === 0x47)) return dataUrl;
+    if (src[12] !== 0x49 || src[13] !== 0x48 || src[14] !== 0x44 || src[15] !== 0x52) return dataUrl;  // 'IHDR'
+    const chunk = new Uint8Array(21);                     // 4 长度 + 4 类型 + 9 数据 + 4 CRC
+    const view = new DataView(chunk.buffer);
+    view.setUint32(0, 9);                                  // pHYs 数据长度固定 9
+    chunk.set([0x70, 0x48, 0x59, 0x73], 4);                // 'pHYs'
+    view.setUint32(8, ppuOfMeter);                         // 水平像素/米
+    view.setUint32(12, ppuOfMeter);                        // 垂直像素/米
+    chunk[16] = 1;                                         // 单位：1 = 米
+    view.setUint32(17, pngCrc32(chunk.subarray(4, 17)));   // CRC 覆盖「类型 + 数据」
+    const out = new Uint8Array(src.length + chunk.length);
+    out.set(src.subarray(0, 33), 0);                       // 签名 + IHDR
+    out.set(chunk, 33);
+    out.set(src.subarray(33), 33 + chunk.length);
+    return prefix + bytesToBase64(out);
+  } catch {
+    return dataUrl;   // 任何异常都回退原图，保证「生成」不因元数据失败
+  }
+}
+
 /**
  * PixelKit - 二维码/一维码工具
  * 生成（文字/数字 → 二维码/一维码）、解码（图片 → 文字）、历史记录（24h 保存）
@@ -28,6 +129,8 @@ export class QrPage {
     this.loadRecords();
     this.initBatch();
     this.initShortlink();
+    // 2026-10-21：物理尺寸提示要实时算模块数，打开二维码页就先预加载 qrcode（原来是点「生成」才加载）
+    this._loadQrLib().catch(() => {});
   }
 
   render() {
@@ -50,13 +153,72 @@ export class QrPage {
         <div class="qr-input-wrap">
           <textarea id="qr-text" placeholder="输入文字、网址或数字即可生成二维码" rows="4"></textarea>
           <div class="qr-options">
-            <label>尺寸：
-              <select id="qr-size">
-                <option value="256">256</option>
-                <option value="512" selected>512</option>
-                <option value="1024">1024</option>
+            <label>尺寸口径：
+              <select id="qr-size-mode">
+                <option value="px" selected>像素尺寸</option>
+                <option value="phys">物理尺寸（打印）</option>
               </select>
             </label>
+            <span id="qr-size-px-wrap" class="qr-size-group">
+              <label>输出尺寸：
+                <select id="qr-size">
+                  <option value="256">256</option>
+                  <option value="512" selected>512</option>
+                  <option value="1024">1024</option>
+                </select>
+              </label>
+            </span>
+            <!-- 2026-10-21：物理尺寸（打印常用 10mil/20mil 单模块，也支持整码宽 mm/inch） -->
+            <span id="qr-size-phys-wrap" class="qr-size-group" style="display:none;">
+              <label>物理尺寸：
+                <input type="number" id="qr-phys-value" value="10" min="0.01" step="1" inputmode="decimal" />
+              </label>
+              <label>单位：
+                <select id="qr-phys-unit">
+                  <option value="mil" selected>mil（密耳）</option>
+                  <option value="mm">mm（毫米）</option>
+                  <option value="inch">inch（英寸）</option>
+                </select>
+              </label>
+              <label>口径：
+                <select id="qr-phys-basis">
+                  <option value="module" selected>单模块</option>
+                  <option value="whole">整码宽</option>
+                </select>
+              </label>
+              <label>DPI：
+                <select id="qr-phys-dpi">
+                  <option value="300">300</option>
+                  <option value="600" selected>600</option>
+                  <option value="1200">1200</option>
+                  <option value="2400">2400</option>
+                </select>
+              </label>
+              <span class="qr-presets">
+                <button type="button" class="btn btn-sm qr-preset" data-qr-preset="10,mil">10 mil</button>
+                <button type="button" class="btn btn-sm qr-preset" data-qr-preset="20,mil">20 mil</button>
+                <button type="button" class="btn btn-sm qr-preset" data-qr-preset="1,mm">1 mm</button>
+                <button type="button" class="btn btn-sm qr-preset" data-qr-preset="2,mm">2 mm</button>
+              </span>
+              <span class="qr-hint" id="qr-phys-hint"></span>
+            </span>
+            <!-- 2026-10-21：预览显示大小（只影响页面上看到的二维码大小，不改变下载像素/打印尺寸） -->
+            <label title="只影响页面预览显示大小，不改变下载图片的像素和打印尺寸">显示大小：
+              <select id="qr-display-size">
+                <option value="128">128 px</option>
+                <option value="192">192 px</option>
+                <option value="256" selected>256 px（默认）</option>
+                <option value="320">320 px</option>
+                <option value="384">384 px</option>
+                <option value="512">512 px</option>
+                <option value="640">640 px</option>
+                <option value="custom">自定义…</option>
+              </select>
+            </label>
+            <label id="qr-display-custom-wrap" style="display:none;">宽：
+              <input type="number" id="qr-display-custom" value="256" min="32" max="1024" step="8" />
+            </label>
+            <span class="qr-hint" id="qr-display-hint">仅影响预览显示，不改变下载像素</span>
             <label>格式：
               <select id="qr-format">
                 <option value="png" selected>PNG（无损·推荐）</option>
@@ -304,6 +466,41 @@ export class QrPage {
     document.getElementById('qr-download').addEventListener('click', () => this.downloadCurrent());
     document.getElementById('qr-save-gen').addEventListener('click', () => this.saveRecord(this._lastText, 'generate'));
 
+    // 2026-10-21：物理尺寸控件 —— 口径切换显隐两组，任意输入实时刷新提示
+    document.getElementById('qr-size-mode')?.addEventListener('change', () => this._applySizeMode());
+    ['qr-phys-value', 'qr-phys-unit', 'qr-phys-basis', 'qr-phys-dpi'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('input', () => this._refreshPhysHint());
+      el.addEventListener('change', () => this._refreshPhysHint());
+    });
+    document.querySelectorAll('[data-qr-preset]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const [val, unit] = String(btn.dataset.qrPreset || '').split(',');
+        const valueEl = document.getElementById('qr-phys-value');
+        const unitEl = document.getElementById('qr-phys-unit');
+        if (valueEl && val) valueEl.value = val;
+        if (unitEl && unit) unitEl.value = unit;
+        this._refreshPhysHint();
+      });
+    });
+    // 文本 / 容错会改变模块数（总模块数 = 整码 / 单模块），提示跟着更新
+    const physHintOnChange = () => { if (document.getElementById('qr-size-mode')?.value === 'phys') this._refreshPhysHint(); };
+    document.getElementById('qr-text')?.addEventListener('input', physHintOnChange);
+    document.getElementById('qr-ecc')?.addEventListener('change', physHintOnChange);
+    this._applySizeMode();
+
+    // 2026-10-21：预览显示大小 —— 只改页面上 <img> 的显示尺寸，不动下载像素/打印尺寸
+    document.getElementById('qr-display-size')?.addEventListener('change', () => {
+      this._applyDisplaySize();
+      this._saveDisplaySize();
+    });
+    document.getElementById('qr-display-custom')?.addEventListener('input', () => {
+      this._applyDisplaySize();
+      this._saveDisplaySize();
+    });
+    this._restoreDisplaySize();
+
     // 生成一维码
     document.getElementById('barcode-gen-btn').addEventListener('click', () => this.generateBarcode());
     document.getElementById('barcode-download').addEventListener('click', () => this.downloadCurrent());
@@ -362,6 +559,18 @@ export class QrPage {
     if (!text) { this.toast?.show('请输入文字或数字', 'error'); return; }
     hint.textContent = '生成中…';
     const size = Number(document.getElementById('qr-size').value) || 512;
+    // 2026-10-21：尺寸口径（px / 物理尺寸），phys 模式下用物理参数渲染并写 DPI 元数据
+    const sizeMode = document.getElementById('qr-size-mode')?.value === 'phys' ? 'phys' : 'px';
+    let phys = null;
+    if (sizeMode === 'phys') {
+      const rawPhys = Number(document.getElementById('qr-phys-value')?.value);
+      if (!(rawPhys > 0)) {
+        hint.textContent = '';
+        this.toast?.show('请输入大于 0 的物理尺寸', 'error');
+        return;
+      }
+      phys = { ...this._physSettings(), value: rawPhys };
+    }
     const dark = document.getElementById('qr-dark').value;
     const light = document.getElementById('qr-light').value;
     const ecc = document.getElementById('qr-ecc')?.value || 'M';
@@ -374,13 +583,17 @@ export class QrPage {
       /* 2026-10-13：改成**客户端**渲染（原来走后端 /api/qr/generate）。
          好处：① 不占服务器配额、零延迟；② 可以本地做样式/格式（后端只有纯黑方块 PNG）。
          qrcode 包提供 create() 拿到模块矩阵，剩下用 canvas 自己画。 */
-      const out = await this._renderQr({ text, size, dark, light, ecc, style, eye, format, useGradient, dark2 });
+      const out = await this._renderQr({ text, size, sizeMode, phys, dark, light, ecc, style, eye, format, useGradient, dark2 });
       this._lastText = text;
       this._lastDataUrl = out.dataUrl;
       this._lastExt = out.ext;
+      this._lastBarcode = false;   // 切回普通二维码时别沿用一维码的下载前缀
+      this._lastPhys = out.phys || null;   // 物理尺寸信息（下载文件名 / 提示用）
       const img = document.getElementById('qr-img');
       img.src = out.dataUrl;
-      img.dataset.filename = `qrcode-${Date.now()}.${out.ext}`;
+      img.dataset.filename = out.phys
+        ? `qrcode-${out.phys.label}.${out.ext}`
+        : `qrcode-${Date.now()}.${out.ext}`;
       const dl = document.getElementById('qr-download');
       if (dl) dl.textContent = `⬇ 下载 ${out.ext.toUpperCase()}`;
       document.getElementById('qr-gen-result').style.display = '';
@@ -392,6 +605,7 @@ export class QrPage {
       this._lastText = '';
       this._lastDataUrl = '';
       this._lastBarcode = false;
+      this._lastPhys = null;
       const oldImg = document.getElementById('qr-img');
       if (oldImg) { oldImg.removeAttribute('src'); delete oldImg.dataset.filename; }
       const box = document.getElementById('qr-gen-result');
@@ -406,13 +620,15 @@ export class QrPage {
    * 说明：这是"太阳码**风格**"的美化二维码（圆形点阵+圆形定位点），
    *      扫码内容由你填写；微信官方小程序码（真·太阳码）必须调微信接口，需要小程序 AppID/Secret。
    */
-  async _renderQr({ text, size, dark, light, ecc, style, eye, format, useGradient, dark2 }) {
-    const QRCode = (await import('qrcode')).default;
+  async _renderQr({ text, size, sizeMode = 'px', phys = null, dark, light, ecc, style, eye, format, useGradient, dark2 }) {
+    const QRCode = await this._loadQrLib();
     const qr = QRCode.create(text, { errorCorrectionLevel: ecc });
     const n = qr.modules.size;
     const data = qr.modules.data;          // 位矩阵：data[y * n + x]
     const margin = 4;
     const total = n + margin * 2;
+    // 2026-10-21：物理尺寸口径 → 用几何换算得到画布像素；px 模式 geom 为 null，完全走原有逻辑
+    const geom = (sizeMode === 'phys' && phys && Number(phys.value) > 0) ? this._physGeometry(n, phys) : null;
     const isFinder = (x, y) => (x < 7 && y < 7) || (x >= n - 7 && y < 7) || (x < 7 && y >= n - 7);
 
     const paint = (ctx, cell, fill) => {
@@ -470,6 +686,9 @@ export class QrPage {
     if (format === 'svg') {
       const cell = 10;
       const px = total * cell;
+      // 2026-10-21：物理尺寸模式把 width/height 写成 mm（viewBox 保持像素单位），
+      // 这样 SVG 按 100% 打印出来就是真实物理尺寸。
+      const sizeAttr = geom ? `${geom.wholeMm.toFixed(3)}mm` : `${px}`;
       let body = '';
       const fill = useGradient ? 'url(#pkgrad)' : dark;
       for (let y = 0; y < n; y++) {
@@ -497,29 +716,172 @@ export class QrPage {
       const gradDef = useGradient
         ? `<defs><linearGradient id="pkgrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${dark}"/><stop offset="1" stop-color="${dark2}"/></linearGradient></defs>`
         : '';
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 ${px} ${px}">`
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${sizeAttr}" height="${sizeAttr}" viewBox="0 0 ${px} ${px}">`
         + gradDef + `<rect width="${px}" height="${px}" fill="${light}"/>` + body + '</svg>';
       const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-      return { dataUrl, ext: 'svg', note: 'SVG 是矢量图，放大不糊' };
+      const note = geom ? this._physNote('svg', geom) : 'SVG 是矢量图，放大不糊';
+      return { dataUrl, ext: 'svg', note, phys: geom || null };
     }
 
+    // 2026-10-21：物理尺寸模式用几何换算出的 px（每模块整数像素）；px 模式仍是原来的 size
+    const outPx = geom ? geom.px : size;
     const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = size;
+    canvas.width = canvas.height = outPx;
     const ctx = canvas.getContext('2d');
-    const cell = size / total;
+    const cell = outPx / total;
     ctx.fillStyle = light;
-    ctx.fillRect(0, 0, size, size);
+    ctx.fillRect(0, 0, outPx, outPx);
     let fill = dark;
     if (useGradient) {
-      const g = ctx.createLinearGradient(0, 0, size, size);
+      const g = ctx.createLinearGradient(0, 0, outPx, outPx);
       g.addColorStop(0, dark);
       g.addColorStop(1, dark2);
       fill = g;
     }
     paint(ctx, cell, fill);
     const mime = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' }[format] || 'image/png';
-    const note = format === 'jpg' ? 'JPG 不支持透明，背景已填色' : '';
-    return { dataUrl: canvas.toDataURL(mime, 0.92), ext: format, note };
+    let dataUrl = canvas.toDataURL(mime, 0.92);
+    // 只有 PNG 能写 pHYs DPI 元数据；JPG/WebP 不写，note 里说明
+    if (geom && format === 'png') dataUrl = pngDataUrlWithDpi(dataUrl, geom.dpi);
+    const note = geom ? this._physNote(format, geom) : (format === 'jpg' ? 'JPG 不支持透明，背景已填色' : '');
+    return { dataUrl, ext: format, note, phys: geom || null };
+  }
+
+  /* ==================== 物理尺寸（2026-10-21）====================
+     打印店说的 10mil/20mil 是「单模块」尺寸；也支持按「整码宽」反推。
+     这里负责：控件读取、口径切换显隐、实时提示、结果 note、下载文件名。 */
+  _loadQrLib() {
+    // qrcode 包原来只在生成时动态 import；物理尺寸提示要实时算模块数，这里缓存一份
+    if (!this._qrLibPromise) {
+      this._qrLibPromise = import('qrcode').then((m) => {
+        this._qrLib = m.default || m;
+        return this._qrLib;
+      });
+    }
+    return this._qrLibPromise;
+  }
+
+  _physGeometry(n, opts = {}) {
+    return qrPhysGeometry({ modules: n, ...opts });
+  }
+
+  _physSettings() {
+    const raw = Number(document.getElementById('qr-phys-value')?.value);
+    return {
+      value: Number.isFinite(raw) && raw > 0 ? raw : 10,
+      unit: document.getElementById('qr-phys-unit')?.value || 'mil',
+      basis: document.getElementById('qr-phys-basis')?.value || 'module',
+      dpi: Number(document.getElementById('qr-phys-dpi')?.value) || 600,
+    };
+  }
+
+  _applySizeMode() {
+    const mode = document.getElementById('qr-size-mode')?.value === 'phys' ? 'phys' : 'px';
+    const pxWrap = document.getElementById('qr-size-px-wrap');
+    const physWrap = document.getElementById('qr-size-phys-wrap');
+    // 内联 display 直接切换，避免和 .qr-options 的 flex 布局打架
+    if (pxWrap) pxWrap.style.display = mode === 'phys' ? 'none' : '';
+    if (physWrap) physWrap.style.display = mode === 'phys' ? '' : 'none';
+    this._refreshPhysHint();
+  }
+
+  _physPreviewModules() {
+    const lib = this._qrLib;
+    if (!lib) return 21;   // 库还没加载：按 version 1（21 模块，total=29）预览，加载完成后自动刷新
+    const text = (document.getElementById('qr-text')?.value || '').trim() || 'PixelKit';
+    const ecc = document.getElementById('qr-ecc')?.value || 'M';
+    try { return lib.create(text, { errorCorrectionLevel: ecc }).modules.size; } catch { return 21; }
+  }
+
+  _physHintText(geom) {
+    // 形如：整码 7.366 mm（290 mil）· 模块 0.254 mm · 174×174 px @ 600 DPI（6 px/模块）
+    const whole = String(Number(geom.wholeMm.toFixed(3)));
+    const wholeMil = Math.round(geom.wholeMm / 0.0254);
+    const mod = String(Number(geom.moduleMm.toFixed(3)));
+    const base = `整码 ${whole} mm（${wholeMil} mil）· 模块 ${mod} mm · ${geom.px}×${geom.px} px @ ${geom.dpi} DPI（${geom.modulePx} px/模块）`;
+    return geom.warnings.length ? `${base}；⚠ ${geom.warnings.join('；')}` : base;
+  }
+
+  _refreshPhysHint() {
+    const box = document.getElementById('qr-phys-hint');
+    if (!box) return;
+    if ((document.getElementById('qr-size-mode')?.value || 'px') !== 'phys') { box.textContent = ''; return; }
+    const rawValue = Number(document.getElementById('qr-phys-value')?.value);
+    if (!(rawValue > 0)) { box.textContent = '请输入大于 0 的物理尺寸'; return; }
+    const geom = this._physGeometry(this._physPreviewModules(), { ...this._physSettings(), value: rawValue });
+    box.textContent = this._physHintText(geom);
+    // 第一次切到物理尺寸时 qrcode 库可能还没加载：加载完用真实模块数再刷一次
+    if (!this._qrLib && !this._physHintPending) {
+      this._physHintPending = true;
+      this._loadQrLib().then(() => {
+        this._physHintPending = false;
+        this._refreshPhysHint();
+      }).catch(() => { this._physHintPending = false; });
+    }
+  }
+
+  _physNote(format, geom) {
+    // 生成成功后的 #qr-gen-hint：含物理尺寸 + DPI/格式说明（打印时知道该怎么用）
+    const unitText = geom.unit === 'mil' ? 'mil' : geom.unit === 'mm' ? 'mm' : 'inch';
+    const basisText = geom.basis === 'whole' ? `整码宽 ${geom.value}${unitText}` : `单模块 ${geom.value}${unitText}`;
+    const whole = String(Number(geom.wholeMm.toFixed(3)));
+    const wholeMil = Math.round(geom.wholeMm / 0.0254);
+    const detail = `${geom.px}×${geom.px} px @ ${geom.dpi} DPI（${geom.modulePx} px/模块）`;
+    let tail;
+    if (format === 'svg') tail = 'SVG 用 mm 物理单位输出，按 100% 打印即真实尺寸';
+    else if (format === 'png') tail = `PNG 已写入 ${geom.dpi} DPI 元数据，打印按实际尺寸`;
+    else tail = `${String(format).toUpperCase()} 不含 DPI 元数据，打印时请按 ${whole}mm 设置尺寸`;
+    const warn = geom.warnings.length ? `；⚠ ${geom.warnings.join('；')}` : '';
+    return `已按${basisText}生成：整码 ${whole}mm（${wholeMil} mil）· ${detail} · ${tail}${warn}`;
+  }
+
+  /* ==================== 预览显示大小（2026-10-21）====================
+     只改页面上 <img> 的 CSS 尺寸：下载文件仍按「输出尺寸 / 物理尺寸」生成，
+     像素和打印尺寸都不变；窄屏由 CSS max-width 收窄，不撑破容器。 */
+  _displaySizePx() {
+    const mode = document.getElementById('qr-display-size')?.value || '256';
+    if (mode !== 'custom') return Number(mode) || 256;
+    const n = Math.round(Number(document.getElementById('qr-display-custom')?.value) || 256);
+    return Math.min(1024, Math.max(32, n));
+  }
+
+  _applyDisplaySize() {
+    const sel = document.getElementById('qr-display-size');
+    const customWrap = document.getElementById('qr-display-custom-wrap');
+    if (customWrap) customWrap.style.display = sel?.value === 'custom' ? '' : 'none';
+    const px = this._displaySizePx();
+    // 只调「生成结果」这几个图；解码预览、记录弹窗保持原样
+    ['qr-img', 'sl-qr', 'qr-file-img'].forEach((id) => {
+      const img = document.getElementById(id);
+      if (!img) return;
+      img.style.width = `${px}px`;
+      img.style.height = 'auto';      // 保持二维码正方形比例，窄屏交给 max-width
+    });
+  }
+
+  _saveDisplaySize() {
+    try {
+      const sel = document.getElementById('qr-display-size');
+      const custom = document.getElementById('qr-display-custom');
+      localStorage.setItem('pixelkit_qr_display_size', JSON.stringify({
+        mode: sel?.value || '256',
+        custom: custom?.value || '256',
+      }));
+    } catch { /* 隐私模式 / 禁用存储时忽略 */ }
+  }
+
+  _restoreDisplaySize() {
+    try {
+      const raw = localStorage.getItem('pixelkit_qr_display_size');
+      if (raw) {
+        const saved = JSON.parse(raw) || {};
+        const sel = document.getElementById('qr-display-size');
+        const custom = document.getElementById('qr-display-custom');
+        if (sel && ['128', '192', '256', '320', '384', '512', '640', 'custom'].includes(saved.mode)) sel.value = saved.mode;
+        if (custom && saved.custom) custom.value = saved.custom;
+      }
+    } catch { /* ignore */ }
+    this._applyDisplaySize();
   }
 
   /* ==================== 批量解码 / 批量扫码（2026-10-13 参考草料二维码增补）====================
@@ -764,8 +1126,12 @@ export class QrPage {
 
   _currentQrOpts() {
     const v = (id) => document.getElementById(id)?.value;
+    // 2026-10-21：尺寸口径 + 物理尺寸参数跟着 opts 走，批量生成 / 活码自动继承
+    const sizeMode = v('qr-size-mode') === 'phys' ? 'phys' : 'px';
     return {
       size: Number(v('qr-size')) || 512,
+      sizeMode,
+      phys: sizeMode === 'phys' ? this._physSettings() : null,
       dark: v('qr-dark') || '#000000',
       light: v('qr-light') || '#ffffff',
       ecc: v('qr-ecc') || 'M',
@@ -976,7 +1342,9 @@ export class QrPage {
     a.href = this._lastDataUrl;
     const prefix = this._lastBarcode ? 'barcode' : 'qrcode';
     const ext = this._lastBarcode ? 'png' : (this._lastExt || 'png');
-    a.download = `${prefix}-${Date.now()}.${ext}`;
+    // 2026-10-21：物理尺寸模式文件名带尺寸信息（如 qrcode-10mil-600dpi.png）；px 模式保持原样
+    const stamp = (!this._lastBarcode && this._lastPhys) ? `-${this._lastPhys.label}` : `-${Date.now()}`;
+    a.download = `${prefix}${stamp}.${ext}`;
     a.click();
   }
 
@@ -1074,6 +1442,10 @@ export class QrPage {
       const gd = await gr.json();
       if (!gd.success) throw new Error('二维码生成失败');
       this._lastDataUrl = gd.dataUrl;
+      // 2026-10-21：文件活码走服务端 512px PNG，清掉上一次物理尺寸/格式的残留，下载文件名才对
+      this._lastExt = 'png';
+      this._lastBarcode = false;
+      this._lastPhys = null;
       document.getElementById('qr-file-img').src = gd.dataUrl;
       document.getElementById('qr-file-link').textContent = d.url;
       document.getElementById('qr-file-result').style.display = '';
