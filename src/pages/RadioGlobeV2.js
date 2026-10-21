@@ -115,27 +115,6 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         const bin = atob(mask);
         const bits = new Uint8Array(bin.length);
         for (let i = 0; i < bin.length; i++) bits[i] = bin.charCodeAt(i);
-        // 陆地/海洋贴图（数据来自 land-mask，可辨认大陆轮廓）
-        const cv = document.createElement('canvas');
-        cv.width = cols; cv.height = rows;
-        const lctx = cv.getContext('2d');
-        const img = lctx.createImageData(cols, rows);
-        for (let r = 0; r < rows; r++) {
-          for (let c = 0; c < cols; c++) {
-            const idx = r * cols + c;
-            const land = (bits[idx >> 3] >> (idx & 7)) & 1;
-            const o = idx * 4;
-            if (land) { img.data[o] = 34; img.data[o + 1] = 74; img.data[o + 2] = 62; img.data[o + 3] = 255; }
-            else { img.data[o] = 7; img.data[o + 1] = 16; img.data[o + 2] = 14; img.data[o + 3] = 255; }
-          }
-        }
-        lctx.putImageData(img, 0, 0);
-        const landTex = new THREE.CanvasTexture(cv);
-        landTex.colorSpace = THREE.SRGBColorSpace;
-        landTex.anisotropy = 4;
-        earth.material.map = landTex;
-        earth.material.color.set(0xffffff);
-        earth.material.needsUpdate = true;
         const cells = [];
         // 0.5° 掩膜隔点取样（约 1°），约 1.9 万个陆地点
         for (let r = 0; r < rows; r += 2) {
@@ -148,13 +127,13 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         const n = cells.length;
         const pos = new Float32Array(n * 3);
         for (let i = 0; i < n; i++) {
-          const v = toVec3(cells[i].lat, cells[i].lon, EARTH_R * 1.004);
+          const v = toVec3(cells[i].lat, cells[i].lon, EARTH_R * 1.012);
           pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
         }
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
         landLayer = new THREE.Points(g, new THREE.PointsMaterial({
-          map: dotTex, size: 0.0065, color: 0x4d6a5f, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending,
+          map: dotTex, size: 0.011, color: 0x8fd0b4, transparent: true, opacity: 0.95,
           depthWrite: false, sizeAttenuation: true,
         }));
         world.add(landLayer);
@@ -325,7 +304,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     const lvl = z > 4.0 ? 0 : z > 2.05 ? 1 : 2;
     if (lvl === zoomLevel) return;
     zoomLevel = lvl;
-    if (z < 1.25) {
+    if (z < 1.9) {
       const c = centerLatLon();
       const cos = Math.cos(c.lat * Math.PI / 180);
       const near = stations.filter((s) => {
@@ -367,7 +346,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       });
       buildPoints(strong.length > 1200 ? strong : stations);
       if (points) points.material.size = lvl === 0 ? (mobile ? 0.02 : 0.012) : (mobile ? 0.028 : 0.018);
-      if (landLayer) landLayer.visible = lvl !== 2;
+      if (landLayer) landLayer.visible = true;
     }
   }
   applyZoomLevel();
@@ -439,7 +418,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   let wheelTimer = null;
   const onWheel = (e) => {
     e.preventDefault();
-    camera.position.z = Math.max(0.62, Math.min(6.0, camera.position.z + (e.deltaY > 0 ? 0.2 : -0.2)));
+    camera.position.z = Math.max(1.28, Math.min(6.0, camera.position.z + (e.deltaY > 0 ? 0.2 : -0.2)));
     lastInteract = Date.now();
     applyZoomLevel();
     // 松手停稳 650ms：把最近的一颗星「吸」过来（自动对焦/锁定）
