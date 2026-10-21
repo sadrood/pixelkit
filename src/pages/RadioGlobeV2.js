@@ -161,7 +161,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   let filtered = stations.slice();
   let points = null;
   let pointsGlow = null;
-  let morphT = 1, morphDur = 1.5, morphBase = null, morphTarget = null;
+  let morphT = 1, morphDur = 1.5, morphBase = null, morphTarget = null, morphStart = null;
   let pointGeo = null;
   let pointsList = [];
   let zoomLevel = 1;
@@ -213,6 +213,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     world.add(pointsGlow);
     // 记录变形起点；目标 = 该电台所属流派的星团位置（与星云 LAYOUT 一致的方位）
     morphBase = pos.slice();
+    morphStart = morphBase;
     const LAY = [
       [1.05, -0.15, 0.45], [1.95, -1.2, 0.15], [0.3, -1.8, 0.68], [2.4, 0.15, -0.45],
       [-2.1, 1.35, 0.83], [-2.2, 0.08, -0.68], [2.1, 1.43, 0.23], [-1.0, -0.38, 1.2],
@@ -536,7 +537,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       morphT = Math.min(1, morphT + dt / Math.max(0.001, morphDur));
       const e = 1 - Math.pow(1 - morphT, 3);
       const arr = pointGeo.attributes.position.array;
-      for (let i = 0; i < arr.length; i++) arr[i] = morphBase[i] + (morphTarget[i] - morphBase[i]) * e;
+      for (let i = 0; i < arr.length; i++) arr[i] = morphStart[i] + (morphTarget[i] - morphStart[i]) * e;
       pointGeo.attributes.position.needsUpdate = true;
     }
     renderer.render(scene, camera);
@@ -675,10 +676,20 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         morphTarget[i * 3 + 1] = c.y + (((h >>> 13) % 1000) / 1000 - 0.5) * 2 * spread;
         morphTarget[i * 3 + 2] = c.z + (((h >>> 23) % 1000) / 1000 - 0.5) * 2 * spread;
       }
+      morphStart = morphBase.slice();
       morphT = 0; morphDur = dur;
-      zoomFrom = camera.position.z; zoomToZ = 1.2; zoomT = 0; zoomDur = dur;
+      zoomFrom = camera.position.z; zoomToZ = 3.4; zoomT = 0; zoomDur = dur;
     },
     /** 星云→地球：恢复球面位置 */
+    /** 星云→地球：同一批粒子从星团位置飞回球面 */
+    morphToGlobe(dur = 1.2) {
+      if (!morphBase || !pointGeo) return;
+      const arr = pointGeo.attributes.position.array;
+      morphStart = Float32Array.from(arr);
+      morphTarget = morphBase.slice();
+      morphT = 0; morphDur = dur;
+      zoomFrom = camera.position.z; zoomToZ = END_Z; zoomT = 0; zoomDur = dur;
+    },
     resetMorph() {
       if (!morphBase || !pointGeo) return;
       const arr = pointGeo.attributes.position.array;

@@ -712,8 +712,8 @@ export class RadioPage {
         const wrap = this.$('radio-nebula3d');
         const fadeEl = this.$('rd-fade');
         // 同一批粒子从地球球面飞散成星团（1.5s），最后 0.3s 淡入黑场
-        try { this._globe.morphToNebula?.(1.05); this._globe.setOpacity?.(0.25); } catch { /* ignore */ }
-        await new Promise((r) => setTimeout(r, 820));
+        try { this._globe.morphToNebula?.(1.4); this._globe.setOpacity?.(0.5); } catch { /* ignore */ }
+        await new Promise((r) => setTimeout(r, 1180));
         try { if (fadeEl) { fadeEl.style.transition = 'opacity .3s var(--rd-ease)'; fadeEl.style.opacity = '1'; } } catch { /* ignore */ }
         await new Promise((r) => setTimeout(r, 240));
         if (globeEl) globeEl.style.visibility = 'hidden';
@@ -738,7 +738,7 @@ export class RadioPage {
           if (this._neb3d && this._neb3d.setStations) this._neb3d.setStations(this.geoStations);
           if (this.genreFilter >= 0) this._neb3d.setFilter?.((st) => (st.g || 0) === this.genreFilter);
           // 从远处飞入星云（不是放大缩小）
-          try { this._neb3d.enter?.(1.5); } catch { /* ignore */ }
+          try { this._neb3d.enter?.(1.35); } catch { /* ignore */ }
           if (wrap) {
             requestAnimationFrame(() => wrap.classList.add('shown'));
           }
@@ -773,19 +773,15 @@ export class RadioPage {
     }
     const wrap3d = this.$('radio-nebula3d');
     const fadeEl2 = this.$('rd-fade');
-    try { if (fadeEl2) { fadeEl2.style.transition = 'opacity .38s var(--rd-ease)'; fadeEl2.style.opacity = '1'; } } catch { /* ignore */ }
+    try { if (fadeEl2) fadeEl2.style.opacity = '0'; } catch { /* ignore */ } // 反向不做黑场，让粒子飞回可见
+    if (globeEl) { globeEl.style.visibility = ''; globeEl.style.display = ''; }
+    try { this._globe?.setOpacity?.(1); this._globe?.morphToGlobe?.(1.3); this._globe?.pullOut?.(1.2); } catch { /* ignore */ }
     if (wrap3d) wrap3d.classList.remove('shown');
     this.stopNebulaAnim();
-    await new Promise((r) => setTimeout(r, 460));
     if (neb) { neb.hidden = true; neb.style.display = 'none'; }
+    await new Promise((r) => setTimeout(r, 520));
     if (wrap3d) wrap3d.hidden = true;
-    if (globeEl) globeEl.style.visibility = '';
-    try { this._globe?.resetMorph?.(); } catch { /* ignore */ }
-    try { this._globe?.setOpacity?.(1); this._globe?.pullOut?.(0.8); } catch { /* ignore */ }
-    await new Promise((r) => setTimeout(r, 220));
-    try { if (fadeEl2) fadeEl2.style.opacity = '0'; } catch { /* ignore */ }
-    if (globeEl) globeEl.style.display = '';
-    if (this._globe) this._globe.setLayout('globe');
+    if (this._globe) this._globe.setLayout?.('globe');
     this.setHint('拖动旋转 · 滚轮远近 · 准星停稳自动收听');
   }
 
@@ -1448,7 +1444,7 @@ export class RadioPage {
         if (s2.prec > 1) continue;
         const h = hash(String(s2.id || s2.name));
         const ang = ((h >>> 9) % 4096) / 4096 * Math.PI * 2;
-        const baseR = s2.prec === 1 ? 1.0 : 1.2;
+        const baseR = s2.prec === 1 ? 0.6 : 0.55;
         const rr = (0.25 + ((h >>> 21) % 1000) / 1000 * 0.75) * baseR;
         const lat0s = s2.prec === 1 ? s2.lat : lat0;
         const lon0s = s2.prec === 1 ? s2.lon : lon0;
@@ -1460,6 +1456,7 @@ export class RadioPage {
           if (this.isLand(la, lo)) { s2.lat = la; s2.lon = ((lo + 540) % 360) - 180; placed = true; break; }
         }
         if (!placed) { s2.lat = lat0s; s2.lon = lon0s; }
+        if (!this.isLand(s2.lat, s2.lon)) { s2.lat = lat0; s2.lon = lon0; }
         s2.approx = true;
         moved++;
       }
