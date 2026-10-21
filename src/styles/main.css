@@ -4335,3 +4335,26 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .rd-genre-row:hover { background: #f5f1e80a; }
 #page-radio .rd-genre-row small { font: 400 11px var(--rd-mono); color: var(--rd-dim); }
 #page-radio .rd-genre-row i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 9px; }
+
+/* 入口页排版：中文标题不拆词、移动端更紧凑 */
+#page-radio .rd-intro-name { word-break: keep-all; max-width: min(820px, 92vw); }
+#page-radio .rd-intro-now { width: min(620px, calc(100vw - 2 * var(--rd-gx))); }
+@media (max-width: 560px) {
+  #page-radio .rd-intro-name { font-size: clamp(30px, 8.6vw, 40px) !important; line-height: 1.18 !important; margin: 10px 0 8px; }
+  #page-radio .rd-intro-now { left: 20px; right: 20px; width: auto; bottom: calc(64px + env(safe-area-inset-bottom)); }
+  #page-radio .rd-intro-acts { gap: 14px; }
+  #page-radio .rd-cta { height: 50px; padding: 0 22px; font-size: 15px; }
+  #page-radio .rd-intro-tip { font-size: 10px; left: 20px; }
+}
+@media (max-width: 400px) {
+  #page-radio .rd-intro-name { font-size: 28px !important; }
+  #page-radio .rd-k { font-size: 10px; }
+}
+
+/* 入口页移动端：去掉重复品牌/提示，避免与页脚重叠 */
+@media (max-width: 560px) {
+  #page-radio .rd-intro-tip, #page-radio .rd-poem, #page-radio .rd-poem-by { display: none !important; }
+  #page-radio .rd-intro-brand { top: calc(var(--rd-gy) + 8px); }
+  #page-radio .rd-intro-now { bottom: calc(104px + env(safe-area-inset-bottom)); }
+  #page-radio .rd-credit { left: 16px; right: 16px; bottom: 10px; text-align: center; font-size: 9px; line-height: 1.5; }
+}

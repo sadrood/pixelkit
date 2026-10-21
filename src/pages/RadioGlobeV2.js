@@ -21,7 +21,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   const scene = new THREE.Scene();
   scene.background = null;
   const camera = new THREE.PerspectiveCamera(45, 1, 0.05, 200);
-  const START_Z = mobile ? 4.4 : 4.8;
+  const START_Z = mobile ? 5.6 : 5.0;
   const END_Z = mobile ? 2.9 : 2.8;
   camera.position.set(0, 0.15, START_Z);
 
