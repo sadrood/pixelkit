@@ -138,6 +138,23 @@ export async function createNebula3D(container, stations, opts = {}) {
       countryCenters.set(cc, { v: new THREE.Vector3(Math.cos(ang) * radius, Math.sin(idx * 0.9) * 1.8, Math.sin(ang) * radius), n: arr.length });
     });
     skyClusters = order.map(([cc, arr]) => ({ cc, count: arr.length, v: countryCenters.get(cc).v }));
+    // 城市级布局：每个国家内按城市分桶，城市团绕国家中心螺旋排布，放大后逐层展开
+    const cityRank = new Map();
+    for (const [cc, arr] of order) {
+      const buckets = new Map();
+      for (const st of arr) {
+        const key = Math.round(st.lat * 2) + ',' + Math.round(st.lon * 2);
+        buckets.set(key, (buckets.get(key) || 0) + 1);
+      }
+      const list = [...buckets.entries()].sort((a, b) => b[1] - a[1]);
+      const off = new Map();
+      list.forEach(([key, cnt], idx) => {
+        const ang = idx * 2.39996;
+        const radius = 0.35 + Math.sqrt(idx + 1) * 0.42;
+        off.set(key, { x: Math.cos(ang) * radius, y: Math.sin(idx * 0.8) * 0.28, z: Math.sin(ang) * radius, cnt });
+      });
+      cityRank.set(cc, off);
+    }
     for (let i = 0; i < n; i++) {
       const s = stationsRef[i];
       const g = (s.g || 0) % nGenre;
@@ -145,10 +162,15 @@ export async function createNebula3D(container, stations, opts = {}) {
       const ccGroup = countryCenters.get(s.cc || '??') || { v: new THREE.Vector3(0, 0, 0), n };
       const c = ccGroup.v;
       const h = hash(s.id || s.name);
-      const spread = 0.5 + Math.sqrt(ccGroup.n) * 0.05;
-      pos[i * 3] = c.x + gauss(h) * spread;
-      pos[i * 3 + 1] = c.y + gauss(h >> 5) * spread * 0.9;
-      pos[i * 3 + 2] = c.z + gauss(h >> 11) * spread * 1.25;
+      const key = Math.round(s.lat * 2) + ',' + Math.round(s.lon * 2);
+      const info = cityRank.get(s.cc || '??');
+      const cityOff = info && info.get(key);
+      const cx = cityOff ? cityOff.x : 0, cy = cityOff ? cityOff.y : 0, cz = cityOff ? cityOff.z : 0;
+      const cnt = cityOff ? cityOff.cnt : 1;
+      const spread = 0.12 + Math.sqrt(cnt) * 0.03;
+      pos[i * 3] = c.x + cx + gauss(h) * spread;
+      pos[i * 3 + 1] = c.y + cy + gauss(h >> 5) * spread * 0.9;
+      pos[i * 3 + 2] = c.z + cz + gauss(h >> 11) * spread * 1.25;
       cent[i * 3] = c.x; cent[i * 3 + 1] = c.y; cent[i * 3 + 2] = c.z;
       rank[i] = (i % 997) / 997;
       tmp.set(GENRE_TINTS[g]).convertSRGBToLinear();
