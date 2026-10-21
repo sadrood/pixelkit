@@ -926,11 +926,22 @@ export class RadioPage {
           }
           clusters = keep;
         }
-        list.innerHTML = clusters.map((c, k) => {
-          const dy = (k % 2 === 0 ? -62 : 44) + (k % 3) * 8;
-          const dx = (k % 2 === 0 ? -1 : 1) * (16 + (k % 3) * 12);
-          return '<span class="nebula-cluster-label" style="left:' + Math.round(c.x + dx) + 'px;top:' + Math.round(c.y + dy) + 'px"><b>' + this.esc(this.zhCountry(c.name) || c.name || '') + '</b><span>' + c.count.toLocaleString('zh-CN') + ' 个电台</span></span>';
-        }).join('');
+        {
+          // 渲染时再做一次位置碰撞检测（含上下错开后的最终坐标），避免标签叠字
+          const placed = [];
+          const html = [];
+          clusters.forEach((c, k) => {
+            const dy = (k % 2 === 0 ? -62 : 44) + (k % 3) * 8;
+            const dx = (k % 2 === 0 ? -1 : 1) * (16 + (k % 3) * 12);
+            const x = c.x + dx, y = c.y + dy;
+            const w = 120, h = 34;
+            const r = { x1: x, y1: y - h / 2, x2: x + w, y2: y + h / 2 };
+            if (placed.some((q) => !(r.x2 < q.x1 || r.x1 > q.x2 || r.y2 < q.y1 || r.y1 > q.y2))) return;
+            placed.push(r);
+            html.push('<span class="nebula-cluster-label" style="left:' + Math.round(x) + 'px;top:' + Math.round(y) + 'px"><b>' + this.esc(this.zhCountry(c.name) || c.name || '') + '</b><span>' + c.count.toLocaleString('zh-CN') + ' 个电台</span></span>');
+          });
+          list.innerHTML = html.join('');
+        }
         if (leaders) leaders.innerHTML = '';
         return;
       }

@@ -40,7 +40,7 @@ export async function createNebula3D(container, stations, opts = {}) {
   container.innerHTML = '';
   container.appendChild(canvas);
   const bloom = document.createElement('canvas');
-  bloom.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen;filter:blur(14px) saturate(1.25);opacity:.42;z-index:0';
+  bloom.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen;filter:blur(14px) saturate(1.2);opacity:.26;z-index:0';
   container.style.position = 'relative';
   container.appendChild(bloom);
   const bctx = bloom.getContext('2d');
@@ -182,7 +182,7 @@ export async function createNebula3D(container, stations, opts = {}) {
       const popK = 0.45 + ((s.pop || 0) / 9) * 0.45;
       tmp.multiplyScalar(popK);
       col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
-      size[i] = 0.17 + ((h >>> 17) % 100) / 100 * 0.26;
+      size[i] = 0.15 + ((h >>> 17) % 100) / 100 * 0.22;
       phase[i] = ((h >>> 7) % 1000) / 1000 * Math.PI * 2;
     }
     drawnCount = 0;
@@ -250,7 +250,7 @@ export async function createNebula3D(container, stations, opts = {}) {
           float cap = mix(30.0, 6.5, smoothstep(6.0, 2.0, uCamDist));
           gl_PointSize = min(cap, s * (560.0 / max(dist, 0.35)));
           // 远处淡去、近处（贴镜头）也变淡，避免完全挡住视线
-          vAlpha = 0.52 * tw * smoothstep(0.8, 2.2, dist) * mix(1.0, smoothstep(0.2, 1.6, hd), uHoleOn) * (1.0 - smoothstep(24.0, 70.0, dist) * 0.35);
+          vAlpha = 0.42 * tw * smoothstep(0.8, 2.2, dist) * mix(1.0, smoothstep(0.2, 1.6, hd), uHoleOn) * (1.0 - smoothstep(24.0, 70.0, dist) * 0.35);
         }
       `,
       fragmentShader: `
