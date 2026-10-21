@@ -472,7 +472,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     // 入场：只在前 1.9s 接管相机；之后完全交给用户（否则缩放/旋转会被每帧重置）
     if (introHold) {
       camera.position.z = START_Z;
-      if (points) points.material.opacity = 0.3;
+      if (points) points.material.opacity = 0.6;
     } else if (!introDone) {
       const intro = Math.min(1, el / 1900);
       const ie = intro * intro * (3 - 2 * intro);

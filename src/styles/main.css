@@ -4010,7 +4010,7 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio.pre .radio-labels,
 #page-radio.pre .radio-cross,
 #page-radio.pre .radio-dial { opacity: 0; transition: opacity .18s var(--rd-ease); }
-#page-radio.pre .radio-globe-wrap { opacity: .82; transition: opacity .3s var(--rd-ease); }
+#page-radio.pre .radio-globe-wrap { opacity: 1; transition: opacity .3s var(--rd-ease); }
 #page-radio .radio-panel,
 #page-radio .radio-chips,
 #page-radio .radio-hints,
@@ -4034,8 +4034,8 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 }
 #page-radio .rd-intro {
   /* 不再用不透明星空图：让介绍页下方的地球透出来 */
-  background-image: linear-gradient(#0c181600 26%, #0c18168f 62%, #0c1816f0 100%),
-                    linear-gradient(#0c18164d, #0c181600 22%);
+  background-image: linear-gradient(#0c181600 18%, #0c18165c 58%, #0c1816ee 100%),
+                    linear-gradient(#0c18161a, #0c181600 18%);
   background-size: cover;
   background-position: center;
 }

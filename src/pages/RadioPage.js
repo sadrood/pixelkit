@@ -307,6 +307,17 @@ export class RadioPage {
       }
       // 拖动停稳后：准星对准的最近电台自动收听（RoamDial 的核心交互）
       try { this._globe.onSettle?.(() => this.autoTuneFromCrosshair()); } catch { /* ignore */ }
+      // 介绍页：点击地球也能进入（拖动仍然可以旋转）
+      try {
+        const globeEl = this.$('radio-globe');
+        if (globeEl && !this._introClickBound) {
+          this._introClickBound = true;
+          globeEl.addEventListener('click', () => {
+            const box = this.$('rd-intro');
+            if (box && !box.hidden) this.$('rd-continue')?.click();
+          });
+        }
+      } catch { /* ignore */ }
       this.loadFullStations();
       // 预热星云模块（用户切过去时不用等）
       import('./RadioNebula3D.js').catch(() => {});
