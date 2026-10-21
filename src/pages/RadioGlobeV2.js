@@ -646,10 +646,31 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     applyZoomLevel() { applyZoomLevel(); },
     /** 地球→星云：同一批粒子从球面飞散到星团位置 */
     morphToNebula(dur = 1.5) {
-      if (!morphBase) return;
-      morphT = 0;
-      morphDur = dur;
-      zoomFrom = camera.position.z; zoomToZ = 3.4; zoomT = 0; zoomDur = dur;
+      if (!morphBase || !pointGeo) return;
+      // 目标布局与 Sky 星云一致：按国家分组 + 黄金角排布
+      const groups = new Map();
+      for (const s of stations) { const k = s.cc || "??"; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(s); }
+      const order = [...groups.entries()].sort((a, b) => (b[1].length - a[1].length) || (a[0] < b[0] ? -1 : 1));
+      const center = new Map();
+      order.forEach(([cc, arr], idx) => {
+        const ang = idx * 2.39996;
+        const radius = 3.0 + Math.sqrt(idx + 1) * 1.35;
+        center.set(cc, { x: Math.cos(ang) * radius, y: Math.sin(idx * 0.9) * 1.8, z: Math.sin(ang) * radius, n: arr.length });
+      });
+      const cur = pointsList;
+      morphTarget = new Float32Array(cur.length * 3);
+      for (let i = 0; i < cur.length; i++) {
+        const s = cur[i];
+        const c = center.get(s.cc || "??") || { x: 0, y: 0, z: 0, n: 1 };
+        let h = 0; const id = String(s.id || s.name || i);
+        for (let k = 0; k < id.length; k++) h = (h * 31 + id.charCodeAt(k)) >>> 0;
+        const spread = 0.5 + Math.sqrt(c.n) * 0.05;
+        morphTarget[i * 3] = c.x + (((h >>> 3) % 1000) / 1000 - 0.5) * 2 * spread;
+        morphTarget[i * 3 + 1] = c.y + (((h >>> 13) % 1000) / 1000 - 0.5) * 2 * spread;
+        morphTarget[i * 3 + 2] = c.z + (((h >>> 23) % 1000) / 1000 - 0.5) * 2 * spread;
+      }
+      morphT = 0; morphDur = dur;
+      zoomFrom = camera.position.z; zoomToZ = 1.2; zoomT = 0; zoomDur = dur;
     },
     /** 星云→地球：恢复球面位置 */
     resetMorph() {

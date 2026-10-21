@@ -700,10 +700,10 @@ export class RadioPage {
         const wrap = this.$('radio-nebula3d');
         const fadeEl = this.$('rd-fade');
         // 同一批粒子从地球球面飞散成星团（1.5s），最后 0.3s 淡入黑场
-        try { this._globe.morphToNebula?.(1.5); } catch { /* ignore */ }
-        await new Promise((r) => setTimeout(r, 1180));
+        try { this._globe.morphToNebula?.(1.05); this._globe.setOpacity?.(0.25); } catch { /* ignore */ }
+        await new Promise((r) => setTimeout(r, 820));
         try { if (fadeEl) { fadeEl.style.transition = 'opacity .3s var(--rd-ease)'; fadeEl.style.opacity = '1'; } } catch { /* ignore */ }
-        await new Promise((r) => setTimeout(r, 330));
+        await new Promise((r) => setTimeout(r, 240));
         if (globeEl) globeEl.style.visibility = 'hidden';
         if (neb) neb.hidden = true;
         if (wrap) { wrap.hidden = false; wrap.classList.remove('shown'); }
