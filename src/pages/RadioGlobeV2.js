@@ -362,7 +362,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         const dLng = ((s.lon - c.lon + 540) % 360) - 180;
         return Math.abs(dLat) <= 3.2 && Math.abs(dLng) * cos <= 3.2;
       });
-      buildPoints(near.length > 60 ? near : stations, 3.2);
+      buildPoints(near.length > 60 ? near : stations, 4.0);
       if (points) { points.material.size = mobile ? 0.009 : 0.006; points.material.opacity = 0.5; }
       if (landLayer) landLayer.visible = false;
       if (landOutline) landOutline.visible = false;
@@ -386,7 +386,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
         const dLng = ((s.lon - c.lon + 540) % 360) - 180;
         return Math.abs(dLat) <= 8 && Math.abs(dLng) * cos <= 8;
       });
-      buildPoints(near.length ? near : stations);
+      buildPoints(near.length ? near : stations, 2.2);
       if (points) { points.material.size = mobile ? 0.011 : 0.007; points.material.opacity = 0.55; }
     } else {
       // 远景只显示强台，中景显示中强台：弱信号要放大才出现
@@ -425,6 +425,23 @@ export async function createRadioGlobe(container, stations, opts = {}) {
   };
   const pointers = new Map();
   let pinchStart = 0, pinchZ0 = 0;
+  // 屏幕空间取最近的点（准星 260px 内），供吸附与 pickCenter API 共用
+  const pickCenterScreen = () => {
+    if (!pointsList.length || !pointGeo) return -1;
+    const arr = pointGeo.attributes.position.array;
+    const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
+    const tmp = new THREE.Vector3();
+    let best = -1, bestD = 1e9;
+    for (let i = 0; i < pointsList.length; i++) {
+      tmp.set(arr[i * 3], arr[i * 3 + 1], arr[i * 3 + 2]).project(camera);
+      if (tmp.z > 1) continue;
+      const x = (tmp.x * 0.5 + 0.5) * w, y = (-tmp.y * 0.5 + 0.5) * h;
+      const d = Math.hypot(x - w / 2, y - h / 2);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return bestD <= 260 ? best : -1;
+  };
+
   const onDown = (e) => {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinchStart = Math.hypot(a.x - b.x, a.y - b.y); pinchZ0 = camera.position.z; dragging = false; return; }
@@ -499,7 +516,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
     wheelTimer = setTimeout(() => {
       wheelTimer = null;
       try {
-        const i = pickCenter();
+        const i = pickCenterScreen();
         if (i >= 0) {
           if (settleCb) settleCb();
           else if (opts.onPick) opts.onPick(pointsList[i], i);
@@ -652,23 +669,7 @@ export async function createRadioGlobe(container, stations, opts = {}) {
       diveT = 0;
       diveDur = dur;
     },
-    pickCenter() {
-      if (!pointsList.length) return -1;
-      const c = centerLatLon();
-      const cos = Math.cos(c.lat * Math.PI / 180);
-      // §5.2 命中优先级：距离最近的优先；距离接近（<1.2°）时信号更强的优先
-      let best = -1, bestGeo = 1e9;
-      for (let i = 0; i < pointsList.length; i++) {
-        const s = pointsList[i];
-        const dLat = s.lat - c.lat;
-        const dLng = ((s.lon - c.lon + 540) % 360) - 180;
-        const deg = Math.sqrt(dLat * dLat + (dLng * cos) * (dLng * cos)) * 180 / Math.PI;
-        if (deg > 25) continue;
-        const score = deg - (s.pop || 0) * 0.18;
-        if (score < bestGeo) { bestGeo = score; best = i; }
-      }
-      return best;
-    },
+    pickCenter() { return pickCenterScreen(); },
     getLabels(limit = 8) {
       if (!pointsList.length || !pointGeo) return [];
       const w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;

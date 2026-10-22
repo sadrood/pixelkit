@@ -4232,8 +4232,6 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .radio-q-item.sel { background: #f5f1e814; outline: 1px solid #f36b4580; }
 
 /* 无操作隐藏 UI */
-#page-radio.ui-idle .radio-panel,
-#page-radio.ui-idle .radio-chips,
 #page-radio.ui-idle .radio-hints,
 #page-radio.ui-idle .radio-topbar,
 #page-radio.ui-idle .radio-cross,
@@ -4408,3 +4406,6 @@ body[data-page="nightmarket"] .theme-fab { display: none !important; }
 #page-radio .rd-actions-btns { display: flex; gap: 8px; flex: 0 0 auto; }
 #page-radio .rd-mini-btn { height: 32px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--rd-line-strong); background: #f5f1e80a; color: var(--rd-ink); font: 400 12px var(--rd-sans); cursor: pointer; }
 #page-radio .rd-mini-btn:hover { border-color: #f5f1e880; background: #f5f1e814; }
+
+#page-radio .radio-nav.rd-prev { width: auto; gap: 6px; padding: 0 4px; color: var(--rd-ink); font: 400 15px var(--rd-sans); }
+#page-radio .radio-nav span { font: 400 13px var(--rd-sans); color: var(--rd-dim); }

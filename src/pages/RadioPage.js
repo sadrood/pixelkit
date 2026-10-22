@@ -105,7 +105,8 @@ export class RadioPage {
       const nextBtn = this.$('radio-next');
       if (nextBtn) { nextBtn.classList.add('rd-next'); nextBtn.innerHTML = '⏭<span>下一站</span>'; }
       const prevBtn = this.$('radio-prev');
-      if (prevBtn) prevBtn.innerHTML = '⏮';
+      if (prevBtn) { prevBtn.classList.add('rd-prev'); prevBtn.innerHTML = '⏮<span>上一站</span>'; prevBtn.title = '上一站（←）'; }
+      if (nextBtn) nextBtn.title = '下一站（→）';
     } catch { /* ignore */ }
     // 地球风格切换（点阵 / 写实）
     this.$('rd-settings-close')?.addEventListener('click', () => this.closeSettings());
@@ -237,7 +238,7 @@ export class RadioPage {
         if (this._introOpen) { this._act = Date.now(); return; }
         const idle = Date.now() - this._act;
         const busy = ['rd-record', 'rd-settings', 'radio-sheet', 'radio-searchbox'].some((id) => { const el = this.$(id); return el && !el.hidden; });
-        page.classList.toggle('ui-idle', !busy && idle > 1200);
+        page.classList.toggle('ui-idle', !busy && idle > 2500);
         const st = this.getSettings ? this.getSettings() : {};
         if (st.autodive !== false && idle > 30000 && this.audio && !this.audio.paused && !busy) {
           this._act = Date.now();
@@ -903,7 +904,7 @@ export class RadioPage {
         } catch { /* ignore */ }
         const tune = this.$('rd-tune');
         if (tune) {
-          const fixed = best <= 140;
+          const fixed = best <= 260;
           if (!isFinite(best) || best > 900) { tune.textContent = '移动准星寻找电台'; }
           else tune.textContent = fixed ? '已锁定' : '调谐中 · 最近 ' + Math.round(best) + ' PX';
           if (fixed && nearest) { const n = this.$('rd-tune-name'); if (n) n.textContent = nearest; }
@@ -1593,7 +1594,7 @@ export class RadioPage {
         if (s2.prec > 1) continue;
         const h = hash(String(s2.id || s2.name));
         const ang = ((h >>> 9) % 4096) / 4096 * Math.PI * 2;
-        const baseR = s2.prec === 1 ? 0.6 : 0.55;
+        const baseR = s2.prec === 1 ? 0.75 : 0.7;
         const rr = (0.25 + ((h >>> 21) % 1000) / 1000 * 0.75) * baseR;
         const lat0s = s2.prec === 1 ? s2.lat : lat0;
         const lon0s = s2.prec === 1 ? s2.lon : lon0;
