@@ -26,6 +26,7 @@ export class RadioPage {
     this._hls = null;
     this._pendingPlay = null;
     this._version = '2.0.0';
+    this._tuneLockUntil = 0;
   }
 
   $(id) { return document.getElementById(id); }
@@ -475,8 +476,10 @@ export class RadioPage {
     this.index = idx;
     const s = this.geoStations[idx];
     this.setNowPlaying(s);
+    this._tuneLockUntil = Date.now() + 4000;
     // 预览（play=false）时不移动镜头，保持初始的全球视角；切台才聚焦
-    try { this._globe?.setSelected(s); if (play) this._globe?.focus?.(this.resolveGeoStation(s)); } catch { /* ignore */ }
+    try { this._globe?.setSelected(s); } catch { /* ignore */ }
+    if (play) { try { this._globe?.focus?.(this.resolveGeoStation(s)); } catch { /* ignore */ } }
     if (play) { try { this.playTuneStatic('switch'); } catch { /* ignore */ } }
     this.syncSlider();
     this.setHint(`第 ${idx + 1} / ${n} 个 · ${[s.country, s.codec, s.bitrate ? s.bitrate + 'kbps' : ''].filter(Boolean).join(' · ')}`);
@@ -493,6 +496,23 @@ export class RadioPage {
     if (!this.geoStations.length) return;
     const i = this.index < 0 ? 0 : this.index + delta;
     this.setIndex(i, true);
+  }
+
+  /** 把列表/搜索/收藏里的电台解析成带真实坐标的数据集电台（用于聚焦与位置显示） */
+  resolveGeoStation(s) {
+    if (!s) return s;
+    const ok = (x) => x && isFinite(x.lat) && isFinite(x.lon) && !(Math.abs(x.lat) < 0.01 && Math.abs(x.lon) < 0.01);
+    if (ok(s)) return s;
+    const list = this.geoStations || [];
+    const byId = list.find((x) => String(x.id) === String(s.id));
+    if (byId && ok(byId)) return byId;
+    const norm = (u) => String(u || "").toLowerCase().replace(/\/+$/, "").replace(/^https?:\/\//, "");
+    const uk = norm(s.url);
+    const byUrl = uk && list.find((x) => norm(x.url) === uk);
+    if (byUrl && ok(byUrl)) return byUrl;
+    const byName = list.find((x) => x.name === s.name && x.cc === s.cc);
+    if (byName && ok(byName)) return byName;
+    return s;
   }
 
   setNowPlaying(s) {
@@ -594,7 +614,9 @@ export class RadioPage {
           }
         } catch { /* 加载失败就退回原生 */ }
       }
-      if (!hlsOk) this.audio.src = '/api/radio/stream?u=' + encodeURIComponent(s.url) + (opts && opts.bust ? '&_r=' + Date.now() : '');
+      if (!hlsOk) this.audio.src = (opts && opts.direct)
+        ? s.url + (s.url.includes('?') ? '&' : '?') + '_r=' + Date.now()
+        : '/api/radio/stream?u=' + encodeURIComponent(s.url) + (opts && opts.bust ? '&_r=' + Date.now() : '');
     } catch { /* ignore */ }
     this.armStall();
     try {
@@ -642,13 +664,21 @@ export class RadioPage {
     const key = String(s.id || s.url || '');
     if (!this._retried) this._retried = new Set();
     // 第一次失败：换线路（加缓存破坏参数）重试同一台
-    if (!this._retried.has(key)) {
-      this._retried.add(key);
+    this._retryStage = this._retryStage || {};
+    const stage = this._retryStage[key] || 0;
+    if (stage === 0) {
+      this._retryStage[key] = 1;
       this.setHint('信号不稳，正在换线路重试：' + (s.name || ''), true);
       setTimeout(() => { try { this.playStation(s, { bust: true }); } catch { /* ignore */ } }, 500);
       return;
     }
-    if (this.autoNextCount >= 5) { this.setHint('连续多个台打不开，可能是网络受限，稍后再试', true); this.updateStatus('网络受限'); return; }
+    if (stage === 1) {
+      this._retryStage[key] = 2;
+      this.setHint('代理线路失败，尝试直连（可能需要代理/VPN）：' + (s.name || ''), true);
+      setTimeout(() => { try { this.playStation(s, { direct: true }); } catch { /* ignore */ } }, 500);
+      return;
+    }
+    if (this.autoNextCount >= 5) { this.setHint('连续多个台打不开：可能是这些流被地区限制或已下线，挂代理/VPN 再试', true); this.updateStatus('网络受限'); return; }
     this.autoNextCount += 1;
     this.setHint('「' + (s.name || '该台') + '」不可用，自动跳过…', true);
     setTimeout(() => {
@@ -904,10 +934,11 @@ export class RadioPage {
         } catch { /* ignore */ }
         const tune = this.$('rd-tune');
         if (tune) {
-          const fixed = best <= 260;
+          const forced = this._tuneLockUntil && Date.now() < this._tuneLockUntil;
+          const fixed = forced || best <= 260;
           if (!isFinite(best) || best > 900) { tune.textContent = '移动准星寻找电台'; }
           else tune.textContent = fixed ? '已锁定' : '调谐中 · 最近 ' + Math.round(best) + ' PX';
-          if (fixed && nearest) { const n = this.$('rd-tune-name'); if (n) n.textContent = nearest; }
+          if (fixed) { const n = this.$('rd-tune-name'); if (n) n.textContent = forced && this.current ? this.current.name : (nearest || ''); }
           else if (this.view === 'nebula') { const n = this.$('rd-tune-name'); if (n) n.textContent = ''; }
         }
       } catch { /* ignore */ }
