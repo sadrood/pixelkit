@@ -342,6 +342,7 @@ export class RadioPage {
         });
       } catch { /* ignore */ }
       this.loadStationHealth();
+      this.loadProbe();
       this.loadFullStations();
       // 预热星云模块（用户切过去时不用等）
       import('./RadioNebula3D.js').catch(() => {});
@@ -519,18 +520,38 @@ export class RadioPage {
     return this._health;
   }
 
+  /** 自建抽样实测数据（HEAD/Range 探测） */
+  async loadProbe() {
+    if (this._probe) return this._probe;
+    try {
+      const j = await fetch('/data/health-probe.json', { cache: 'no-cache' }).then((r) => r.json());
+      const okSet = new Set(), deadSet = new Set();
+      for (const [id, v] of Object.entries(j && j.results ? j.results : {})) {
+        if (v && v[0] === 1) okSet.add(String(id)); else deadSet.add(String(id));
+      }
+      this._probe = { okSet, deadSet, builtAt: j.builtAt, sample: j.sample };
+      console.log('[radio] 实测探活：' + okSet.size + '/' + (okSet.size + deadSet.size) + ' 可连接');
+    } catch { this._probe = null; }
+    return this._probe;
+  }
+
   /** 返回 { ok, hours, clicks, votes } 或 null */
   healthOf(st) {
-    if (!st || !this._health || !this._health.deadSet) return null;
+    if (!st) return null;
     const id = String(st.id || '').toLowerCase();
+    if (this._probe) {
+      if (this._probe.okSet.has(id)) return { ok: true, probe: true };
+      if (this._probe.deadSet.has(id)) return { ok: false, probe: true };
+    }
+    if (!this._health || !this._health.deadSet) return null;
     return { ok: !this._health.deadSet.has(id) };
   }
 
   healthLabel(st) {
     const h = this.healthOf(st);
     if (!h) return '';
-    if (!h.ok) return '社区验证：可能已失效';
-    return '社区验证：可用';
+    if (!h.ok) return h.probe ? '实测：无法连接' : '社区验证：可能已失效';
+    return h.probe ? '实测：可连接' : '社区验证：可用';
   }
 
   resolveGeoStation(s) {
