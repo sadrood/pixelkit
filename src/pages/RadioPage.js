@@ -343,6 +343,7 @@ export class RadioPage {
       } catch { /* ignore */ }
       this.loadStationHealth();
       this.loadProbe();
+      this.loadExtras();
       this.loadFullStations();
       // 预热星云模块（用户切过去时不用等）
       import('./RadioNebula3D.js').catch(() => {});
@@ -551,6 +552,17 @@ export class RadioPage {
   }
 
   /** 把列表/搜索/收藏里的电台解析成带真实坐标的数据集电台（用于聚焦与位置显示） */
+  /** 第二目录：Xiph/Icecast（无坐标，仅搜索/播放） */
+  async loadExtras() {
+    if (this._extra) return this._extra;
+    try {
+      const j = await fetch('/data/extra-stations.json', { cache: 'no-cache' }).then((r) => r.json());
+      this._extra = (j && j.stations) || [];
+      console.log('[radio] Icecast 目录：' + this._extra.length + ' 台');
+    } catch { this._extra = []; }
+    return this._extra;
+  }
+
   /** 社区探活数据（Radio Browser lastcheckok） */
   async loadStationHealth() {
     if (this._health) return this._health;
@@ -2202,14 +2214,44 @@ export class RadioPage {
     }
     scored.sort((a, b) => (a.score - b.score) || (b.pop - a.pop));
     const hits = scored.slice(0, 12);
-    if (!hits.length) { list.innerHTML = '<div class="radio-q-empty">没有匹配的电台</div>'; list.hidden = false; return; }
+    const extraHits = [];
+    if (this._extra && this._extra.length) {
+      const k2 = norm(raw);
+      for (const x of this._extra) {
+        const hay = norm((x.name || '') + ' ' + (x.genre || ''));
+        if (!hay.includes(k2)) continue;
+        extraHits.push(x);
+        if (extraHits.length >= 3) break;
+      }
+    }
+    if (!hits.length && !extraHits.length) { list.innerHTML = '<div class="radio-q-empty">没有匹配的电台</div>'; list.hidden = false; return; }
     list.innerHTML = hits.map(({ s }) => '<button class="radio-q-item" data-i="' + this.geoStations.indexOf(s) + '" type="button">' +
       '<b>' + this.esc(s.name) + '</b>' +
       '<small>' + this.esc([this.zhCountry(s.cc) || s.country, (this.genres && s.g != null ? this.genres[s.g] : ''), (s.tags || []).slice(0, 1).join('')].filter(Boolean).join(' · ')) + '</small>' +
       '</button>').join('');
     list.hidden = false;
+    if (extraHits.length) {
+      list.insertAdjacentHTML('beforeend', extraHits.map((x, ix) => '<button class="radio-q-item radio-q-extra" data-x="' + ix + '" type="button">' +
+        '<b>' + this.esc(x.name) + '</b>' +
+        '<small>' + this.esc(['Icecast 目录', x.genre, x.bitrate ? x.bitrate + ' kbps' : ''].filter(Boolean).join(' · ')) + '</small>' +
+        '</button>').join(''));
+    }
     list.querySelectorAll('.radio-q-item').forEach((el) => {
       el.onclick = () => {
+        if (el.dataset.x != null) {
+          const x = extraHits[Number(el.dataset.x)];
+          if (x) {
+            this._tuneLockUntil = Date.now() + 4000;
+            this.current = { id: x.id, name: x.name, url: x.url, cc: '', lat: NaN, lon: NaN, prec: 0 };
+            this.setNowPlaying(this.current);
+            this.playStation(this.current);
+            this.setHint('Icecast 目录 · ' + (x.genre || '未知流派'));
+          }
+          list.hidden = true;
+          const input = this.$('radio-q');
+          if (input) input.value = '';
+          return;
+        }
         this.setIndex(Number(el.dataset.i), true);
         list.hidden = true;
         const input = this.$('radio-q');
