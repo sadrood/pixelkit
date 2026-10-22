@@ -962,6 +962,9 @@ export function SceneCanvas({
       for (let g = 0; g < 11; g++) {
         const gEl = document.createElementNS("http://www.w3.org/2000/svg", "text");
         gEl.setAttribute("class", "big");
+        gEl.style.paintOrder = "stroke";
+        gEl.style.stroke = "rgba(9,20,18,0.85)";
+        gEl.style.strokeWidth = "3px";
         const nEl = document.createElementNS("http://www.w3.org/2000/svg", "text");
         nEl.setAttribute("class", "s");
         const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
@@ -1276,10 +1279,11 @@ export function SceneCanvas({
           const items = dragState ? [] : labels.slice();
           for (let k = 0; k < items.length && k < labelEls.length; k++) {
             const [i, x, y] = items[k];
-            const name = (p.stations[i]?.name || "").slice(0, 26);
+            const rawName = p.stations[i]?.name || "";
+            const name = rawName.length > 26 ? rawName.slice(0, 26) + "…" : rawName;
             if (!name || i === p.currentIdx || i === nearestRef.idx) continue;
             const w = Math.min(26, name.length) * 6.6 + 16;
-            const rect: [number, number, number, number] = [x + 10, y - 24, w, 16];
+            const rect: [number, number, number, number] = [x + 8, y - 34, w, 20];
             if (
               rects.some(
                 (r) =>
@@ -1295,14 +1299,14 @@ export function SceneCanvas({
             el.line.style.display = "block";
             el.line.setAttribute("x1", String(x));
             el.line.setAttribute("y1", String(y));
-            el.line.setAttribute("x2", String(x + 10));
-            el.line.setAttribute("y2", String(y - 10));
+            el.line.setAttribute("x2", String(x + 8));
+            el.line.setAttribute("y2", String(y - 18));
             el.g.style.display = "block";
             el.n.style.display = "none";
             el.g.textContent = name;
             el.g.setAttribute("text-anchor", "start");
-            el.g.setAttribute("x", String(x + 13));
-            el.g.setAttribute("y", String(y - 12));
+            el.g.setAttribute("x", String(x + 11));
+            el.g.setAttribute("y", String(y - 20));
             el.g.setAttribute("fill", "#f5f1e8");
             el.g.style.opacity = "0.85";
           }
