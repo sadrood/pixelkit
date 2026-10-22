@@ -494,9 +494,52 @@ export class RadioPage {
     }
   }
 
+  /** 后台预取接下来几个候选的可播性（静默探测，不打断当前播放） */
+  prefetchCandidates(count = 3) {
+    if (!this.geoStations.length) return;
+    this._probeCache = this._probeCache || new Map();
+    const n = this.geoStations.length;
+    let added = 0;
+    for (let k = 1; k <= 8 && added < count; k++) {
+      const st = this.geoStations[(this.index + k) % n];
+      if (!st || !st.url) continue;
+      const id = String(st.id || '');
+      if (this._probeCache.has(id)) continue;
+      const h = this.healthOf(st);
+      if (h && !h.ok) { this._probeCache.set(id, false); continue; }
+      added += 1;
+      this.probeAudio(st).then((ok) => this._probeCache.set(id, ok)).catch(() => this._probeCache.set(id, false));
+    }
+  }
+
+  /** 用隐藏 Audio 探测一个流是否能播（3.5 秒超时） */
+  probeAudio(st) {
+    return new Promise((resolve) => {
+      const a = new Audio();
+      a.preload = 'none';
+      a.muted = true;
+      let done = false;
+      const finish = (ok) => { if (done) return; done = true; try { a.pause(); a.removeAttribute('src'); a.load(); } catch { /* ignore */ } resolve(ok); };
+      const timer = setTimeout(() => finish(false), 3500);
+      a.addEventListener('canplay', () => { clearTimeout(timer); finish(true); }, { once: true });
+      a.addEventListener('loadedmetadata', () => { clearTimeout(timer); finish(true); }, { once: true });
+      a.addEventListener('error', () => { clearTimeout(timer); finish(false); }, { once: true });
+      try { a.src = '/api/radio/stream?u=' + encodeURIComponent(st.url); a.load(); } catch { finish(false); }
+    });
+  }
+
   step(delta) {
     if (!this.geoStations.length) return;
     let i = this.index < 0 ? 0 : this.index + delta;
+    // 优先选后台预取确认可播的台
+    if (this._probeCache && this._probeCache.size) {
+      const n = this.geoStations.length;
+      for (let k = 1; k <= 5; k++) {
+        const j = ((this.index + delta * k) % n + n) % n;
+        const st = this.geoStations[j];
+        if (st && this._probeCache.get(String(st.id)) === true) { i = j; break; }
+      }
+    }
     // 优先跳到社区验证可用的台（最多尝试 8 个）
     for (let k = 0; k < 8; k++) {
       const st = this.geoStations[((i % this.geoStations.length) + this.geoStations.length) % this.geoStations.length];
@@ -678,6 +721,7 @@ export class RadioPage {
       await this.audio.play();
       this.updateStatus('播放中');
       this.setHint('正在播放：' + s.name);
+      setTimeout(() => this.prefetchCandidates(3), 1200);
     } catch (e) {
       if (e && e.name === 'NotAllowedError') {
         // 浏览器拦截自动播放：等用户下一次点击
