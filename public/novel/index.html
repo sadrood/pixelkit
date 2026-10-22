@@ -198,6 +198,13 @@ a{color:var(--accent); text-decoration:none}
 .modal h3{margin:0 0 4px; font-size:17px}
 .modal .sub{margin:0 0 14px; font-size:12.5px; color:var(--ink-3); line-height:1.7}
 .srcs{display:flex; flex-direction:column; gap:7px; margin-bottom:14px; max-height:200px; overflow:auto}
+/* 内置默认书源：只读展示，让用户知道"已经有源"，不用导入 */
+.src-builtin{margin:0 0 14px; padding:10px 12px; border:1px dashed var(--rule); border-radius:10px; background:var(--card-2)}
+.src-builtin[hidden]{display:none}
+.src-builtin .sb-h{font-size:11.5px; color:var(--ink-3); margin-bottom:7px}
+.src-builtin .sb-h b{color:var(--ink); font-size:12.5px; margin-right:4px}
+.src-builtin .sb-list{display:flex; flex-wrap:wrap; gap:6px}
+.src-builtin .sb-i{font-size:12px; padding:3px 9px; border-radius:999px; background:var(--accent-soft); color:var(--ink-2); white-space:nowrap}
 .src-i{display:flex; align-items:center; gap:9px; padding:9px 11px; border:1px solid var(--rule-2); border-radius:10px; background:var(--card-2)}
 .src-i .n{font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:40%}
 .src-i .u{font-size:11.5px; color:var(--ink-3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1}
@@ -374,6 +381,10 @@ textarea#src-input:focus, input#src-url:focus{border-color:var(--accent)}
   <div class="modal">
     <h3>书源管理</h3>
     <p class="sub">粘贴「阅读」格式的书源 JSON（单个对象或数组），或贴书源分享链接由服务器代抓。导入后自动检测哪些可用。</p>
+    <div class="src-builtin" id="src-builtin" hidden>
+      <div class="sb-h"><b>内置默认书源</b><span id="src-builtin-count"></span> 已随服务端加载，不导入也能搜</div>
+      <div class="sb-list" id="src-builtin-list"></div>
+    </div>
     <div class="srcs" id="src-list"></div>
     <textarea id="src-input" placeholder='[{"bookSourceName":"...","bookSourceUrl":"https://...","searchUrl":"...","ruleSearch":{...}}]'></textarea>
     <div class="link-row">
@@ -423,6 +434,7 @@ const store = {
 };
 
 let SOURCES = store.get(LS.src, []);
+let DEFAULTS = [];          // 服务端内置默认书源（只读展示）
 let CAP = {};
 let BOOKS = store.get(LS.books, []);
 let CFG = Object.assign({ font: 'serif', size: 18, theme: 'paper' }, store.get(LS.cfg, {}));
@@ -588,10 +600,26 @@ $('#pick-ok').onclick = async () => {
   finally { btn.disabled = false; btn.textContent = '导入选中'; updatePickCount(); }
 };
 
+/* ---------- 内置默认书源（只读展示） ---------- */
+async function loadBuiltinSources() {
+  try {
+    const r = await fetch('/api/novel/defaults').then((x) => x.json());
+    if (r.success && Array.isArray(r.sources)) DEFAULTS = r.sources;
+  } catch { /* 老服务端没有这个接口就保持空，不影响搜索 */ }
+  const box = $('#src-builtin');
+  if (!box) return;
+  if (!DEFAULTS.length) { box.hidden = true; return; }
+  $('#src-builtin-count').textContent = '· ' + DEFAULTS.length + ' 个';
+  $('#src-builtin-list').innerHTML = DEFAULTS.map((s) =>
+    `<span class="sb-i" title="${esc(s.url || '')}">${esc(s.name || '')}</span>`).join('');
+  box.hidden = false;
+}
+loadBuiltinSources();
+
 function renderSourceList() {
   const box = $('#src-list');
   if (!SOURCES.length) {
-    box.innerHTML = '<p style="font-size:12.5px;color:var(--ink-3);padding:10px 2px">正在使用内置默认书源，直接搜索即可。也可以粘贴 JSON 或贴链接，导入自己的书源。</p>';
+    box.innerHTML = '<p style="font-size:12.5px;color:var(--ink-3);padding:10px 2px">还没有导入自己的书源 —— 上面 ' + (DEFAULTS.length || '') + ' 个内置书源已经可以用，直接搜书名即可。也可以粘贴 JSON 或贴链接，再加自己的源。</p>';
     return;
   }
   box.innerHTML = SOURCES.map((s, i) => {
@@ -641,6 +669,7 @@ $('#btn-src-ok').onclick = async () => {
     $('#src-input').value = '';
     renderSourceList();
     renderShelf();
+    $('#m-src').classList.remove('on');
     toast(`导入 ${r.total} 个书源，${r.usable} 个可用`);
   } catch (e) { toast(e.message, true); }
 };
@@ -686,14 +715,15 @@ $('#btn-src-url').onclick = async () => {
   finally { btn.disabled = false; btn.textContent = label; }
 };
 
-/** 示例书源：格格党（qodown.com），字段对着真实页面写的 */
+/** 示例书源：速读谷（与实际内置源同一份规则，导入后确实能搜到书） */
 const DEMO_SOURCE = {
-  bookSourceName: '格格党',
-  bookSourceUrl: 'http://www.qodown.com',
-  searchUrl: 'http://www.qodown.com/search/,\n{\n  "body": "searchkey={{key}}&Submit=搜索",\n  "method": "POST"\n}',
-  ruleSearch: { bookList: '.txt-list li', name: '.s2 a::text', author: '.s4::text', bookUrl: '.s2 a[href]' },
-  ruleToc: { chapterList: '.section-list li a', chapterName: 'text', chapterUrl: 'href' },
-  ruleContent: { content: '#content' },
+  bookSourceName: '速读谷',
+  bookSourceUrl: 'https://www.suduguu.com',
+  searchUrl: '/i/sor.aspx?key={{key}}',
+  ruleSearch: { bookList: '.item', name: 'h3 a', author: 'p a', bookUrl: 'a', coverUrl: 'img' },
+  ruleBookInfo: { name: 'h1 a', author: '.itemtxt p a', intro: '.des p', coverUrl: '.item img' },
+  ruleToc: { chapterList: '#list ul li a', chapterName: 'text', chapterUrl: 'href' },
+  ruleContent: { content: '.con' },
 };
 $('#btn-src-demo').onclick = () => { $('#src-input').value = JSON.stringify([DEMO_SOURCE], null, 2); toast('已填入示例书源，点「导入」确认'); };
 $('#btn-src-clear').onclick = () => { $('#src-input').value = ''; $('#src-url').value = ''; };
@@ -771,6 +801,7 @@ async function doSearch() {
       return;
     }
     $('#search-sub').textContent = `找到 ${r.results.length} 个结果`;
+    if (r.fallback) $('#search-sub').textContent = `你的书源没搜到，已用内置书源找到 ${r.results.length} 个结果`;
     box.innerHTML = r.results.map((x, i) => `
       <button class="res" data-i="${i}">
         <div class="cov">${x.cover ? `<img src="${esc(x.cover)}" alt="" onerror="this.parentNode.textContent='${esc((x.title || '书')[0])}'" />` : esc((x.title || '书')[0])}</div>

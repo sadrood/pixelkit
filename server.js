@@ -6999,6 +6999,15 @@ const RADIO_API_BASES = (process.env.RADIO_API_BASE
 let radioApiBase = RADIO_API_BASES[0];
 const radioCache = new Map();
 const radioAllowedHosts = new Set();      // 音频中转白名单：只允许目录里真实出现过的电台主机（防 SSRF）
+// RoamDial 复刻版（35,699 台）的主机也加入代理白名单，否则这些台的代理重试会被 403
+try {
+  const rawRD = readFileSync(path.join(__dirname, 'public', 'roamdial', 'globe_rest.json'), 'utf-8').replace(/^﻿/, '');
+  const jRD = JSON.parse(rawRD);
+  const urlsRD = jRD.url || jRD.urls || [];
+  let addedRD = 0;
+  for (const u of urlsRD) { try { radioAllowedHosts.add(new URL(u).host.toLowerCase()); addedRD++; } catch { /* ignore */ } }
+  console.log('[radio] 代理白名单补充 RoamDial 主机：' + addedRD);
+} catch { /* ignore */ }
 function radioRemember(url) {
   try { radioAllowedHosts.add(new URL(url).host.toLowerCase()); } catch { /* ignore */ }
 }
@@ -7344,10 +7353,20 @@ app.get('/s/:code', (req, res) => {
    浏览器没导入过任何书源也能直接搜。
 */
 const novelSources = new Map();
-for (const s of await loadDefaultSources().catch(() => [])) {
+const DEFAULT_SOURCES = await loadDefaultSources().catch(() => []);
+for (const s of DEFAULT_SOURCES) {
   const k = String(s?.bookSourceName || '').trim();
   if (k) novelSources.set(k, s);
 }
+// 前端书源管理弹窗里展示「已有哪些内置源」，避免用户以为一个源都没有
+app.get('/api/novel/defaults', (req, res) => {
+  res.json({
+    success: true,
+    sources: DEFAULT_SOURCES
+      .filter((s) => s?.bookSourceName)
+      .map((s) => ({ name: s.bookSourceName, url: s.bookSourceUrl || '' })),
+  });
+});
 app.use(createNovelRouter(() => novelSources));
 app.use(createNovelSourceImportRouter());
 app.post('/api/novel/register', (req, res) => {
