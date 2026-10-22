@@ -215,6 +215,36 @@ input#src-url{height:40px; font-family:var(--font-ui)}
 textarea#src-input:focus, input#src-url:focus{border-color:var(--accent)}
 .link-row{display:flex; gap:8px; margin:10px 0 4px}
 .link-row input{flex:1; min-width:0}
+
+/* ---------- 链接抓取后的书源勾选 ---------- */
+.pick{margin:12px 0 2px; border:1px solid var(--rule); border-radius:12px; background:var(--card-2); overflow:hidden}
+.pick[hidden]{display:none}
+.pick-head{display:flex; align-items:baseline; gap:8px; padding:10px 12px; border-bottom:1px solid var(--rule-2); flex-wrap:wrap}
+.pick-head b{font-size:13px}
+.pick-head span{font-size:11.5px; color:var(--ink-3)}
+.pick-tools{display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--rule-2); flex-wrap:wrap}
+.pick-tools input[type=search]{
+  flex:1; min-width:120px; height:30px; padding:0 9px; border:1px solid var(--rule-2); border-radius:8px;
+  background:var(--card); color:var(--ink); font-size:12px; outline:none; font-family:var(--font-ui);
+}
+.pick-tools input[type=search]:focus{border-color:var(--accent)}
+.pick-tools label{display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--ink-2)}
+.pick-tools label input{accent-color:var(--accent)}
+.pick-tools .btn{height:30px; padding:0 10px; font-size:12px}
+.pick-list{max-height:260px; overflow:auto; padding:4px 6px}
+.pick-i{display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:8px; cursor:pointer}
+.pick-i:hover{background:var(--accent-soft)}
+.pick-i .cb{flex:none; accent-color:var(--accent)}
+.pick-i .n{font-size:12.5px; font-weight:600; max-width:46%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pick-i .u{font-size:11px; color:var(--ink-3); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.pick-i .tag{font-size:10.5px; padding:2px 7px; border-radius:999px; white-space:nowrap; max-width:190px; overflow:hidden; text-overflow:ellipsis}
+.pick-i .tag.ok{background:rgba(74,124,89,.14); color:var(--ok)}
+.pick-i .tag.no{background:rgba(168,64,44,.1); color:var(--bad)}
+.pick-foot{display:flex; align-items:center; gap:8px; padding:9px 12px; border-top:1px solid var(--rule-2)}
+.pick-foot .grow{flex:1}
+.pick-foot .count{font-size:11.5px; color:var(--ink-3)}
+.pick.busy .pick-tools, .pick.busy .pick-foot{display:none}
+
 .modal-acts{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; align-items:center}
 .modal-acts .grow{flex:1}
 .btn{
@@ -255,6 +285,9 @@ textarea#src-input:focus, input#src-url:focus{border-color:var(--accent)}
   .toc{grid-template-columns:1fr}
   .modal{padding:16px; border-radius:14px}
   .src-i .u{display:none}
+  .pick-i .u{display:none}
+  .pick-list{max-height:210px}
+  .pick-i .n{max-width:60%}
 }
 </style>
 </head>
@@ -278,7 +311,7 @@ textarea#src-input:focus, input#src-url:focus{border-color:var(--accent)}
   <!-- ========== 书架 ========== -->
   <section class="view on" id="v-shelf">
     <div class="page-head">
-      <div><h2>书架</h2><p class="sub" id="shelf-sub">导入书源后就能搜书了</p></div>
+      <div><h2>书架</h2><p class="sub" id="shelf-sub">内置默认书源已就绪 · 直接搜索书名</p></div>
       <button class="tbtn" id="btn-shelf-src">管理书源</button>
     </div>
     <div id="shelf"></div>
@@ -347,6 +380,22 @@ textarea#src-input:focus, input#src-url:focus{border-color:var(--accent)}
       <input id="src-url" placeholder="书源链接（.json 或分享页，服务器代抓）" />
       <button class="btn" id="btn-src-url">从链接导入</button>
     </div>
+    <div class="pick" id="pick" hidden>
+      <div class="pick-head"><b id="pick-title">链接里的书源</b><span id="pick-sub"></span></div>
+      <div class="pick-tools">
+        <input type="search" id="pick-q" placeholder="筛选名称或站点" />
+        <label><input type="checkbox" id="pick-only-ok" checked /> 只看可用</label>
+        <button class="btn" id="pick-all">全选</button>
+        <button class="btn" id="pick-none">清空</button>
+      </div>
+      <div class="pick-list" id="pick-list"></div>
+      <div class="pick-foot">
+        <span class="count" id="pick-count"></span>
+        <span class="grow"></span>
+        <button class="btn pri" id="pick-ok">导入选中</button>
+        <button class="btn" id="pick-cancel">取消</button>
+      </div>
+    </div>
     <div class="modal-acts">
       <button class="btn" id="btn-src-demo">载入示例</button>
       <button class="btn" id="btn-src-file">从文件读</button>
@@ -370,7 +419,7 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 const store = {
   get(k, def) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? def : v; } catch { return def; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
 };
 
 let SOURCES = store.get(LS.src, []);
@@ -426,16 +475,15 @@ $('#btn-font').onclick = () => { CFG.font = CFG.font === 'serif' ? 'sans' : 'ser
    ============================================================ */
 function usableSources() { return SOURCES.filter((s) => CAP[s.bookSourceName]?.usable); }
 
-async function importSources(text) {
-  let parsed;
-  try { parsed = JSON.parse(text); } catch (e) { throw new Error('JSON 格式有误：' + String(e.message).slice(0, 60)); }
-  const list = Array.isArray(parsed) ? parsed : [parsed];
-  const valid = list.filter((s) => s && (s.bookSourceUrl || s.bookSourceName));
+async function saveSources(list) {
+  const valid = (list || []).filter((s) => s && (s.bookSourceUrl || s.bookSourceName));
   if (!valid.length) throw new Error('没识别到书源（需要 bookSourceUrl 字段）');
   const byName = new Map(SOURCES.map((s) => [s.bookSourceName, s]));
   for (const s of valid) byName.set(s.bookSourceName || s.bookSourceUrl, s);
-  SOURCES = [...byName.values()];
-  store.set(LS.src, SOURCES);
+  const next = [...byName.values()];
+  // 分享包动辄上百个源（单包 5.8MB），全塞 localStorage 会超配额且失败时静默丢数据
+  if (!store.set(LS.src, next)) throw new Error('选中的书源太大，浏览器存不下，请少选几个');
+  SOURCES = next;
   try {
     const r = await api('/inspect', { sources: SOURCES });
     CAP = {};
@@ -449,10 +497,101 @@ async function importSources(text) {
   }
 }
 
+async function importSources(text) {
+  let parsed;
+  try { parsed = JSON.parse(text); } catch (e) { throw new Error('JSON 格式有误：' + String(e.message).slice(0, 60)); }
+  return saveSources(Array.isArray(parsed) ? parsed : [parsed]);
+}
+
+/* ---------- 链接抓回来的合集：先勾选，再入库 ---------- */
+let PENDING = [];
+const hostOf = (s) => { try { return new URL(s.bookSourceUrl).host; } catch { return s.bookSourceUrl || ''; } };
+
+function showFetching() {
+  PENDING = [];
+  $('#pick-title').textContent = '正在抓取链接…';
+  $('#pick-sub').textContent = '合集包大时约 1 分钟，请稍候';
+  $('#pick-list').innerHTML = '<div style="padding:20px;text-align:center;font-size:12px;color:var(--ink-3)">抓取中…</div>';
+  $('#pick-count').textContent = '';
+  $('#pick').classList.add('busy');
+  $('#pick').hidden = false;
+}
+
+async function openPicker(list) {
+  let cap = {};
+  try {
+    const r = await api('/inspect', { sources: list });
+    for (const x of r.sources) if (!cap[x.name]) cap[x.name] = x;
+  } catch { /* 检测失败就让用户手选 */ }
+  PENDING = list.map((src) => {
+    const c = cap[src.bookSourceName || '(未命名)'] || {};
+    return { src, name: src.bookSourceName || '(未命名)', host: hostOf(src), usable: !!c.usable, reason: c.reason || '未检测', checked: !!c.usable };
+  }).sort((a, b) => (b.usable - a.usable) || a.name.localeCompare(b.name, 'zh'));
+  const ok = PENDING.filter((x) => x.usable).length;
+  $('#pick-title').textContent = `链接里有 ${PENDING.length} 个书源`;
+  $('#pick-sub').textContent = ok ? `${ok} 个可直接用` : '没有可直接用的：都依赖 JS 规则或没有搜索地址';
+  $('#pick-only-ok').checked = ok > 0;
+  $('#pick-q').value = '';
+  $('#pick').classList.remove('busy');
+  $('#pick').hidden = false;
+  renderPick();
+}
+
+function pickView() {
+  const q = ($('#pick-q').value || '').trim().toLowerCase();
+  const onlyOk = $('#pick-only-ok').checked;
+  return PENDING.filter((x) => (!onlyOk || x.usable) && (!q || (x.name + ' ' + x.host).toLowerCase().includes(q)));
+}
+
+function renderPick() {
+  const view = pickView();
+  $('#pick-list').innerHTML = view.length ? view.map((x) => {
+    const i = PENDING.indexOf(x);
+    return `<label class="pick-i">
+      <input class="cb" type="checkbox" data-i="${i}" ${x.checked ? 'checked' : ''} />
+      <span class="n">${esc(x.name)}</span>
+      <span class="u">${esc(x.host)}</span>
+      <span class="tag ${x.usable ? 'ok' : 'no'}" title="${esc(x.reason)}">${x.usable ? '可用' : esc(x.reason)}</span>
+    </label>`;
+  }).join('') : '<p style="font-size:12px;color:var(--ink-3);padding:14px 10px;margin:0">没有匹配的书源</p>';
+  $('#pick-list').querySelectorAll('.cb').forEach((cb) => {
+    cb.onchange = () => { PENDING[+cb.dataset.i].checked = cb.checked; updatePickCount(); };
+  });
+  updatePickCount();
+}
+
+function updatePickCount() {
+  const n = PENDING.filter((x) => x.checked).length;
+  $('#pick-count').textContent = `已选 ${n} / ${PENDING.length}`;
+  $('#pick-ok').disabled = !n;
+}
+
+$('#pick-q').oninput = renderPick;
+$('#pick-only-ok').onchange = renderPick;
+$('#pick-all').onclick = () => { pickView().forEach((x) => { x.checked = true; }); renderPick(); };
+$('#pick-none').onclick = () => { pickView().forEach((x) => { x.checked = false; }); renderPick(); };
+$('#pick-cancel').onclick = () => { $('#pick').hidden = true; PENDING = []; };
+
+$('#pick-ok').onclick = async () => {
+  const list = PENDING.filter((x) => x.checked).map((x) => x.src);
+  if (!list.length) return;
+  const btn = $('#pick-ok');
+  btn.disabled = true; btn.textContent = '导入中…';
+  try {
+    const r = await saveSources(list);
+    $('#pick').hidden = true; PENDING = [];
+    renderSourceList();
+    renderShelf();
+    $('#m-src').classList.remove('on');
+    toast(`已导入 ${list.length} 个书源，${r.usable || 0} 个可用`);
+  } catch (e) { toast(e.message, true); }
+  finally { btn.disabled = false; btn.textContent = '导入选中'; updatePickCount(); }
+};
+
 function renderSourceList() {
   const box = $('#src-list');
   if (!SOURCES.length) {
-    box.innerHTML = '<p style="font-size:12.5px;color:var(--ink-3);padding:10px 2px">还没有书源。粘贴 JSON 或贴链接，然后点「导入」。</p>';
+    box.innerHTML = '<p style="font-size:12.5px;color:var(--ink-3);padding:10px 2px">正在使用内置默认书源，直接搜索即可。也可以粘贴 JSON 或贴链接，导入自己的书源。</p>';
     return;
   }
   box.innerHTML = SOURCES.map((s, i) => {
@@ -478,14 +617,25 @@ function renderSourceList() {
   });
 }
 
-$('#btn-src').onclick = () => { renderSourceList(); $('#m-src').classList.add('on'); };
-$('#btn-shelf-src').onclick = () => { renderSourceList(); $('#m-src').classList.add('on'); };
-$('#btn-src-close').onclick = () => $('#m-src').classList.remove('on');
-$('#m-src').onclick = (e) => { if (e.target.id === 'm-src') $('#m-src').classList.remove('on'); };
+const closeSrcModal = () => {
+  $('#m-src').classList.remove('on');
+  $('#pick').hidden = true;
+  PENDING = [];
+};
+$('#btn-src').onclick = () => { renderSourceList(); $('#pick').hidden = true; $('#m-src').classList.add('on'); };
+$('#btn-shelf-src').onclick = () => { renderSourceList(); $('#pick').hidden = true; $('#m-src').classList.add('on'); };
+$('#btn-src-close').onclick = closeSrcModal;
+$('#m-src').onclick = (e) => { if (e.target.id === 'm-src') closeSrcModal(); };
 
 $('#btn-src-ok').onclick = async () => {
   const text = $('#src-input').value.trim();
   if (!text) return toast('先粘贴书源 JSON', true);
+  // 链接贴进 JSON 框也认：转到「从链接导入」，别让人对着 JSON 报错发愣
+  if (/^https?:\/\/\S+$/i.test(text)) {
+    $('#src-url').value = text;
+    $('#src-input').value = '';
+    return $('#btn-src-url').click();
+  }
   try {
     const r = await importSources(text);
     $('#src-input').value = '';
@@ -512,18 +662,27 @@ $('#btn-src-url').onclick = async () => {
   const btn = $('#btn-src-url');
   const label = btn.textContent;
   btn.disabled = true; btn.textContent = '抓取中…';
+  showFetching();
   try {
     const r = await fetch('/api/novel/fetch-source?url=' + encodeURIComponent(u)).then((x) => x.json());
     if (!r.success) throw new Error(r.error || '抓取失败');
-    const text = JSON.stringify(r.sources);
-    $('#src-input').value = text;
-    const res = await importSources(text);
+    if (!r.sources?.length) throw new Error('链接里没有书源');
     input.value = '';
-    $('#src-input').value = '';
-    renderSourceList();
-    renderShelf();
-    toast(`从链接导入 ${r.count} 个书源，${res.usable || 0} 个可用`);
-  } catch (e) { toast(e.message, true); }
+    if (r.sources.length === 1) {
+      const res = await saveSources(r.sources);
+      renderSourceList();
+      renderShelf();
+      $('#m-src').classList.remove('on');
+      toast(`已导入 1 个书源，${res.usable || 0} 个可用`);
+    } else {
+      await openPicker(r.sources);
+      toast(`抓到 ${r.count} 个书源，勾选后导入`);
+    }
+  } catch (e) {
+    $('#pick').hidden = true;
+    $('#pick').classList.remove('busy');
+    toast(e.message, true);
+  }
   finally { btn.disabled = false; btn.textContent = label; }
 };
 
@@ -547,12 +706,12 @@ function renderShelf() {
   const usable = usableSources().length;
   $('#shelf-sub').textContent = SOURCES.length
     ? `${SOURCES.length} 个书源，${usable} 个可用 · 搜索后点书加入书架`
-    : '还没有书源：点「管理书源」粘贴 JSON 或贴链接导入';
+    : '内置默认书源已就绪 · 直接搜索书名，点开就能读';
   if (!BOOKS.length) {
     box.innerHTML = `<div class="empty">
       <div class="big">📖</div>
       <h3>书架还是空的</h3>
-      <p>导入书源 → 搜索书名 → 点开一本书，它就会出现在这里，并记住你读到哪一章。</p>
+      <p>直接搜索书名 → 点开一本书，它就会出现在这里，并记住你读到哪一章。</p>
       <div class="acts">
         <button class="tbtn primary" id="e-src">导入书源</button>
         <button class="tbtn" id="e-searc">去搜书</button>
@@ -595,18 +754,18 @@ async function doSearch() {
   const kw = $('#q').value.trim();
   if (!kw) { view('search'); $('#q').focus(); return toast('输入书名或作者', true); }
   const usable = usableSources();
-  if (!usable.length) {
-    renderSourceList(); $('#m-src').classList.add('on');
-    return toast('还没有可用书源，先导入一个', true);
-  }
+  // 没导入过自己的书源就用服务器内置默认书源（不传 sources，服务端用注册表）
+  const useDefault = !usable.length;
   view('search');
   $('#search-title').textContent = `搜索「${kw}」`;
-  $('#search-sub').textContent = `正在 ${usable.length} 个书源里查找…`;
+  $('#search-sub').textContent = useDefault ? '正在内置默认书源里查找…' : `正在 ${usable.length} 个书源里查找…`;
   $('#search-errs').textContent = '';
   const box = $('#results');
   box.innerHTML = '<div class="loading" style="grid-column:1/-1"><span class="spin"></span> 搜索中，书源多时可能要十几秒…</div>';
   try {
-    const r = await api('/search', { keyword: kw, sources: usable.map((s) => ({ bookSourceName: s.bookSourceName })) });
+    const body = { keyword: kw };
+    if (!useDefault) body.sources = usable.map((s) => ({ bookSourceName: s.bookSourceName }));
+    const r = await api('/search', body);
     if (!r.results || !r.results.length) {
       box.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="big">🔍</div><h3>没有搜到结果</h3><p>书源都没返回数据，可能规则已变更或源站限制了访问。试试换关键词或换书源。</p></div>`;
       return;
@@ -627,6 +786,8 @@ async function doSearch() {
       $('#search-errs').innerHTML = '部分书源失败：' + r.errors.map((e) => `<b>${esc(e.name)}</b> ${esc(e.error)}`).join('；');
     }
   } catch (e) {
+    // 服务端连默认书源都没有（预置包缺失）时，才需要引导导入
+    if (/没有可用的书源/.test(e.message)) { renderSourceList(); $('#m-src').classList.add('on'); }
     box.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="big">⚠️</div><h3>搜索失败</h3><p>${esc(e.message)}</p></div>`;
   }
 }

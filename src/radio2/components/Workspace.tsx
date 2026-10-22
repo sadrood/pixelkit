@@ -237,6 +237,8 @@ export default function Workspace() {
   diveRef.current = dive;
   const skipOnError = useRef(true);
   const skipCount = useRef(0);
+  // 每个电台只尝试一次「代理线路」重试
+  const proxyRetriedRef = useRef<Set<string>>(new Set());
   const nearestRef = useRef<{ idx: number; d: number; locked: boolean; settled: boolean } | null>(
     null
   );
@@ -623,6 +625,14 @@ export default function Workspace() {
         if (s === "playing") skipCount.current = 0;
         if (s === "error") {
           setPlayState("error");
+          /* 多线路：直连失败先用本站代理重试一次 */
+          const curSt = stationRef.current;
+          if (curSt && curSt.url && !String(curSt.url).startsWith("/api/radio/stream") && !proxyRetriedRef.current.has(curSt.id)) {
+            proxyRetriedRef.current.add(curSt.id);
+            console.log("[radio2] 直连失败，改用本站代理重试：" + curSt.name);
+            loadAndPlay("/api/radio/stream?u=" + encodeURIComponent(curSt.url)).catch(() => setPlayState("blocked"));
+            return;
+          }
           /* 原站：!Gn（唱片态不自动跳）、z<3（最多连跳三次）、跳台走 Ar() 的原地语义 */
           if (skipOnError.current && !recordViewRef.current && skipCount.current < 3) {
             const failedId = stationRef.current?.id;

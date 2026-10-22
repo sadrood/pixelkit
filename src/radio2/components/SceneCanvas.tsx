@@ -989,6 +989,9 @@ export function SceneCanvas({
       const dt = prevMs ? Math.min(0.05, Math.max(0.001, (ms - prevMs) / 1000)) : 1 / 60;
       prevMs = ms;
       const f60 = dt * 60;
+      // 频谱/低音：每帧刷新，驱动点云呼吸与 Bloom（原站 strength = .45 + bass * …）
+      try { updateSpectrum(dt, tt); } catch { /* ignore */ }
+      if (bloom) { try { bloom.strength = 0.45 + getBass() * 0.55 * (p.pro ? 1 : 0.35); } catch { /* ignore */ } }
 
       if (p.stations !== builtFor) build();
       updateFlags();

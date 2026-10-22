@@ -212,6 +212,18 @@ export function loadAndPlay(url: string): Promise<void> {
   other?.pause();
   el.src = url;
   applyVol(el);
+  // 直连失败（CORS/混合内容/地区限制）时，自动改用本站代理重试一次
+  const directUrl = url;
+  el.onerror = () => {
+    if (el !== cur()) return;
+    if (!directUrl.startsWith("/api/radio/stream")) {
+      const proxied = "/api/radio/stream?u=" + encodeURIComponent(directUrl);
+      console.log("[radio2] 直连失败，改用代理重试");
+      loadAndPlay(proxied);
+    } else {
+      emit("error");
+    }
+  };
   if (ctx && ctx.state === "suspended") ctx.resume();
   emit("loading");
   return el.play().catch(() => emit("blocked"));
@@ -299,3 +311,8 @@ export const getLevel = () => level;
 /** 原站 l.real：正在播放且走的是带分析器的 A 元素 */
 export const isReal = () => live && mode === "A";
 export const isLiveAudio = () => live;
+
+// 诊断入口（浏览器控制台可查频谱/低音是否工作）
+if (typeof window !== "undefined") {
+  (window as any).__rdAudio = { getBass, getLevel, isReal, isLiveAudio, currentState, loadAndPlay };
+}

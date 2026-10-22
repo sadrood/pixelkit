@@ -1,0 +1,117 @@
+{
+ "note": "人工实测过搜索+目录+正文的默认书源；网上公开合集里能用的通常只有个位数",
+ "savedAt": "2026-10-22T09:33:12.790Z",
+ "sources": [
+  {
+   "bookSourceName": "思兔阅读",
+   "bookSourceUrl": "https://www.sto66.com",
+   "searchUrl": "https://www.sto66.com/search/{{key}}.html",
+   "ruleSearch": {
+    "author": "div.author:eq(0)@text##作者：",
+    "bookList": "div.bookbox",
+    "bookUrl": "h2.bookname a@href",
+    "checkKeyWord": "夜无疆",
+    "intro": "div.update@text##简介：",
+    "lastChapter": "div.cat a@text",
+    "name": "h2.bookname a@text"
+   },
+   "ruleBookInfo": {
+    "author": "meta[property=\"og:novel:author\"]@content",
+    "coverUrl": "meta[property=\"og:image\"]@content",
+    "intro": "meta[property=\"og:description\"]@content",
+    "kind": "meta[property=\"og:novel:category\"]@content",
+    "lastChapter": "meta[property=\"og:novel:latest_chapter_name\"]@content",
+    "name": "meta[property=\"og:novel:book_name\"]@content || h1@text",
+    "tocUrl": "@js:\nvar m = baseUrl.match(/\\/book\\/(\\w+)\\.html/);\nif (m) '/chapter/' + m[1] + '/1.html'; else '';"
+   },
+   "ruleToc": {
+    "chapterList": "div#allchapter dl dd",
+    "chapterName": "a@text",
+    "chapterUrl": "a@href",
+    "nextTocUrl": "a#linkNext@href"
+   },
+   "ruleContent": {
+    "content": "div#content p@text",
+    "nextContentUrl": "a#linkNext@href",
+    "title": "div.book.read h1@text || h1.pt10@text"
+   }
+  },
+  {
+   "bookSourceName": "全本小说网",
+   "bookSourceUrl": "https://quanben.io",
+   "searchUrl": "/index.php?c=book&a=search&keywords={{key}}",
+   "ruleSearch": {
+    "bookList": "div.list2",
+    "name": "h3 a",
+    "author": "span[itemprop=author]",
+    "bookUrl": "h3 a",
+    "coverUrl": "img",
+    "intro": "p[itemprop=description]"
+   },
+   "ruleBookInfo": {
+    "name": "div.list2 h3",
+    "author": "span[itemprop=author]",
+    "intro": "div.description",
+    "coverUrl": "div.list2 img",
+    "tocUrl": "list.html"
+   },
+   "ruleToc": {
+    "chapterList": "ul.list3 li",
+    "chapterName": "a",
+    "chapterUrl": "a"
+   },
+   "ruleContent": {
+    "content": ".articlebody"
+   }
+  },
+  {
+   "bookSourceName": "篱笆好文学",
+   "bookSourceUrl": "https://m.libahao2.com",
+   "searchUrl": "/sou?wd={{key}}",
+   "ruleSearch": {
+    "intro": "p.m-book-description@text",
+    "kind": "p.m-book-meta@text##.*?·\\s*||span.m-pill@text",
+    "bookUrl": "a@href##^(/.*)##https://m.libahao2.com$1",
+    "bookList": "a.m-book-row",
+    "author": "p.m-book-meta@text##·.*",
+    "name": "h3.m-book-title@text",
+    "coverUrl": "img.m-cover@src"
+   },
+   "ruleToc": {
+    "chapterUrl": "a@href",
+    "chapterName": "a@text",
+    "chapterList": "ol li"
+   },
+   "ruleContent": {
+    "content": "#chapterText@p@html",
+    "nextContentUrl": "text.下一页@href"
+   }
+  },
+  {
+   "bookSourceName": "速读谷",
+   "bookSourceUrl": "https://www.suduguu.com",
+   "searchUrl": "/i/sor.aspx?key={{key}}",
+   "ruleSearch": {
+    "bookList": ".item",
+    "name": "h3 a",
+    "author": "p a",
+    "bookUrl": "a",
+    "coverUrl": "img"
+   },
+   "ruleBookInfo": {
+    "name": "h1 a",
+    "author": ".itemtxt p a",
+    "intro": ".des p",
+    "coverUrl": ".item img"
+   },
+   "ruleToc": {
+    "chapterList": "#list ul li a",
+    "chapterName": "text",
+    "chapterUrl": "href"
+   },
+   "ruleContent": {
+    "content": ".con"
+   }
+  }
+ ]
+}
