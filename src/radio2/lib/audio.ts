@@ -2,8 +2,9 @@
  * - 双元素策略照抄原站 web 引擎：A 元素 crossOrigin=anonymous 并接入
  *   MediaElementSource → AnalyserNode，能拿到真实频谱；A 失败（流无 CORS）
  *   自动退回普通 B 元素直出，播放不受影响、只是没有频谱
- * - 音量 / 静音统一在这里落地并持久化
- * - 调台音效：独立的 WebAudio 静电 burst，不接入播放流，无 CORS 风险
+ * - .m3u8 走 hls.js（原站同款）：Chrome 不能原生播 HLS，且 hls.js 的 XHR 也要 CORS，
+ *   所以链路是 HLS(A) → HLS(B) → emit error（由上层自动换台）
+ * - 音量 / 静音 / 静电都经 setLevels 写进音频图（原站每帧调用同一个函数）
  */
 
 let elA: HTMLAudioElement | null = null;
@@ -12,19 +13,32 @@ let mode: "A" | "B" | "" = "";
 let curUrl = "";
 let aFailed = false;
 let live = false;
+let paused = true;
+
+type HlsClass = typeof import("hls.js").default;
+type HlsInstance = InstanceType<HlsClass>;
+let hlsMod: HlsClass | null | undefined;
+let hls: HlsInstance | null = null;
+let tuneToken = 0;
+let failTimer = 0;
 
 let ctx: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
 let master: GainNode | null = null;
 let streamGain: GainNode | null = null;
 let normGain: GainNode | null = null;
+let noiseGain: GainNode | null = null;
 let comp: DynamicsCompressorNode | null = null;
+let td: Float32Array<ArrayBuffer> | null = null;
 
 let normOn = false;
 let volume = 0.8;
 let muted = false;
 let fxOn = false;
-let staticUntil = 0;
+/** 原站 gn：静电剩余秒数（换台时 wn(.9) 顶上去） */
+let staticLeft = 0;
+let ms = 0;
+let msT = 0;
 
 type Listener = (s: PlayState) => void;
 const listeners = new Set<Listener>();
@@ -41,11 +55,6 @@ export function onPlayState(f: Listener): () => void {
 }
 
 /* ---------- 图与元素 ---------- */
-
-function applyVol(el: HTMLAudioElement) {
-  el.volume = volume;
-  el.muted = muted;
-}
 
 function ensureGraph() {
   if (elB) return;
@@ -69,55 +78,239 @@ function ensureGraph() {
     analyser.connect(normGain);
     normGain.connect(comp);
     comp.connect(streamGain);
+    td = new Float32Array(analyser.fftSize);
+    /* 静电：2 秒白噪循环 → 带通 2200/Q.5 → noiseGain（原站同款，靠增益开关） */
+    const n = ctx.sampleRate * 2;
+    const nb = ctx.createBuffer(1, n, ctx.sampleRate);
+    const nd = nb.getChannelData(0);
+    for (let i = 0; i < n; i++) nd[i] = Math.random() * 2 - 1;
+    const ns = ctx.createBufferSource();
+    ns.buffer = nb;
+    ns.loop = true;
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 2200;
+    bp.Q.value = 0.5;
+    noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0;
+    ns.connect(bp);
+    bp.connect(noiseGain);
+    noiseGain.connect(master);
+    ns.start();
+    window.setInterval(() => {
+      const t = ctx!.currentTime;
+      normalize(t - normLast);
+      normLast = t;
+    }, 100);
   } catch {
     ctx = null;
     analyser = null;
   }
-  elA = new Audio();
-  elA.preload = "none";
-  if (ctx && analyser) {
+  elA = mkEl("A");
+  elB = mkEl("B");
+}
+
+/** 原站 mkEl：A 接分析器，B 直出；两者共用一套事件语义 */
+function mkEl(kind: "A" | "B"): HTMLAudioElement {
+  const el = new Audio();
+  el.preload = "none";
+  if (kind === "A" && ctx && analyser) {
     try {
-      elA.crossOrigin = "anonymous";
-      ctx.createMediaElementSource(elA).connect(analyser);
+      el.crossOrigin = "anonymous";
+      ctx.createMediaElementSource(el).connect(analyser);
     } catch {
-      elA.crossOrigin = "";
+      el.crossOrigin = "";
     }
   }
-  elB = new Audio();
-  elB.preload = "none";
-  for (const el of [elA, elB]) {
-    el.addEventListener("playing", () => {
-      if (el !== cur()) return;
-      live = true;
-      emit("playing");
-    });
-    el.addEventListener("waiting", () => {
-      if (el !== cur()) return;
-      live = false;
-      emit("loading");
-    });
-    el.addEventListener("pause", () => {
-      if (el !== cur()) return;
-      live = false;
-      emit("paused");
-    });
-    el.addEventListener("error", () => {
-      if (el !== cur() || !el.getAttribute("src")) return;
-      if (el === elA && mode === "A") {
-        // 无 CORS 的流：A 元素必然失败，退回 B 直出（原站同款回退）
-        aFailed = true;
-        mode = "B";
-        elA.pause();
-        const b = elB!;
-        b.src = curUrl;
-        applyVol(b);
-        b.play().catch(() => emit("error"));
-        return;
-      }
-      live = false;
-      emit("error");
+  el.addEventListener("playing", () => {
+    if (el !== cur()) return;
+    live = true;
+    paused = false;
+    window.clearTimeout(failTimer);
+    dropHold();
+    emit("playing");
+  });
+  el.addEventListener("waiting", () => {
+    if (el !== cur()) return;
+    live = false;
+    emit("loading");
+  });
+  el.addEventListener("pause", () => {
+    if (el !== cur()) return;
+    live = false;
+    paused = true;
+    emit("paused");
+  });
+  el.addEventListener("error", () => {
+    if (el !== cur() || !el.getAttribute("src")) return;
+    // HLS 的失败统一走 hls.js 的 ERROR 事件，避免同一次失败被处理两遍
+    if (hls) return;
+    failStream();
+  });
+  return el;
+}
+
+/* ---------- 备用元素池 / hold / 预载（原站 spareA / spareB / hold / pre） ---------- */
+
+const POOL_MAX = 2;
+const poolA: HTMLAudioElement[] = [];
+const poolB: HTMLAudioElement[] = [];
+let holdEl: HTMLAudioElement | null = null;
+let holdKind: "A" | "B" = "A";
+let preEl: HTMLAudioElement | null = null;
+let preUrl = "";
+let preKind: "A" | "B" = "A";
+
+function recycle(el: HTMLAudioElement, kind: "A" | "B") {
+  try {
+    el.pause();
+    el.removeAttribute("src");
+    el.load();
+  } catch {
+    /* ignore */
+  }
+  const pool = kind === "A" ? poolA : poolB;
+  if (pool.length < POOL_MAX && !pool.includes(el)) pool.push(el);
+}
+
+function takeEl(kind: "A" | "B"): HTMLAudioElement {
+  const pool = kind === "A" ? poolA : poolB;
+  return pool.pop() ?? mkEl(kind);
+}
+
+/** 新台出声后，旧台才可以停 */
+function dropHold() {
+  if (!holdEl) return;
+  const h = holdEl;
+  const k = holdKind;
+  holdEl = null;
+  recycle(h, k);
+}
+
+function dropPre() {
+  if (!preEl) return;
+  const p = preEl;
+  const k = preKind;
+  preEl = null;
+  preUrl = "";
+  recycle(p, k);
+}
+
+/** 原站 preload / preStart：把准星锁定的台先缓冲进空闲元素，换台时直接接管 */
+export function preload(url: string) {
+  if (!url) return;
+  ensureGraph();
+  if (url === curUrl || url === preUrl) return;
+  const kind: "A" | "B" = analyser && !aFailed ? "A" : "B";
+  dropPre();
+  const el = takeEl(kind);
+  el.preload = "auto";
+  el.src = url;
+  try {
+    el.load();
+  } catch {
+    /* ignore */
+  }
+  preEl = el;
+  preUrl = url;
+  preKind = kind;
+}
+
+/* ---------- HLS（原站 oA / hlsJs） ---------- */
+
+const isHlsUrl = (u: string) => /\.m3u8($|\?)/i.test(u);
+
+async function ensureHls(): Promise<HlsClass | null> {
+  if (hlsMod !== undefined) return hlsMod;
+  try {
+    hlsMod = (await import("hls.js")).default;
+  } catch {
+    hlsMod = null;
+  }
+  return hlsMod ?? null;
+}
+
+function destroyHls() {
+  if (!hls) return;
+  try {
+    hls.destroy();
+  } catch {
+    /* ignore */
+  }
+  hls = null;
+}
+
+/** 原站 failTimer：9 秒还没有声音就判这条线路失败 */
+function armFail() {
+  window.clearTimeout(failTimer);
+  failTimer = window.setTimeout(() => {
+    if (!live && !paused) failStream();
+  }, 9000);
+}
+
+/** 原站 fail()：A 失败→换 B；B 也失败→报错（上层自动换台） */
+function failStream() {
+  destroyHls();
+  window.clearTimeout(failTimer);
+  if (mode === "A") {
+    aFailed = true;
+    mode = "B";
+    elA?.pause();
+    void loadOn(elB!, curUrl);
+    return;
+  }
+  live = false;
+  paused = true;
+  dropHold();
+  emit("error");
+}
+
+function loadOn(el: HTMLAudioElement, url: string): Promise<void> {
+  const token = ++tuneToken;
+  el.removeAttribute("src");
+  try {
+    el.load();
+  } catch {
+    /* ignore */
+  }
+  setLevels();
+  if (!isHlsUrl(url)) {
+    el.src = url;
+    armFail();
+    return el.play().catch(() => {
+      if (token === tuneToken) emit("blocked");
+      return undefined;
     });
   }
+  return startHls(token, url, el);
+}
+
+async function startHls(token: number, url: string, el: HTMLAudioElement): Promise<void> {
+  const Hls = await ensureHls();
+  if (token !== tuneToken) return;
+  if (!Hls || !Hls.isSupported()) {
+    el.src = url;
+    armFail();
+    return el.play().catch(() => {
+      if (token === tuneToken) emit("blocked");
+    });
+  }
+  const h = new Hls();
+  hls = h;
+  h.on(Hls.Events.ERROR, (_ev, data) => {
+    if (!data?.fatal || token !== tuneToken || el !== cur()) return;
+    failStream();
+  });
+  h.loadSource(url);
+  h.attachMedia(el);
+  armFail();
+  return el.play().catch((e: DOMException) => {
+    if (token !== tuneToken) return;
+    if (e?.name === "NotAllowedError") {
+      paused = true;
+      emit("blocked");
+    }
+  });
 }
 
 function cur(): HTMLAudioElement | null {
@@ -129,24 +322,37 @@ export function getAudio(): HTMLAudioElement {
   return cur() ?? elB!;
 }
 
-/* ---------- 音量 ---------- */
+/* ---------- 音量 / 静音 / 静电（原站 setLevels，渲染循环每帧调用） ---------- */
 
 export function setVolume(v: number) {
   volume = Math.max(0, Math.min(1, v));
-  if (elA) applyVol(elA);
-  if (elB) applyVol(elB);
+  setLevels();
 }
 
 export function setMuted(m: boolean) {
   muted = m;
-  if (elA) applyVol(elA);
-  if (elB) applyVol(elB);
+  setLevels();
 }
 
-/* ---------- 响度归一（原站 setNorm：只重置自动增益） ---------- */
+/** A 走音频图（streamGain 控音量），B 是普通元素（自身 volume 控音量） */
+export function setLevels(): number {
+  const v = muted || paused ? 0 : volume;
+  const a = fxOn && staticLeft > 0 ? 0.08 : 0;
+  if (elB) elB.volume = Math.min(1, Math.max(0, v));
+  if (ctx && streamGain) {
+    const now = ctx.currentTime;
+    noiseGain?.gain.setTargetAtTime(a * v, now, 0.05);
+    streamGain.gain.setTargetAtTime(v, now, 0.08);
+  }
+  return paused ? 0 : a;
+}
+
+/* ---------- 响度归一（原站 normalize：RMS → normGain） ---------- */
 
 export function setNorm(on: boolean) {
   normOn = on;
+  ms = 0;
+  msT = 0;
   if (ctx && normGain) normGain.gain.setTargetAtTime(1, ctx.currentTime, 0.3);
 }
 
@@ -154,7 +360,23 @@ export function isNorm(): boolean {
   return normOn;
 }
 
-/* ---------- 调台音效（静电 burst，独立图） ---------- */
+let normLast = 0;
+
+function normalize(dt: number) {
+  if (!normOn || !live || paused || mode !== "A" || dt <= 0) return;
+  if (!analyser || !td || !ctx || !normGain) return;
+  analyser.getFloatTimeDomainData(td);
+  let sum = 0;
+  for (let i = 0; i < td.length; i++) sum += td[i] * td[i];
+  const mean = sum / td.length;
+  if (mean < 1e-5) return;
+  ms = msT === 0 ? mean : ms + (mean - ms) * Math.min(1, dt / (msT < 4 ? 1 : 6));
+  msT += dt;
+  const g = Math.min(3, Math.max(0.5, 0.18 / Math.sqrt(ms)));
+  normGain.gain.setTargetAtTime(g, ctx.currentTime, msT < 4 ? 0.4 : 1.5);
+}
+
+/* ---------- 调台静电 ---------- */
 
 export function setFx(on: boolean) {
   fxOn = on;
@@ -164,41 +386,14 @@ export function isFx(): boolean {
   return fxOn;
 }
 
-/** 换台时响一下电台杂音；同时点亮颗粒层的静电（原站 wn(.8)） */
-export function playTuningFx() {
-  if (!fxOn) return;
-  staticUntil = performance.now() + 800;
-  try {
-    if (!ctx) ctx = new AudioContext();
-    if (ctx.state === "suspended") ctx.resume();
-    const dur = 0.22;
-    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-      // 静电噪声 + 指数衰减包络
-      const t = i / data.length;
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.2) * 0.16;
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const bp = ctx.createBiquadFilter();
-    bp.type = "bandpass";
-    bp.frequency.value = 2400;
-    bp.Q.value = 0.6;
-    const g = ctx.createGain();
-    g.gain.value = 0.7;
-    src.connect(bp);
-    bp.connect(g);
-    g.connect(ctx.destination);
-    src.start();
-  } catch {
-    /* 无音频环境时静默失败 */
-  }
+/** 原站 wn(.9)：换台时把静电计时顶上去，噪声环带通增益自然淡入淡出 */
+export function playTuningFx(sec = 0.9) {
+  staticLeft = Math.max(staticLeft, sec);
 }
 
-/** 颗粒层静电强度（原站 setLevels 返回 fx&&静电计时 ? .08 : 0） */
-export function getStaticLevel(): number {
-  return fxOn && performance.now() < staticUntil ? 0.08 : 0;
+/** 原站 gn=Math.max(0,gn-e) */
+export function tickStatic(dt: number) {
+  staticLeft = Math.max(0, staticLeft - dt);
 }
 
 /* ---------- 播放控制 ---------- */
@@ -206,39 +401,54 @@ export function getStaticLevel(): number {
 export function loadAndPlay(url: string): Promise<void> {
   ensureGraph();
   curUrl = url;
-  mode = analyser && !aFailed ? "A" : "B";
-  const el = cur()!;
-  const other = el === elA ? elB : elA;
-  other?.pause();
-  el.src = url;
-  applyVol(el);
-  // 直连失败（CORS/混合内容/地区限制）时，自动改用本站代理重试一次
-  const directUrl = url;
-  el.onerror = () => {
-    if (el !== cur()) return;
-    if (!directUrl.startsWith("/api/radio/stream")) {
-      const proxied = "/api/radio/stream?u=" + encodeURIComponent(directUrl);
-      console.log("[radio2] 直连失败，改用代理重试");
-      loadAndPlay(proxied);
-    } else {
-      emit("error");
-    }
-  };
+  live = false;
+  const kind: "A" | "B" = analyser && !aFailed ? "A" : "B";
+  const prev = mode ? cur() : null;
+  dropHold();
+  /* 旧台还在响就留在 hold 里继续出声，等新台 playing 再回收 */
+  if (prev && mode === kind && !prev.paused && prev.getAttribute("src")) {
+    holdEl = prev;
+    holdKind = kind;
+  } else if (prev) {
+    recycle(prev, mode as "A" | "B");
+  }
+  let el: HTMLAudioElement;
+  if (preEl && preUrl === url && preKind === kind) {
+    el = preEl;
+    preEl = null;
+    preUrl = "";
+  } else {
+    dropPre();
+    el = takeEl(kind);
+  }
+  mode = kind;
+  if (kind === "A") elA = el;
+  else elB = el;
+  destroyHls();
+  window.clearTimeout(failTimer);
+  paused = false;
+  setLevels();
   if (ctx && ctx.state === "suspended") ctx.resume();
   emit("loading");
-  return el.play().catch(() => emit("blocked"));
+  return loadOn(el, url);
 }
 
 export function resumePlay(): Promise<void> {
   ensureGraph();
   const el = cur() ?? elB!;
-  applyVol(el);
+  paused = false;
+  setLevels();
   if (ctx && ctx.state === "suspended") ctx.resume();
   emit("loading");
+  armFail();
   return el.play().catch(() => emit("blocked"));
 }
 
 export function pauseAudio() {
+  paused = true;
+  window.clearTimeout(failTimer);
+  dropHold();
+  setLevels();
   cur()?.pause();
 }
 
@@ -312,7 +522,6 @@ export const getLevel = () => level;
 export const isReal = () => live && mode === "A";
 export const isLiveAudio = () => live;
 
-// 诊断入口（浏览器控制台可查频谱/低音是否工作）
 if (typeof window !== "undefined") {
   (window as any).__rdAudio = { getBass, getLevel, isReal, isLiveAudio, currentState, loadAndPlay };
 }

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SceneCanvas } from "./SceneCanvas";
 import { Intro, BrandMark, placeLine, metaLine } from "./Intro";
-import { RecordView, type DiveForm } from "./RecordView";
+import type { DiveForm } from "../lib/dive";
 import { Standby } from "./Standby";
 import { PhonePlayer } from "./PhonePlayer";
 import { StationSheet } from "./StationSheet";
@@ -22,6 +22,7 @@ import {
 } from "../lib/stations";
 import { detectLang, t, type Lang } from "../lib/i18n";
 import { storage } from "../lib/storage";
+import { stationArtwork } from "../lib/mediaArtwork";
 import {
   loadAndPlay,
   resumePlay,
@@ -31,6 +32,7 @@ import {
   setFx as audioSetFx,
   setNorm as audioSetNorm,
   playTuningFx,
+  preload,
   onPlayState,
 } from "../lib/audio";
 
@@ -237,11 +239,12 @@ export default function Workspace() {
   diveRef.current = dive;
   const skipOnError = useRef(true);
   const skipCount = useRef(0);
-  // 每个电台只尝试一次「代理线路」重试
+  // 每个电台只尝试一次代理线路重试
   const proxyRetriedRef = useRef<Set<string>>(new Set());
   const nearestRef = useRef<{ idx: number; d: number; locked: boolean; settled: boolean } | null>(
     null
   );
+  const preIdRef = useRef<string>("");
   const autoRecordAt = useRef(0); // 最近一次换台时间（自动进入唱片用）
   const stationRef = useRef<Station | null>(null);
   stationRef.current = station;
@@ -292,7 +295,7 @@ export default function Workspace() {
     const norm = storage.getBool("norm", false);
     const autoRec = storage.getBool("autoDive", true);
     const favOnly = storage.getBool("favOnly", false);
-    // 低端设备（窄屏 / 少核 / 低内存）默认开省电模式，保证流畅
+    // 低端设备（窄屏/少核/低内存）默认开省电模式
     let lowEndDevice = false;
     try {
       const cores = navigator.hardwareConcurrency || 8;
@@ -698,6 +701,81 @@ export default function Workspace() {
     if (s) tuneIn(s, true);
   }, [data, nextStation, tuneIn]);
 
+  /* ---------- 标签页标题（原站 iI） ---------- */
+  const baseTitle = useRef("");
+  if (!baseTitle.current && typeof document !== "undefined") baseTitle.current = document.title;
+  useEffect(() => {
+    document.title = station ? `${station.name || t("en", "unnamed")} · RoamDial` : baseTitle.current;
+  }, [station]);
+
+  /* ---------- Media Session（原站 uP）：锁屏 / 系统媒体键 ---------- */
+  const mediaRef = useRef({ station, playState, togglePlay, nextStation, prevStation });
+  mediaRef.current = { station, playState, togglePlay, nextStation, prevStation };
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator)) return;
+    const ms = navigator.mediaSession;
+    let lastJump = 0;
+    const off = () => {
+      const s = mediaRef.current.playState;
+      return s === "paused" || s === "error" || s === "blocked";
+    };
+    const guard = (fn: () => void) => () => {
+      if (mediaRef.current.station) fn();
+    };
+    // 原站：next/prev 有 300ms 防抖，避免系统连点把历史打乱
+    const jump = (fn: () => void) => () => {
+      const now = performance.now();
+      if (now - lastJump < 300 || !mediaRef.current.station) return;
+      lastJump = now;
+      fn();
+    };
+    const handlers: [MediaSessionAction, () => void][] = [
+      ["play", guard(() => { if (off()) mediaRef.current.togglePlay(); })],
+      ["pause", guard(() => { if (!off()) mediaRef.current.togglePlay(); })],
+      ["stop", guard(() => { if (!off()) mediaRef.current.togglePlay(); })],
+      ["nexttrack", jump(() => mediaRef.current.nextStation())],
+      ["previoustrack", jump(() => mediaRef.current.prevStation())],
+    ];
+    for (const [a, fn] of handlers) {
+      try {
+        ms.setActionHandler(a, fn);
+      } catch {
+        /* 该动作不支持时忽略 */
+      }
+    }
+    return () => {
+      for (const [a] of handlers) {
+        try {
+          ms.setActionHandler(a, null);
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!("mediaSession" in navigator) || !station) return;
+    const ms = navigator.mediaSession;
+    const c = data?.meta.countries[station.country];
+    const artist = [station.state, lang === "zh" ? c?.[1] : c?.[2]].filter(Boolean).join(" · ");
+    const color = data?.meta.genreColors[station.genre] ?? "#8FA39C";
+    const name = station.name || t("en", "unnamed");
+    try {
+      ms.metadata = new MediaMetadata({
+        title: name,
+        artist,
+        album: "RoamDial",
+        artwork: [{ src: stationArtwork(name, color), sizes: "512x512", type: "image/png" }],
+      });
+      ms.playbackState =
+        playState === "playing" || playState === "loading" ? "playing" : "paused";
+    } catch {
+      /* 老浏览器不支持 MediaMetadata 时忽略 */
+    }
+  }, [station, playState, data, lang]);
+
   const nearbyStep = useCallback(
     (dir: 1 | -1) => {
       const cur = stationRef.current;
@@ -891,6 +969,11 @@ export default function Workspace() {
           return;
         nearestRef.current = { idx: s.idx, d, locked, settled: !!settled };
         setNearest({ s, d, locked, km, settled: !!settled });
+        /* 原站 l.preload()：准星锁定的台先缓冲，换台时直接接管元素 */
+        if (locked && s.id !== preIdRef.current && s.id !== stationRef.current?.id) {
+          preIdRef.current = s.id;
+          preload(s.url);
+        }
       } else {
         if (!prev) return;
         nearestRef.current = null;
@@ -1255,6 +1338,8 @@ export default function Workspace() {
         onGrab={onGrab}
         zoomOnSwitch={switchZoom}
         diving={recordView}
+        diveForm={diveForm}
+        pro={!ecoOn}
         onDive={() => setRecordView(true)}
         onError={() => {
           setWebglFailed(true);
@@ -1263,10 +1348,8 @@ export default function Workspace() {
       />
 
       <div className="scrim" />
-      <div
-        className="glow"
-        style={{ opacity: isLive ? 1 : 0, ["--glow-c" as any]: glowColor }}
-      />
+      {/* .glow 的不透明度由 SceneCanvas 按音频实时写（原站同款），这里只给颜色 */}
+      <div className="glow" style={{ ["--glow-c" as any]: glowColor }} />
 
       {/* 准星 */}
       <div className="cross">
@@ -2101,16 +2184,7 @@ export default function Workspace() {
         </div>
       )}
 
-      {/* 唱片视图 */}
-      {recordView && station && data && !standbyOn && !sheetOpen && (
-        <RecordView
-          station={station}
-          meta={data.meta}
-          form={diveForm}
-          pro={!ecoOn}
-          playing={playState === "playing"}
-        />
-      )}
+      {/* 唱片视图：已并入 WebGL 场景（原站 3D 点云），不再有 2D 覆盖层 */}
 
       {/* 闲置挂机画面 */}
       {standbyOn && station && data && (

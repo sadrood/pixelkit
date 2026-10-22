@@ -11,11 +11,24 @@ import type { Station, StationMeta } from "../lib/stations";
 import { reducedMotion } from "../lib/motion";
 import { t } from "../lib/i18n";
 import {
+  DIVE_N,
+  DIVE_CFG,
+  diveGeo,
+  diveSeeds,
+  originCloud,
+  resolveForm,
+  type DiveForm,
+  type DiveGeo,
+  type DiveKey,
+  type ResolvedForm,
+} from "../lib/dive";
+import {
   updateSpectrum,
   getFftData,
   getBass,
   getLevel,
-  getStaticLevel,
+  setLevels,
+  tickStatic,
   isReal,
   isLiveAudio,
 } from "../lib/audio";
@@ -164,6 +177,18 @@ vec3 curl(vec3 p){
 }
 `;
 
+const DIVE_SC = S / 1.6;
+
+const SIG_FN = `
+/* 原站 NN：选台后的球面行进脉冲（5 秒一圈，只在原生宿主开启） */
+float sig(vec3 p){
+  if (uSigOn < 0.001) return 0.0;
+  float ang = acos(clamp(dot(normalize(p), uSig), -1.0, 1.0));
+  float ph = fract(uTime / 5.0);
+  return exp(-pow((ang - ph) / 0.08, 2.0)) * smoothstep(0.03, 0.16, ph) * pow(1.0 - ph, 1.5) * uSigOn;
+}
+`;
+
 const VERT = `
 attribute vec3 aNeb;
 attribute vec4 aInfo;
@@ -171,12 +196,14 @@ attribute vec2 aFlag;
 attribute vec3 aRing;
 attribute float aIdx;
 attribute float aDen;
-uniform float uTime, uView, uRingE, uPR, uSel, uIntro, uBoost, uLevel;
+uniform float uTime, uView, uRingE, uPR, uSel, uIntro, uBoost, uLevel, uSigOn, uDive;
 uniform vec3 uCol[11];
+uniform vec3 uSig;
 uniform sampler2D uFFT;
 varying vec3 vCol;
 varying float vA;
 ${NOISE}
+${SIG_FN}
 float ease(float t){ return t<0.5 ? 4.0*t*t*t : 1.0-pow(-2.0*t+2.0,3.0)/2.0; }
 void main(){
   float sd = aInfo.w;
@@ -200,7 +227,8 @@ void main(){
   float back = mix(mix(0.05, 1.0, face), 1.0, max(e, rr));
   float pop = aInfo.y / 9.0;
   float sel = 1.0 - step(0.5, abs(aIdx - uSel));
-  float sz = (1.1 + pop*2.3) * (6.0 * ${S.toFixed(1)} / -mv.z) * mix(1.0, 2.6, rr) * mix(1.0, 2.1, e) * mix(0.6, uBoost, m) * (1.0 + ff*0.7*m*uLevel) + sel*(9.0 + uLevel*10.0);
+  float sg = sig(position) * (1.0 - e) * (1.0 - rr);
+  float sz = (1.0 + sg*0.35) * (1.1 + pop*2.3) * (6.0 * ${S.toFixed(1)} / -mv.z) * mix(1.0, 2.6, rr) * mix(1.0, 2.1, e) * mix(0.6, uBoost, m) * (1.0 + ff*0.7*m*uLevel) + sel*(9.0 + uLevel*10.0);
   gl_PointSize = clamp(sz * uPR, 1.0, 46.0);
   vec3 gc = uCol[int(aInfo.x + 0.5)];
   vCol = mix(vec3(0.95, 0.9, 0.82), gc, mix(0.45, 1.0, max(e, rr)));
@@ -208,6 +236,9 @@ void main(){
   float dn = mix(aDen, 1.0, max(e, rr));
   dn *= mix(1.0, 0.16, ease(uRingE) * (1.0 - aFlag.y));
   vA = (0.16 + pop*0.7) * mix(1.0, 1.25, e) * dn * back * mix(0.035, 1.0, m) * (1.0 + ff*uLevel) * ie + sel*1.6;
+  vCol = mix(vCol, vec3(1.0, 0.78, 0.62), sg*0.35);
+  vA *= 1.0 + sg * 0.7;
+  vA *= 1.0 - uDive;
 }
 `;
 
@@ -221,6 +252,84 @@ void main(){
   float a = smoothstep(0.5, 0.0, r);
   a *= a;
   gl_FragColor = vec4(vCol * vA * a, 1.0);
+  #include <colorspace_fragment>
+}
+`;
+
+/* 原站 BN / VN：唱片态（dive）点云。aFrom/aTo 各带亮度，aBand 是 FFT 取样行列 */
+const DIVE_VERT = `
+attribute vec4 aFrom;
+attribute vec4 aTo;
+attribute vec4 aSeed;
+attribute vec4 aBand;
+uniform float uTime, uProg, uFromMode, uToMode, uFromGain, uToGain, uFromPt, uToPt, uSize, uPR, uFocus, uAspect, uMouseF;
+uniform vec2 uMouse;
+uniform sampler2D uFFT;
+varying float vA;
+varying float vAmp;
+varying float vB;
+varying float vHot;
+${NOISE}
+float dease(float t){ return t<0.5 ? 4.0*t*t*t : 1.0-pow(-2.0*t+2.0,3.0)/2.0; }
+vec3 dirFor(float m, vec3 p){ return m < 0.5 ? normalize(p+1e-5) : vec3(0.0,1.0,0.0); }
+void main(){
+  float e = dease(clamp((uProg - aSeed.x*0.4)/0.6, 0.0, 1.0));
+  vec3 pos = mix(aFrom.xyz, aTo.xyz, e);
+  float bright = mix(aFrom.w, aTo.w, e);
+  float mid = sin(3.14159265*e);
+  if (mid > 0.002) {
+    pos += curl(pos*0.45 + vec3(uTime*0.12, 0.0, aSeed.y*3.0)) * mid * (0.9 + aSeed.y*2.2);
+    pos += normalize(aFrom.xyz + aTo.xyz + 1e-4) * mid * mid * (0.4 + aSeed.z*1.7);
+  }
+  float aF = texture2D(uFFT, vec2(aBand.x, aBand.y*0.97+0.004)).r;
+  float aT = texture2D(uFFT, vec2(aBand.z, aBand.w*0.97+0.004)).r;
+  float amp = mix(aF*uFromGain, aT*uToGain, e);
+  vec3 dir = normalize(mix(dirFor(uFromMode, pos), dirFor(uToMode, pos), e) + 1e-5);
+  float rowShape = step(0.0005, mix(aBand.y, aBand.w, e));
+  pos += dir * amp * mix(0.35 + aSeed.w*0.65, 1.0, rowShape);
+  pos += vec3(sin(uTime*0.7+aSeed.y*40.0), cos(uTime*0.6+aSeed.z*40.0), sin(uTime*0.5+aSeed.x*40.0)) * 0.006;
+  vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+  vec4 cl = projectionMatrix * mv;
+  vec2 nd = cl.xy / cl.w;
+  vec2 d = nd - uMouse;
+  d.x *= uAspect;
+  mv.xy += normalize(d + 1e-5) * smoothstep(0.22, 0.0, length(d)) * uMouseF * 0.22 * (-mv.z) * 0.16;
+  gl_Position = projectionMatrix * mv;
+  float depth = -mv.z;
+  float coc = abs(depth - uFocus);
+  vec3 wn = normalize((modelMatrix * vec4(pos,0.0)).xyz + 1e-5);
+  float face = smoothstep(-0.35, 0.35, dot(wn, normalize(cameraPosition - (modelMatrix*vec4(pos,1.0)).xyz)));
+  float radial = 1.0 - min(1.0, mix(uFromMode, uToMode, e));
+  float back = mix(1.0, 0.12 + 0.88*face, radial * (1.0 - mid));
+  float sz = uSize * (0.55 + aSeed.w*0.9) * (1.0 + coc*coc*0.9) * (6.0/depth) * (1.0 + amp*0.9);
+  gl_PointSize = clamp(sz * uPR, 1.0, 44.0);
+  float pt = mix(uFromPt, 0.0, e) + mix(0.0, uToPt, e);
+  vA = bright * back * (0.62 / (1.0 + coc*coc*3.0)) * (1.0 + amp*0.7) * (1.0 + mid*0.5) * mix(1.0, 0.004, clamp(pt, 0.0, 1.0));
+  vAmp = amp;
+  vB = aSeed.w;
+  vHot = smoothstep(0.85, 1.6, bright);
+}
+`;
+
+const DIVE_FRAG = `
+uniform vec3 uBase;
+uniform vec3 uAccA;
+uniform vec3 uAccB;
+uniform float uProg;
+varying float vA;
+varying float vAmp;
+varying float vB;
+varying float vHot;
+void main(){
+  vec2 c = gl_PointCoord - 0.5;
+  float r = length(c);
+  if (r > 0.5) discard;
+  float a = smoothstep(0.5, 0.0, r);
+  a *= a;
+  vec3 acc = mix(uAccA, uAccB, smoothstep(0.25, 0.75, uProg));
+  vec3 col = mix(uBase, acc, clamp(vAmp*1.1 + vHot*0.8 + step(0.86, vB)*0.55, 0.0, 1.0))
+    + vec3(1.0) * smoothstep(0.7, 1.2, vAmp) * 0.6;
+  gl_FragColor = vec4(col * vA * a, 1.0);
   #include <colorspace_fragment>
 }
 `;
@@ -301,13 +410,17 @@ void main(){
 
 /* 原站 PN / FN：/land-dots.json 的陆地小点层 */
 const LAND_VERT = `
-uniform float uPR;
+uniform float uPR, uTime, uSigOn;
+uniform vec3 uSig;
 varying float vF;
+varying float vS;
+${SIG_FN}
 void main(){
   vec4 mv = modelViewMatrix * vec4(position, 1.0);
   vec3 wn = normalize((modelMatrix * vec4(position, 0.0)).xyz);
   vF = smoothstep(-0.05, 0.35, dot(wn, normalize(cameraPosition)));
-  gl_PointSize = 1.6 * uPR * (6.0 * ${S.toFixed(1)} / -mv.z);
+  vS = sig(position);
+  gl_PointSize = 1.6 * uPR * (6.0 * ${S.toFixed(1)} / -mv.z) * (1.0 + vS * 0.4);
   gl_Position = projectionMatrix * mv;
 }
 `;
@@ -315,10 +428,11 @@ void main(){
 const LAND_FRAG = `
 uniform float uA;
 varying float vF;
+varying float vS;
 void main(){
   vec2 c = gl_PointCoord - 0.5;
   if (length(c) > 0.5) discard;
-  gl_FragColor = vec4(vec3(0.028, 0.040, 0.036) * vF * uA, 1.0);
+  gl_FragColor = vec4((vec3(0.028, 0.040, 0.036) + vec3(0.06, 0.046, 0.035) * vS) * vF * uA, 1.0);
 }
 `;
 
@@ -346,6 +460,10 @@ export interface SceneCanvasProps {
   zoomOnSwitch?: boolean;
   diving?: boolean;
   onDive?: () => void;
+  /** 唱片态效果偏好（原站设置里的 diveForm） */
+  diveForm?: DiveForm;
+  /** 高画质档：省电模式只允许 3 种轻效果 */
+  pro?: boolean;
   onError: () => void;
 }
 
@@ -364,6 +482,8 @@ export function SceneCanvas({
   zoomOnSwitch = true,
   diving = false,
   onDive,
+  diveForm = "genre",
+  pro = true,
   onError,
 }: SceneCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -383,6 +503,8 @@ export function SceneCanvas({
     zoomOnSwitch,
     diving,
     onDive,
+    diveForm,
+    pro,
     onError,
   });
   propsRef.current = {
@@ -400,6 +522,8 @@ export function SceneCanvas({
     zoomOnSwitch,
     diving,
     onDive,
+    diveForm,
+    pro,
     onError,
   };
 
@@ -436,6 +560,7 @@ export function SceneCanvas({
       Math.min(32, Math.max(10.5, 4.4 / (Math.tan(19 * DEG) * camera.aspect))) * S;
     const globeDist = () => 6.2 * vScale() * S;
     let camZ = 9 * vScale() * S;
+    let camZNow = camZ;
     camera.position.set(0, 0, camZ);
 
     /* 后处理：原站 three EffectComposer（HalfFloat）→ RenderPass → UnrealBloom(.45/.55/.2)
@@ -505,10 +630,15 @@ export function SceneCanvas({
     scene.add(group);
 
     /* 地景点球（原站 setLand）：极暗小点铺出大陆，morph 到星云时淡出 */
+    const sigDir = new THREE.Vector3(0, 0, 1); // 原站 D/te 共用同一个 uSig
     const landMat = new THREE.ShaderMaterial({
       uniforms: {
         uA: { value: 0 },
         uPR: { value: dpr },
+        uTime: { value: 0 },
+        uSigOn: { value: 0 },
+        uSig: { value: sigDir },
+        uDive: { value: 0 },
       },
       vertexShader: LAND_VERT,
       fragmentShader: LAND_FRAG,
@@ -568,6 +698,9 @@ export function SceneCanvas({
         uBoost: { value: 1 },
         uLevel: { value: 0 },
         uFFT: { value: fftTex },
+        uSigOn: { value: 0 },
+        uSig: { value: sigDir },
+        uDive: { value: 0 },
         uCol: { value: pointColors },
       },
       vertexShader: VERT,
@@ -577,6 +710,113 @@ export function SceneCanvas({
       depthTest: false,
       blending: THREE.AdditiveBlending,
     });
+    /* ---------- 唱片态 3D 点云（原站 je / ke / Me / I） ---------- */
+    const diveUniforms = {
+      uTime: { value: 0 },
+      uProg: { value: 1 },
+      uFromMode: { value: 0 },
+      uToMode: { value: 0 },
+      uFromGain: { value: 0 },
+      uToGain: { value: 0 },
+      uFromPt: { value: 1 },
+      uToPt: { value: 1 },
+      uSize: { value: pro ? 1.7 : 2.1 },
+      uPR: { value: dpr },
+      uFocus: { value: 6 },
+      uAspect: { value: window.innerWidth / window.innerHeight },
+      uMouse: { value: new THREE.Vector2(9, 9) },
+      uMouseF: { value: 0 },
+      uFFT: { value: fftTex },
+      uBase: { value: new THREE.Color("#F5F1E8") },
+      uAccA: { value: new THREE.Color("#EDE3CC") },
+      uAccB: { value: new THREE.Color("#EDE3CC") },
+    };
+    const diveMat = new THREE.ShaderMaterial({
+      uniforms: diveUniforms,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending,
+      vertexShader: DIVE_VERT,
+      fragmentShader: DIVE_FRAG,
+    });
+    /* 原站 c 档：高画质 65,536 点 / 省电 32,768 点，点大小 1.7 / 2.1 */
+    const diveN = pro ? DIVE_N : DIVE_N / 2;
+    const diveSeed = diveSeeds(diveN);
+    const diveFrom = new THREE.BufferAttribute(new Float32Array(diveN * 4), 4);
+    const diveTo = new THREE.BufferAttribute(new Float32Array(diveN * 4), 4);
+    const diveBand = new THREE.BufferAttribute(new Float32Array(diveN * 2), 2);
+    const diveGeom = new THREE.BufferGeometry();
+    diveGeom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(diveN * 3), 3));
+    diveGeom.setAttribute("aFrom", diveFrom);
+    diveGeom.setAttribute("aTo", diveTo);
+    diveGeom.setAttribute("aSeed", new THREE.BufferAttribute(diveSeed, 4));
+    diveGeom.setAttribute("aBand", diveBand);
+    const divePoints = new THREE.Points(diveGeom, diveMat);
+    divePoints.frustumCulled = false;
+    divePoints.visible = false;
+    const diveSpin = new THREE.Group();
+    const diveGroup = new THREE.Group();
+    diveGroup.add(diveSpin);
+    diveSpin.add(divePoints);
+    scene.add(diveGroup);
+    let diveKey: DiveKey = "point";
+    let diveLast: ResolvedForm = "disc";
+    let diveFe = 1;
+    let diveRate = 0.42;
+    let diveWasOn = false;
+    let diveSpinA = 0;
+    let diveZoom = 1;
+    let diveYaw = 0;
+    let divePitch = 0;
+    let diveYawT = 0;
+    let divePitchT = 0;
+    let diveDrag = false;
+    let diveHover = false;
+    let diveReq = { form: "genre" as DiveForm, pro: true, genre: 10 };
+    let diveMouseF = 0;
+    const diveTmp = new THREE.Vector3();
+    const ease01 = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+    /** 原站 Ue()：把新形态塞进 aTo，aFrom 按 uProg 追平，aBand 过半数后换列 */
+    const applyDive = (key: DiveKey, geo: DiveGeo, rate = 0.42, color?: string) => {
+      const fa = diveFrom.array as Float32Array;
+      const ta = diveTo.array as Float32Array;
+      const ba = diveBand.array as Float32Array;
+      for (let i = 0; i < diveN; i++) {
+        const r = i * 4;
+        const n = ease01(Math.min(1, Math.max(0, (diveFe - diveSeed[r] * 0.4) / 0.6)));
+        fa[r] += (ta[r] - fa[r]) * n;
+        fa[r + 1] += (ta[r + 1] - fa[r + 1]) * n;
+        fa[r + 2] += (ta[r + 2] - fa[r + 2]) * n;
+        fa[r + 3] += (ta[r + 3] - fa[r + 3]) * n;
+        if (n > 0.5) {
+          ba[r] = ba[r + 2];
+          ba[r + 1] = ba[r + 3];
+        }
+        ba[r + 2] = geo.band[i * 2];
+        ba[r + 3] = geo.band[i * 2 + 1];
+      }
+      ta.set(geo.pos);
+      diveFrom.needsUpdate = true;
+      diveTo.needsUpdate = true;
+      diveBand.needsUpdate = true;
+      const c = DIVE_CFG[diveKey];
+      const l = DIVE_CFG[key];
+      diveUniforms.uFromMode.value = c.mode;
+      diveUniforms.uToMode.value = l.mode;
+      diveUniforms.uFromGain.value = c.gain;
+      diveUniforms.uToGain.value = l.gain;
+      diveUniforms.uFromPt.value = diveKey === "point" ? 1 : 0;
+      diveUniforms.uToPt.value = key === "point" ? 1 : 0;
+      (diveUniforms.uAccA.value as THREE.Color).copy(diveUniforms.uAccB.value as THREE.Color);
+      if (color) (diveUniforms.uAccB.value as THREE.Color).set(color);
+      diveKey = key;
+      if (key !== "point") diveLast = key as ResolvedForm;
+      diveFe = 0;
+      diveRate = rate;
+    };
+
     let points: THREE.Points | null = null;
     let layout: Layout = { globe: new Float32Array(0), neb: new Float32Array(0), den: new Float32Array(0), info: new Float32Array(0), anchors: [], ring: new Float32Array(0) };
     let flags: Float32Array = new Float32Array(0);
@@ -810,17 +1050,21 @@ export function SceneCanvas({
 
     /* 投影：世界（组内）坐标 → 屏幕。viewPoint 走与渲染一致的矩阵 */
     const v3 = new THREE.Vector3();
-    const toScreen = (arr: Float32Array, i: number) => {
+    /* 复用同一个输出对象：原来每次调用都返回新字面量，扫 35,699 个台就是 35,699 次分配 */
+    type ScreenPt = { x: number; y: number; z: number; front: number };
+    const spTmp: ScreenPt = { x: 0, y: 0, z: 0, front: 0 };
+    const pvMat = new THREE.Matrix4();
+    let vw2 = window.innerWidth;
+    let vh2 = window.innerHeight;
+    const toScreen = (arr: Float32Array, i: number, out: ScreenPt = spTmp): ScreenPt => {
       v3.set(arr[i * 3], arr[i * 3 + 1], arr[i * 3 + 2]);
       group.localToWorld(v3);
-      const front = v3.z;
+      out.front = v3.z;
       v3.project(camera);
-      return {
-        x: (v3.x * 0.5 + 0.5) * window.innerWidth,
-        y: (-v3.y * 0.5 + 0.5) * window.innerHeight,
-        z: v3.z,
-        front,
-      };
+      out.x = (v3.x * 0.5 + 0.5) * vw2;
+      out.y = (-v3.y * 0.5 + 0.5) * vh2;
+      out.z = v3.z;
+      return out;
     };
 
     const pickAt = (sx: number, sy: number): number => {
@@ -848,6 +1092,7 @@ export function SceneCanvas({
     /* 交互 */
     const onPointerDown = (e: PointerEvent) => {
       dragState = true;
+      diveDrag = true;
       moved = 0;
       downAt = performance.now();
       grabbed = false;
@@ -860,6 +1105,21 @@ export function SceneCanvas({
     const onPointerMove = (e: PointerEvent) => {
       tiltTarget.x = (e.clientX / window.innerWidth - 0.5) * 2;
       tiltTarget.y = -(e.clientY / window.innerHeight - 0.5) * 2;
+      (diveUniforms.uMouse.value as THREE.Vector2).set(
+        (e.clientX / window.innerWidth) * 2 - 1,
+        -(e.clientY / window.innerHeight) * 2 + 1
+      );
+      diveHover = true;
+      if (propsRef.current.diving) {
+        if (dragState) {
+          const ddx = e.clientX - last.x;
+          const ddy = e.clientY - last.y;
+          diveYawT += ddx * 0.0042;
+          divePitchT = Math.max(-1.1, Math.min(1.1, divePitchT + ddy * 0.003));
+          last = { x: e.clientX, y: e.clientY };
+        }
+        return;
+      }
       if (!dragState) return;
       const dx = e.clientX - last.x;
       const dy = e.clientY - last.y;
@@ -893,6 +1153,7 @@ export function SceneCanvas({
         }
       }
       dragState = false;
+      diveDrag = false;
       canvas.classList.remove("drag");
     };
     const onWheel = (e: WheelEvent) => {
@@ -900,6 +1161,10 @@ export function SceneCanvas({
       userDragged = false;
       userZoomed = true;
       const delta = e.deltaY;
+      if (propsRef.current.diving) {
+        diveZoom = Math.max(0.55, Math.min(1.8, diveZoom * (1 + delta * 0.0012)));
+        return;
+      }
       /* 原站 Sr()：地球 [1.95, 9v]，星云 [3.5, max(15, y*1.3)] */
       const sky = morphTarget > 0.5;
       const lo = (sky ? 3.5 : 1.95) * S;
@@ -981,6 +1246,16 @@ export function SceneCanvas({
     const nearestRef = { idx: -1, dist: 1e9, locked: false, settled: false };
     let labels: [number, number, number][] = [];
     const stationCount = () => layout.globe.length / 3;
+    /* .glow 的不透明度由音频驱动（原站在渲染循环里写 style.opacity），这里缓存节点 */
+    let glowEl: HTMLElement | null = null;
+    let glowO = 0;
+    let glowLast = -1;
+    /** 原站 Wr：脉冲强度的缓动值 */
+    let sigAmt = 0;
+    /* 自适应画质：连续 2 秒平均帧时间 > 24ms 就把渲染分辨率降到 1.25，弱 GPU 上更稳 */
+    let perfAcc = 0;
+    let perfN = 0;
+    let perfChecked = false;
 
     const frame = (ms: number) => {
       raf = requestAnimationFrame(frame);
@@ -989,9 +1264,19 @@ export function SceneCanvas({
       const dt = prevMs ? Math.min(0.05, Math.max(0.001, (ms - prevMs) / 1000)) : 1 / 60;
       prevMs = ms;
       const f60 = dt * 60;
-      // 频谱/低音：每帧刷新，驱动点云呼吸与 Bloom（原站 strength = .45 + bass * …）
-      try { updateSpectrum(dt, tt); } catch { /* ignore */ }
-      if (bloom) { try { bloom.strength = 0.45 + getBass() * 0.55 * (p.pro ? 1 : 0.35); } catch { /* ignore */ } }
+      if (!perfChecked) {
+        perfAcc += dt;
+        perfN++;
+        if (perfAcc > 2) {
+          perfChecked = true;
+          if (perfAcc / perfN > 0.024) {
+            const pr = Math.min(dpr, 1.25);
+            renderer.setPixelRatio(pr);
+            composer?.setPixelRatio(pr);
+            composer?.setSize(window.innerWidth, window.innerHeight);
+          }
+        }
+      }
 
       if (p.stations !== builtFor) build();
       updateFlags();
@@ -1012,12 +1297,43 @@ export function SceneCanvas({
       mat.uniforms.uView.value = morph;
       mat.uniforms.uTime.value = tt;
       mat.uniforms.uPR.value = renderer.getPixelRatio();
+      vw2 = window.innerWidth;
+      vh2 = window.innerHeight;
       mat.uniforms.uIntro.value = intro;
       mat.uniforms.uSel.value = p.currentIdx ?? -1;
 
       /* 唱片态：点阵/背景一起让位（原站 uDive），我们的 .rv 是覆盖层，淡出更稳 */
-      diveAmt += ((p.diving ? 1 : 0) - diveAmt) * (reducedMotion() ? 1 : Math.min(1, dt * 5));
+      /* 原站 Ge+=(Ke-Ge)*min(1, i*(Ke?1.6:1.3))：进 1.6/s、出 1.3/s，比之前 dt*5 慢得多 */
+      diveAmt +=
+        ((p.diving ? 1 : 0) - diveAmt) *
+        (reducedMotion() ? 1 : Math.min(1, dt * (p.diving ? 1.6 : 1.3)));
       (mat.uniforms.uBoost as { value: number }).value = 1 - diveAmt * 0.4;
+
+      /* 音频联动（原站 Bn → uFFT / uLevel / 泛光 / 颗粒 / .glow） */
+      updateSpectrum(dt, tt);
+      fftTex.needsUpdate = true;
+      mat.uniforms.uLevel.value = getLevel();
+      const bs = getBass();
+      if (bloom) bloom.strength = 0.45 + bs * 0.3;
+      tickStatic(dt);
+      const staticLv = setLevels();
+      if (grain) grain.uniforms.uNoise.value = staticLv * 4;
+      if (!glowEl || !glowEl.isConnected) glowEl = document.querySelector<HTMLElement>(".glow");
+      if (glowEl) {
+        const gt =
+          p.currentIdx == null
+            ? 0
+            : isReal()
+              ? 0.4 + Math.min(1, bs) * 0.6
+              : isLiveAudio()
+                ? 0.3
+                : 0.16;
+        glowO += (gt - glowO) * Math.min(1, dt * 6);
+        if (Math.abs(glowO - glowLast) > 0.004) {
+          glowLast = glowO;
+          glowEl.style.opacity = glowO.toFixed(3);
+        }
+      }
 
       /* 背景星空 + 颗粒（原站 S / le 的 uniform 更新） */
       const cur = p.currentIdx != null ? p.stations[p.currentIdx] : null;
@@ -1039,6 +1355,88 @@ export function SceneCanvas({
         Math.max(0.3, Math.min(1, (camZ / S - 2.2) / 3.2));
       landMat.uniforms.uPR.value = renderer.getPixelRatio();
 
+      /* 原站只在原生宿主（HM）里跑：选台后的球面行进脉冲 + 背景流星。
+         web 端用 window.__roamdialNative 显式模拟宿主，默认关闭（与原站网页一致） */
+      const nativeOn = (window as any).__roamdialNative === true;
+      bgMat.uniforms.uLive.value = nativeOn ? 1 : 0;
+      const sigTarget =
+        nativeOn && p.currentIdx != null && !p.diving && !ringOn
+          ? Math.max(0, 1 - morph * 3)
+          : 0;
+      sigAmt += (sigTarget - sigAmt) * Math.min(1, dt * 2);
+      mat.uniforms.uSigOn.value = sigAmt;
+      landMat.uniforms.uSigOn.value = sigAmt;
+      landMat.uniforms.uTime.value = tt;
+
+      /* ---------- 唱片态 3D 点云（原站 rt / lt / Ue / 每帧驱动） ---------- */
+      if (p.diving !== diveWasOn && layout.globe.length > 0) {
+        const idx = p.currentIdx ?? 0;
+        const g = p.stations[idx];
+        diveTmp
+          .set(layout.globe[idx * 3], layout.globe[idx * 3 + 1], layout.globe[idx * 3 + 2])
+          .applyMatrix4(group.matrixWorld)
+          .divideScalar(DIVE_SC);
+        if (p.diving) {
+          const o0 = originCloud(diveTmp.x, diveTmp.y, diveTmp.z, 0.012, diveN);
+          (diveFrom.array as Float32Array).set(o0.pos);
+          (diveTo.array as Float32Array).set(o0.pos);
+          diveFrom.needsUpdate = true;
+          diveTo.needsUpdate = true;
+          diveKey = "point";
+          diveFe = 1;
+          const col = p.meta.genreColors[g?.genre ?? 10] ?? "#EDE3CC";
+          (diveUniforms.uAccB.value as THREE.Color).set(col);
+          diveSpinA = 0;
+          diveZoom = 1;
+          diveYaw = diveYawT = divePitch = divePitchT = 0;
+          diveGroup.rotation.set(0, 0, 0);
+          diveSpin.rotation.set(0, 0, 0);
+          diveReq = { form: p.diveForm, pro: p.pro, genre: g?.genre ?? 10 };
+          const rf = resolveForm(diveReq.form, diveReq.genre, diveReq.pro, diveLast);
+          applyDive(rf, diveGeo(rf, diveN), 0.42, col);
+          divePoints.visible = true;
+        } else {
+          applyDive("point", originCloud(diveTmp.x, diveTmp.y, diveTmp.z, 0.012, diveN), 0.6);
+        }
+        diveWasOn = p.diving;
+      }
+      diveFe = Math.min(1, diveFe + dt * diveRate);
+      diveUniforms.uProg.value = diveFe;
+      diveUniforms.uTime.value = tt;
+      diveUniforms.uPR.value = renderer.getPixelRatio();
+      diveUniforms.uAspect.value = camera.aspect;
+      /* 设置里换了效果 / 换了台 / 切了画质档 → 交叉淡入到新形态 */
+      if (p.diving && p.currentIdx != null) {
+        const g = p.stations[p.currentIdx];
+        const genre = g?.genre ?? 10;
+        if (
+          diveFe > 0.85 &&
+          (diveReq.form !== p.diveForm || diveReq.pro !== p.pro || diveReq.genre !== genre)
+        ) {
+          diveReq = { form: p.diveForm, pro: p.pro, genre };
+          const rf = resolveForm(diveReq.form, genre, diveReq.pro, diveLast);
+          if (rf !== diveLast) applyDive(rf, diveGeo(rf, diveN), 0.42, p.meta.genreColors[genre] ?? "#EDE3CC");
+        }
+      }
+      diveSpinA += dt * DIVE_CFG[diveKey].spin * (1 + getBass() * 0.6);
+      diveSpin.rotation.y = diveSpinA;
+      diveYaw += (diveYawT - diveYaw) * 0.06;
+      divePitch += (divePitchT - divePitch) * 0.06;
+      if (!diveDrag) {
+        diveYawT *= 0.985;
+        divePitchT *= 0.985;
+      }
+      diveGroup.rotation.set(divePitch * diveAmt, diveYaw * diveAmt, 0);
+      diveMouseF += ((diveHover && !diveDrag && p.diving ? 1 : 0) - diveMouseF) * Math.min(1, dt * 8);
+      diveUniforms.uMouseF.value = diveMouseF;
+      if (!p.diving && diveFe >= 1 && divePoints.visible) divePoints.visible = false;
+      if (points) points.visible = diveAmt < 0.995;
+      mat.uniforms.uDive.value = diveAmt;
+      if (p.currentIdx != null) {
+        const b = p.currentIdx * 3;
+        sigDir.set(layout.globe[b], layout.globe[b + 1], layout.globe[b + 2]).normalize();
+      }
+
       /* 拖拽惯性 + 自转 + 缓动 */
       if (!dragState) {
         tgt.y += vel.y * f60;
@@ -1057,10 +1455,40 @@ export function SceneCanvas({
       }
       group.rotation.set(rot.x, rot.y, 0);
       group.updateMatrixWorld(true);
-      camera.position.z +=
-        (camZ - camera.position.z) * (reducedMotion() ? 1 : 1 - Math.pow(0.94, f60));
+      /* 原站机位：唱片态把相机抬到 de[form].cam 并看向 look，靠 uDive 混合过去 */
+      camZNow += (camZ - camZNow) * (reducedMotion() ? 1 : 1 - Math.pow(0.94, f60));
+      if (diveAmt > 0.001) {
+        const cfg = DIVE_CFG[p.diving ? diveLast : "point"];
+        const uScale = Math.max(1, 0.95 / camera.aspect);
+        const cWave = Math.sin(Math.PI * ease01(diveFe));
+        const k = diveZoom * uScale * (1 + cWave * 0.22) * (1 + 0.45 * diveAmt);
+        const dz = cfg.cam[2] * k;
+        const bDive = camZNow / DIVE_SC;
+        /* 原站唱片态鼠标视差：Ye.x += xr.x*.25、Ye.y += xr.y*.15 */
+        const par = diveHover ? diveAmt : 0;
+        const pmx = (diveUniforms.uMouse.value as THREE.Vector2).x * 0.25 * par;
+        const pmy = (diveUniforms.uMouse.value as THREE.Vector2).y * 0.15 * par;
+        camera.position.set(
+          cfg.cam[0] * k * diveAmt + pmx,
+          cfg.cam[1] * k * diveAmt + pmy,
+          bDive + (dz - bDive) * diveAmt
+        );
+        camera.lookAt(cfg.look[0] * diveAmt, cfg.look[1] * diveAmt, cfg.look[2] * diveAmt);
+        diveUniforms.uFocus.value = camera.position.distanceTo(
+          diveTmp.set(cfg.look[0] * diveAmt, cfg.look[1] * diveAmt, cfg.look[2] * diveAmt)
+        );
+      } else {
+        camera.position.set(0, 0, camZNow);
+        camera.lookAt(0, 0, 0);
+        diveUniforms.uFocus.value = camZNow / DIVE_SC;
+      }
       camera.updateMatrixWorld(true);
-      camera.updateProjectionMatrix();
+      /* 原站每帧 setViewOffset：桌面唱片态整体右移 11% 让位给左侧信息，窄屏下移 13%
+         （ci 是宿主 setIntroShift 的缓动值，独立访问恒 0） */
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      if (vw > 900) camera.setViewOffset(vw, vh, -vw * 0.11 * diveAmt, 0, vw, vh);
+      else camera.setViewOffset(vw, vh, 0, vh * 0.13 * diveAmt, vw, vh);
 
       /* 入场：数据到了以后原站 uIntro += i*.35 */
       if (builtFor && intro < 1) intro = Math.min(1, intro + dt * 0.35);
@@ -1118,7 +1546,7 @@ export function SceneCanvas({
       const globeSettled = morph < 0.01;
       const ringMid = ringOn && ringE > 0.01 && ringE < 0.99;
       scanFor += dt;
-      if (scanFor > (busy ? 0.08 : 0.2)) {
+      if (!p.diving && scanFor > (busy ? 0.12 : 0.22)) {
         scanFor = 0;
         if ((!skySettled && !globeSettled) || ringMid) {
           if (nearestRef.idx !== -1 || nearestRef.locked) {
@@ -1134,17 +1562,27 @@ export function SceneCanvas({
           const ringFull = !sky && ringOn && ringE > 0.99;
           const arr = ringFull ? layout.ring : posFor(0, sky);
           const n = ringFull ? ringList.length : stationCount();
-          const hw = window.innerWidth / 2;
-          const hh = window.innerHeight / 2;
+          const hw = vw2 / 2;
+          const hh = vh2 / 2;
           let bi = -1;
           let bd = 1e9;
           const near: [number, number, number][] = [];
+          /* 内联 world*project：每点只做乘加，避免 35,699 次 Vector3 方法调用 */
+          const gm = group.matrixWorld.elements;
+          const pv = pvMat.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).elements;
           for (let k = 0; k < n; k++) {
             const i = ringFull ? ringList[k] : k;
-            const sp = toScreen(arr, i);
-            if (!sky && !ringFull && sp.front < LIMB_SCAN) continue;
-            const dx = sp.x - hw;
-            const dy = sp.y - hh;
+            const x0 = arr[i * 3], y0 = arr[i * 3 + 1], z0 = arr[i * 3 + 2];
+            const wx = gm[0] * x0 + gm[4] * y0 + gm[8] * z0 + gm[12];
+            const wy = gm[1] * x0 + gm[5] * y0 + gm[9] * z0 + gm[13];
+            const wz = gm[2] * x0 + gm[6] * y0 + gm[10] * z0 + gm[14];
+            if (!sky && !ringFull && wz < LIMB_SCAN) continue;
+            const cw = pv[3] * wx + pv[7] * wy + pv[11] * wz + pv[15];
+            if (cw <= 0) continue;
+            const spx = ((pv[0] * wx + pv[4] * wy + pv[8] * wz + pv[12]) / cw * 0.5 + 0.5) * vw2;
+            const spy = (-(pv[1] * wx + pv[5] * wy + pv[9] * wz + pv[13]) / cw * 0.5 + 0.5) * vh2;
+            const dx = spx - hw;
+            const dy = spy - hh;
             const d2 = dx * dx + dy * dy;
             if (d2 < bd) {
               bd = d2;
@@ -1152,7 +1590,7 @@ export function SceneCanvas({
             }
             const st = p.stations[i];
             if (d2 < 260 * 260 && st && st.pop >= 4) {
-              near.push([i, sp.x, sp.y]);
+              near.push([i, spx, spy]);
             }
           }
           const nd = Math.sqrt(bd);
@@ -1217,7 +1655,6 @@ export function SceneCanvas({
         } else if (morph > 0.98) {
           ann.style.opacity = "1";
           const colors = p.meta.genreColors;
-          // 标签避让：UI 安全区 + 已放置标签（const safeZones）
           const safeZones = [
             { x: 16, y: 16, w: 320, h: 120 },
             { x: window.innerWidth - 520, y: 16, w: 504, h: 96 },
@@ -1387,6 +1824,7 @@ export function SceneCanvas({
         }
       });
       mat.dispose();
+      fftTex.dispose();
       grain?.material.dispose();
       bloom?.dispose();
       composer?.dispose();
