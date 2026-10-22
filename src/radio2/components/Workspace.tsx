@@ -290,7 +290,14 @@ export default function Workspace() {
     const norm = storage.getBool("norm", false);
     const autoRec = storage.getBool("autoDive", true);
     const favOnly = storage.getBool("favOnly", false);
-    const eco = storage.getBool("eco", false);
+    // 低端设备（窄屏 / 少核 / 低内存）默认开省电模式，保证流畅
+    let lowEndDevice = false;
+    try {
+      const cores = navigator.hardwareConcurrency || 8;
+      const mem = (navigator as any).deviceMemory || 8;
+      lowEndDevice = window.innerWidth <= 560 || cores <= 4 || mem <= 4;
+    } catch { /* ignore */ }
+    const eco = storage.getBool("eco", lowEndDevice);
     const df = storage.getDiveForm() as DiveForm;
     setFxOn(fx);
     setNormOn(norm);

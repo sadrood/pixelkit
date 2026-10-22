@@ -29,7 +29,9 @@ export function mountRadio() {
 
   // 样式（Shadow 内生效，外部站点 CSS 不影响）
   const style = document.createElement('style');
-  style.textContent = cssText;
+  style.textContent = cssText + `
+/* mobile-hints: 手机上隐藏键盘快捷键提示，避免压住台名 */
+@media (max-width:560px){ .hints, .hint { display:none !important; } }`;
   shadow.appendChild(style);
 
   // React 挂载点
