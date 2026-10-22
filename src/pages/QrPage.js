@@ -104,6 +104,14 @@ export function pngDataUrlWithDpi(dataUrl, dpi) {
   }
 }
 
+/** 弹层打开时锁滚动；全屏只显示二维码 / 屏幕校准 / 整屏背景图任一打开都算 */
+function syncQrBodyLock() {
+  const open = document.getElementById('qr-zoom')?.classList.contains('open')
+    || document.getElementById('qr-calib')?.classList.contains('open')
+    || document.getElementById('qr-bg')?.classList.contains('open');
+  document.body.style.overflow = open ? 'hidden' : '';
+}
+
 /**
  * PixelKit - 二维码/一维码工具
  * 生成（文字/数字 → 二维码/一维码）、解码（图片 → 文字）、历史记录（24h 保存）
@@ -150,6 +158,7 @@ export class QrPage {
         <button class="qr-tab" data-tab="shortlink">🔗 活码</button>
         <button class="qr-tab" data-tab="file">📁 文件</button>
         <button class="qr-tab" data-tab="records">📑 记录</button>
+        <button class="qr-tab" data-tab="scantest">🧪 扫码测试</button>
       </div>
 
       <!-- 生成 -->
@@ -469,6 +478,19 @@ export class QrPage {
         </div>
       </div>
 
+      <!-- 扫码测试：用例库 ↔ 测试码对应，点码图全屏展示供扫码枪/手机实测 -->
+      <div class="qr-panel" id="qr-scantest">
+        <div class="qr-scantest-bar">
+          <div class="qr-scantest-tip">
+            <b>扫码测试台</b>
+            <span class="qr-hint">111 条扫码用例 · 632 个测试码，码值与用例一一对应；点码图可全屏展示，扫码枪/手机直接扫</span>
+          </div>
+          <a class="btn btn-sm" href="/scan-test/" target="_blank" rel="noopener">↗ 新窗口打开</a>
+        </div>
+        <iframe id="qr-scantest-frame" class="qr-scantest-frame" data-src="/scan-test/index.html"
+          title="扫码测试台" allowfullscreen allow="fullscreen; clipboard-write"></iframe>
+      </div>
+
       <!-- 2026-10-21：单独显示二维码（全屏只看二维码，可指定显示大小） -->
       <div class="qr-zoom" id="qr-zoom" aria-hidden="true">
         <button type="button" class="qr-zoom-close" id="qr-zoom-close" title="关闭（Esc）">✕</button>
@@ -478,6 +500,7 @@ export class QrPage {
           </div>
         </div>
         <div class="qr-zoom-bar">
+          <button type="button" class="btn btn-sm" id="qr-zoom-back">← 返回</button>
           <span class="qr-zoom-title">单独显示</span>
           <label>大小
             <input type="range" id="qr-zoom-range" min="128" max="1024" step="8" value="512" />
@@ -564,6 +587,11 @@ export class QrPage {
         document.querySelectorAll('.qr-panel').forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
         document.getElementById(`qr-${tab.dataset.tab}`).classList.add('active');
+        // 扫码测试台按需加载，避免打开二维码页就预载 632 张码图
+        if (tab.dataset.tab === 'scantest') {
+          const f = document.getElementById('qr-scantest-frame');
+          if (f && !f.getAttribute('src')) f.setAttribute('src', f.dataset.src);
+        }
       });
     });
 
@@ -627,6 +655,7 @@ export class QrPage {
     document.getElementById('qr-zoom-open')?.addEventListener('click', () => this._openQrZoom());
     document.getElementById('qr-img')?.addEventListener('click', () => this._openQrZoom());
     document.getElementById('qr-zoom-close')?.addEventListener('click', () => this._closeQrZoom());
+    document.getElementById('qr-zoom-back')?.addEventListener('click', () => this._closeQrZoom());
     document.getElementById('qr-zoom')?.addEventListener('click', (e) => {
       if (e.target.id === 'qr-zoom' || e.target.id === 'qr-zoom-stage') this._closeQrZoom();
     });
@@ -651,6 +680,17 @@ export class QrPage {
       if (document.getElementById('qr-calib')?.classList.contains('open')) { this._closeQrCalib(); return; }
       this._closeQrZoom();
     });
+    // 浏览器 / 手机返回键：只退出「单独显示」，不离开当前页
+    if (!window.__pkQrZoomPop) {
+      window.__pkQrZoomPop = true;
+      window.addEventListener('popstate', () => {
+        const box = document.getElementById('qr-zoom');
+        if (!box || !box.classList.contains('open')) return;
+        box.classList.remove('open');
+        box.setAttribute('aria-hidden', 'true');
+        syncQrBodyLock();
+      });
+    }
     // 2026-10-21：整屏背景图（二维码保持显示大小，其余填白/黑背景，相册/壁纸用）
     document.getElementById('qr-bg-open')?.addEventListener('click', () => this._openQrBg());
     document.getElementById('qr-bg-cancel')?.addEventListener('click', () => this._closeQrBg());
@@ -1092,23 +1132,25 @@ export class QrPage {
     box.classList.add('open');
     box.setAttribute('aria-hidden', 'false');
     this._syncBodyLock();
+    // 让浏览器 / 手机返回键只退出「单独显示」，而不是离开页面
+    if (!(history.state && history.state.pkQrZoom)) {
+      history.pushState({ pkQrZoom: true }, '', location.pathname + location.search + '#qr-zoom');
+    }
     document.getElementById('qr-zoom-close')?.focus();
     this._refreshZoomPhys();     // 上次勾了「按物理尺寸」就继续按物理尺寸显示
   }
 
-  _closeQrZoom() {
+  _closeQrZoom(fromPop) {
     const box = document.getElementById('qr-zoom');
     if (!box || !box.classList.contains('open')) return;
     box.classList.remove('open');
     box.setAttribute('aria-hidden', 'true');
     this._syncBodyLock();
+    if (!fromPop && history.state && history.state.pkQrZoom) history.back();
   }
 
   _syncBodyLock() {
-    const open = document.getElementById('qr-zoom')?.classList.contains('open')
-      || document.getElementById('qr-calib')?.classList.contains('open')
-      || document.getElementById('qr-bg')?.classList.contains('open');
-    document.body.style.overflow = open ? 'hidden' : '';
+    syncQrBodyLock();
   }
 
   _syncZoomControls(px) {

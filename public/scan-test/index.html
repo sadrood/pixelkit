@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>扫码测试台 · 用例对应码值</title>
+<style>
+:root {
+  --bg: #f4f5f7;
+  --panel: #ffffff;
+  --line: #e4e6ea;
+  --ink: #1c1f24;
+  --ink-2: #5a6169;
+  --ink-3: #8a9199;
+  --accent: #0d6efd;
+  --accent-soft: #e8f1ff;
+  --ok: #1a7f37;
+  --warn: #b54708;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Courier New", monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+header {
+  position: sticky; top: 0; z-index: 20;
+  background: #14171c; color: #eef1f5;
+  padding: 10px 16px 0;
+}
+.head-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+h1 { font-size: 17px; margin: 0; font-weight: 600; letter-spacing: .5px; }
+h1 small { color: #9aa4b2; font-weight: 400; font-size: 12px; margin-left: 8px; }
+.stats { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; color: #c8d0da; }
+.stats b { color: #fff; font-variant-numeric: tabular-nums; }
+.stats span { background: #232830; border: 1px solid #2e343d; border-radius: 999px; padding: 2px 10px; }
+.search {
+  margin-left: auto; display: flex; align-items: center; gap: 6px;
+}
+.search input {
+  background: #232830; border: 1px solid #2e343d; color: #eef1f5;
+  border-radius: 8px; padding: 7px 12px; width: min(340px, 46vw); outline: none; font-size: 13px;
+}
+.search input:focus { border-color: var(--accent); }
+.tabs { display: flex; gap: 4px; margin-top: 10px; }
+.tabs button {
+  appearance: none; border: 0; background: transparent; color: #9aa4b2;
+  font-size: 14px; padding: 8px 16px; cursor: pointer; border-radius: 8px 8px 0 0; font-weight: 500;
+}
+.tabs button.on { background: var(--bg); color: var(--ink); }
+main { max-width: 1240px; margin: 0 auto; padding: 18px 16px 60px; }
+.hint {
+  background: var(--accent-soft); border: 1px solid #cfe0ff; color: #17427a;
+  border-radius: 10px; padding: 9px 14px; font-size: 13px; margin-bottom: 16px;
+}
+section.cat { margin-bottom: 26px; }
+.cat-title {
+  display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px;
+}
+.cat-title h2 { font-size: 15px; margin: 0; }
+.cat-title em { font-style: normal; color: var(--ink-3); font-size: 12px; }
+.case {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 14px; margin-bottom: 10px;
+}
+.case-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.case-id {
+  font-family: var(--mono); font-size: 12px; color: var(--accent);
+  background: var(--accent-soft); border-radius: 6px; padding: 1px 8px; font-weight: 600;
+}
+.case-name { font-size: 15px; font-weight: 600; }
+.case-expect { color: var(--ink-2); font-size: 13px; margin-top: 4px; white-space: pre-line; }
+.case-nocodes { color: var(--ink-3); font-size: 13px; margin-top: 8px; }
+.codes-strip { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.thumb {
+  width: 170px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+  cursor: zoom-in; background: #fff; transition: border-color .15s, box-shadow .15s;
+}
+.thumb:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(13,110,253,.12); }
+.thumb .imgbox { height: 108px; display: flex; align-items: center; justify-content: center; padding: 6px; }
+.thumb img { max-width: 100%; max-height: 100%; display: block; }
+.thumb .meta { border-top: 1px solid var(--line); padding: 5px 8px; }
+.thumb .v {
+  font-family: var(--mono); font-size: 11px; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.thumb .v.miss { color: var(--ink-3); }
+.thumb .f { font-size: 11px; color: var(--ink-3); display: flex; justify-content: space-between; gap: 6px; margin-top: 1px; }
+.goto {
+  margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;
+}
+.goto button {
+  appearance: none; border: 1px solid #cfe0ff; background: var(--accent-soft); color: #17427a;
+  border-radius: 8px; padding: 5px 12px; font-size: 13px; cursor: pointer;
+}
+.goto button:hover { border-color: var(--accent); }
+.filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.filters button {
+  appearance: none; border: 1px solid var(--line); background: var(--panel); color: var(--ink-2);
+  border-radius: 999px; padding: 4px 12px; font-size: 12.5px; cursor: pointer;
+}
+.filters button.on { background: #14171c; border-color: #14171c; color: #fff; }
+.grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 10px;
+}
+.tile {
+  background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; cursor: zoom-in;
+  transition: border-color .15s, box-shadow .15s; content-visibility: auto; contain-intrinsic-size: 200px;
+}
+.tile:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(13,110,253,.12); }
+.tile .imgbox { height: 130px; display: flex; align-items: center; justify-content: center; padding: 6px; }
+.tile img { max-width: 100%; max-height: 100%; display: block; }
+.tile .meta { border-top: 1px solid var(--line); padding: 5px 8px; }
+.tile .n { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2); }
+.tile .v { font-family: var(--mono); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .v.miss { color: var(--ink-3); }
+.empty { color: var(--ink-3); padding: 30px 0; text-align: center; }
+/* ============ 测试结果标记 ============ */
+.result-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 8px 12px; margin-bottom: 12px; font-size: 13px; color: var(--ink-2);
+}
+.result-bar .rb-title { font-weight: 600; color: var(--ink); }
+.result-bar b { font-variant-numeric: tabular-nums; color: var(--ink); }
+.result-bar .rb-pass b { color: var(--ok); }
+.result-bar .rb-fail b { color: #b42318; }
+.result-bar .rb-nt b { color: var(--warn); }
+.result-bar .rb-btn {
+  appearance: none; border: 1px solid var(--line); background: #fff; color: var(--ink-2);
+  border-radius: 7px; padding: 4px 10px; font-size: 12.5px; cursor: pointer;
+}
+.result-bar .rb-btn:hover { border-color: var(--accent); color: var(--accent); }
+.result-bar .rb-btn:last-child { margin-left: auto; }
+.case-old { font-size: 11px; color: var(--ink-3); font-family: var(--mono); }
+.case-result {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line);
+}
+.case-result .lbl { font-size: 12px; color: var(--ink-3); margin-right: 2px; }
+.res-btn {
+  appearance: none; border: 1px solid var(--line); background: #fff; color: var(--ink-2);
+  border-radius: 7px; padding: 3px 10px; font-size: 12.5px; cursor: pointer;
+  transition: all .12s;
+}
+.res-btn:hover { border-color: var(--ink-3); }
+.res-btn.on[data-status="pass"] { background: #e8f6ec; border-color: var(--ok); color: var(--ok); font-weight: 600; }
+.res-btn.on[data-status="fail"] { background: #fdecea; border-color: #b42318; color: #b42318; font-weight: 600; }
+.res-btn.on[data-status="nt"] { background: #fff4e5; border-color: var(--warn); color: var(--warn); font-weight: 600; }
+.res-btn.on[data-status="na"] { background: #eef0f3; border-color: #6b7280; color: #374151; font-weight: 600; }
+.res-btn.on[data-status="issue"] { background: #f3edff; border-color: #7c3aed; color: #6d28d9; font-weight: 600; }
+.case-result input {
+  flex: 1 1 200px; min-width: 150px; border: 1px solid var(--line); border-radius: 7px;
+  padding: 4px 9px; font-size: 12.5px; font-family: inherit; color: var(--ink); outline: none;
+}
+.case-result input:focus { border-color: var(--accent); }
+.case.res-pass { border-left: 3px solid var(--ok); }
+.case.res-fail { border-left: 3px solid #b42318; }
+.case.res-nt { border-left: 3px solid var(--warn); }
+.case.res-na { border-left: 3px solid #6b7280; }
+.case.res-issue { border-left: 3px solid #7c3aed; }
+/* ============ 全屏扫码展示 ============ */
+.overlay {
+  position: fixed; inset: 0; z-index: 100; display: none;
+  background: #3a3d42; color: #fff;
+}
+.overlay.on { display: flex; flex-direction: column; }
+.overlay.light { background: #f2f3f5; color: #14171c; }
+.ov-top { display: flex; align-items: center; gap: 8px; padding: 10px 14px; flex-wrap: wrap; }
+.ov-top .title { font-weight: 600; font-size: 15px; margin-right: auto; }
+.ov-top .sub { font-size: 12.5px; opacity: .72; font-family: var(--mono); }
+.ov-btn {
+  appearance: none; border: 1px solid rgba(127,127,127,.45); background: transparent; color: inherit;
+  border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+}
+.ov-btn:hover { border-color: currentColor; }
+.ov-btn.primary { background: #0d6efd; border-color: #0d6efd; color: #fff; }
+.ov-btn.back { background: rgba(255,255,255,.16); border-color: transparent; font-weight: 600; }
+.overlay.light .ov-btn.back { background: #dfe3e8; }
+.stage {
+  flex: 1; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  padding: 8px 16px; user-select: none; cursor: grab; position: relative;
+}
+.stage.dragging { cursor: grabbing; }
+.stage img {
+  max-width: 92%; max-height: 100%; background: #fff;
+  image-rendering: auto; transform-origin: center center; will-change: transform;
+  box-shadow: 0 4px 30px rgba(0,0,0,.35);
+}
+.overlay.light .stage img { box-shadow: 0 4px 24px rgba(0,0,0,.14); }
+.ov-bottom { padding: 10px 14px 14px; background: rgba(0,0,0,.28); }
+.overlay.light .ov-bottom { background: #e6e8eb; }
+.ov-value {
+  font-family: var(--mono); font-size: 13px; line-height: 1.55; background: rgba(0,0,0,.25);
+  border-radius: 8px; padding: 8px 10px; max-height: 118px; overflow: auto; word-break: break-all;
+  white-space: pre-wrap;
+}
+.overlay.light .ov-value { background: #fff; border: 1px solid var(--line); }
+.ov-value .missing { opacity: .7; font-style: italic; }
+.ov-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+.ov-pos { font-size: 12.5px; opacity: .75; font-family: var(--mono); margin-left: auto; }
+@media (max-width: 640px) {
+  .thumb { width: 142px; }
+  .tile .imgbox { height: 110px; }
+  .search input { width: 100%; }
+  .search { margin-left: 0; width: 100%; }
+  .ov-btn { padding: 8px 12px; font-size: 13.5px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="head-row">
+    <h1>扫码测试台<small>智能产品测试基础用例库 · 扫码模块(#373)</small></h1>
+    <div class="stats" id="stats"></div>
+    <div class="search"><input id="q" type="search" placeholder="搜用例编号 / 名称 / 码值…"></div>
+  </div>
+  <div class="tabs">
+    <button id="tab-cases" class="on">按用例</button>
+    <button id="tab-lib">码库</button>
+  </div>
+</header>
+<main>
+  <div class="hint" id="hint">把扫码枪 / 手机对着屏幕即可测试：点任意码图可全屏放大（← → 换码，+ − 缩放，R 旋转，F 全屏；Esc / 浏览器返回键 / 点空白处退出）。每条用例下方可直接标记结果，自动保存在本机浏览器。</div>
+  <div class="result-bar" id="result-bar">
+    <span class="rb-title">测试结果</span>
+    <span>已测 <b id="rb-done">0</b> / <b id="rb-total">0</b></span>
+    <span class="rb-pass">通过 <b id="rb-pass">0</b></span>
+    <span class="rb-fail">不通过 <b id="rb-fail">0</b></span>
+    <span class="rb-nt">NT <b id="rb-nt">0</b></span>
+    <span class="rb-na">NA <b id="rb-na">0</b></span>
+    <span>Issue <b id="rb-issue">0</b></span>
+    <button class="rb-btn" id="export-results">⬇ 导出结果 CSV</button>
+    <button class="rb-btn" id="clear-results">清空结果</button>
+  </div>
+  <div id="view"></div>
+</main>
+
+<div class="overlay" id="overlay">
+  <div class="ov-top">
+    <button class="ov-btn back" id="ov-back">← 返回用例</button>
+    <div class="title" id="ov-title"></div>
+    <div class="sub" id="ov-sub"></div>
+    <button class="ov-btn" id="ov-bg">切换底色</button>
+    <button class="ov-btn" id="ov-rot">旋转 90°</button>
+    <button class="ov-btn" id="ov-zoomout">−</button>
+    <button class="ov-btn" id="ov-zoomin">＋</button>
+    <button class="ov-btn" id="ov-fit">复位</button>
+    <button class="ov-btn" id="ov-full">全屏</button>
+    <button class="ov-btn primary" id="ov-close">关闭</button>
+  </div>
+  <div class="stage" id="stage"><img id="ov-img" alt=""></div>
+  <div class="ov-bottom">
+    <div class="ov-value" id="ov-value"></div>
+    <div class="ov-actions">
+      <button class="ov-btn" id="ov-copy">复制码值</button>
+      <button class="ov-btn" id="ov-prev">← 上一张</button>
+      <button class="ov-btn" id="ov-next">下一张 →</button>
+      <span class="ov-pos" id="ov-pos"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+let DATA = null;
+let tab = 'cases';
+let filter = { g: 'all', fmt: 'all' };
+let q = '';
+const $ = (s) => document.querySelector(s);
+const view = $('#view');
+
+/* ---------- 测试结果（本机保存） ---------- */
+const RES_KEY = 'pkScanResults.v1';
+const STATUS = [
+  ['pass', '✓ 通过'],
+  ['fail', '✗ 不通过'],
+  ['nt', 'NT'],
+  ['na', 'NA'],
+  ['issue', 'Issue'],
+];
+const STATUS_LABEL = { pass: 'Pass', fail: 'Fail', nt: 'NT', na: 'NA', issue: '用例 Issue' };
+let RESULTS = {};
+try { RESULTS = JSON.parse(localStorage.getItem(RES_KEY) || '{}') || {}; } catch { RESULTS = {}; }
+function saveResults() { try { localStorage.setItem(RES_KEY, JSON.stringify(RESULTS)); } catch { /* 隐私模式下忽略 */ } }
+function getRes(id) { return RESULTS[id] || {}; }
+function setStatus(id, s) {
+  const r = RESULTS[id] || (RESULTS[id] = {});
+  if (r.s === s) delete r.s;
+  else { r.s = s; r.ts = Date.now(); }
+  if (!r.s && !r.note) delete RESULTS[id];
+  saveResults();
+  syncCase(id);
+  updateResultBar();
+}
+function setNote(id, note) {
+  const r = RESULTS[id] || (RESULTS[id] = {});
+  r.note = note;
+  if (!r.s && !note) delete RESULTS[id];
+  else r.ts = r.ts || Date.now();
+  saveResults();
+}
+function syncCase(id) {
+  const el = document.querySelector(`.case[data-cid="${id}"]`);
+  if (!el) return;
+  const s = getRes(id).s;
+  el.className = 'case' + (s ? ' res-' + s : '');
+  el.querySelectorAll('.res-btn').forEach((b) => b.classList.toggle('on', b.dataset.status === s));
+}
+function updateResultBar() {
+  if (!DATA) return;
+  const n = { pass: 0, fail: 0, nt: 0, na: 0, issue: 0, done: 0 };
+  for (const c of DATA.cases) {
+    const s = getRes(c.id).s;
+    if (!s) continue;
+    n.done++; n[s] = (n[s] || 0) + 1;
+  }
+  $('#rb-total').textContent = DATA.cases.length;
+  $('#rb-done').textContent = n.done;
+  $('#rb-pass').textContent = n.pass;
+  $('#rb-fail').textContent = n.fail;
+  $('#rb-nt').textContent = n.nt;
+  $('#rb-na').textContent = n.na;
+  $('#rb-issue').textContent = n.issue;
+}
+function csvCell(v) {
+  const s = String(v == null ? '' : v);
+  return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function exportResults() {
+  if (!DATA) return;
+  const rows = [['用例编号', '原用例编号', '测试内容', '分类', '是否通过', '实际结果/备注', '测试时间']];
+  for (const c of DATA.cases) {
+    const r = getRes(c.id);
+    rows.push([
+      c.newId || c.id, c.id, c.name, c.cat,
+      STATUS_LABEL[r.s] || '', r.note || '',
+      r.ts ? new Date(r.ts).toLocaleString('zh-CN', { hour12: false }) : '',
+    ]);
+  }
+  const csv = '\uFEFF' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const d = new Date(), p = (x) => String(x).padStart(2, '0');
+  a.download = `扫码测试结果_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+const ESC_MAP = { '\r': '␍', '\n': '␊', '\t': '␉' };
+function esc(v) {
+  if (v == null) return '';
+  return v.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, (c) => '\\x' + c.charCodeAt(0).toString(16).padStart(2, '0'))
+          .replace(/[\r\n\t]/g, (c) => ESC_MAP[c]);
+}
+function escAttr(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+function short(v, n) {
+  if (v == null) return '未解码';
+  const s = esc(v);
+  return s.length > n ? s.slice(0, n) + '…' : s;
+}
+function is2d(fmt) { return fmt && /QR|Data Matrix|Aztec|PDF|MaxiCode/.test(fmt); }
+function fmtShort(fmt) {
+  if (!fmt) return '未解码';
+  return fmt.replace('QR Code', 'QR').replace('Code 39 Extended', 'Code 39 Ext');
+}
+function codeById(id) { return DATA.codes.find((c) => c.id === id); }
+function codeUrl(c) { return 'codes/' + c.id.split('/').map(encodeURIComponent).join('/'); }
+
+/* ---------- 过滤 ---------- */
+function matchQ(s) { return !q || String(s).toLowerCase().includes(q.toLowerCase()); }
+function caseHit(c) {
+  return matchQ(c.id) || matchQ(c.newId) || matchQ(c.name) || matchQ(c.expect) || matchQ(c.cat) ||
+    c.codes.some((id) => { const cc = codeById(id); return cc && (matchQ(cc.name) || matchQ(cc.value || '')); });
+}
+function libList() {
+  return DATA.codes.filter((c) => {
+    if (filter.g === 'all-1d' && (!c.fmt || is2d(c.fmt))) return false;
+    if (filter.g === 'all-2d' && !is2d(c.fmt)) return false;
+    if (filter.g === 'undecoded' && c.value != null) return false;
+    if (!/^(all|all-1d|all-2d|undecoded)$/.test(filter.g) && c.g !== filter.g) return false;
+    if (filter.fmt !== 'all' && fmtShort(c.fmt) !== filter.fmt) return false;
+    if (!matchQ(c.name) && !matchQ(c.value || '') && !matchQ(c.caption || '')) return false;
+    return true;
+  });
+}
+
+/* ---------- 渲染：按用例 ---------- */
+function renderCases() {
+  let html = '';
+  const cats = [];
+  for (const c of DATA.cases) {
+    if (!caseHit(c)) continue;
+    let cat = cats.find((x) => x.name === c.cat);
+    if (!cat) { cat = { name: c.cat, items: [] }; cats.push(cat); }
+    cat.items.push(c);
+  }
+  if (!cats.length) { view.innerHTML = '<div class="empty">没有匹配的用例</div>'; return; }
+  for (const cat of cats) {
+    html += `<section class="cat"><div class="cat-title"><h2>${cat.name}</h2><em>${cat.items.length} 条</em></div>`;
+    for (const c of cat.items) {
+      const r = getRes(c.id);
+      html += `<div class="case${r.s ? ' res-' + r.s : ''}" data-cid="${c.id}">
+        <div class="case-head"><span class="case-id">${c.newId || c.id}</span><span class="case-old">原${c.id}</span><span class="case-name">${c.name}</span></div>
+        ${c.expect ? `<div class="case-expect">预期：${c.expect.trim()}</div>` : ''}`;
+      if (c.codes.length) {
+        html += '<div class="codes-strip">' + c.codes.map((id) => {
+          const cc = codeById(id);
+          if (!cc) return '';
+          return `<div class="thumb" data-id="${cc.id}">
+            <div class="imgbox"><img loading="lazy" src="${codeUrl(cc)}" alt=""></div>
+            <div class="meta">
+              <div class="v${cc.value == null ? ' miss' : ''}" title="${esc(cc.value || '')}">${short(cc.value, 46)}</div>
+              <div class="f"><span>${fmtShort(cc.fmt)}</span><span>${cc.caption || cc.name}</span></div>
+            </div></div>`;
+        }).join('') + '</div>';
+      } else if (!c.links.length) {
+        html += `<div class="case-nocodes">${c.pre ? '前置：' + c.pre + ' · ' : ''}无固定码值，现场操作测试</div>`;
+      }
+      if (c.links.length) {
+        html += '<div class="goto">' + c.links.map((l) =>
+          `<button data-goto="${l.g}">${l.label} →</button>`).join('') + '</div>';
+      }
+      html += `<div class="case-result">
+        <span class="lbl">结果：</span>
+        ${STATUS.map(([s, t]) => `<button type="button" class="res-btn${r.s === s ? ' on' : ''}" data-status="${s}">${t}</button>`).join('')}
+        <input type="text" class="note" data-note="${c.id}" maxlength="200" placeholder="备注 / 实际结果（可选）" value="${escAttr(r.note || '')}">
+      </div>`;
+      html += '</div>';
+    }
+    html += '</section>';
+  }
+  view.innerHTML = html;
+}
+
+/* ---------- 渲染：码库 ---------- */
+function renderLib() {
+  const list = libList();
+  const fset = new Map();
+  for (const c of DATA.codes) {
+    const k = fmtShort(c.fmt);
+    fset.set(k, (fset.get(k) || 0) + 1);
+  }
+  const fmts = [...fset.entries()].sort((a, b) => b[1] - a[1]);
+  const gchips = [
+    ['all', '全部 ' + DATA.codes.length],
+    ['bctc', 'BCTC 图集'],
+    ['samples', '扫码枪案例'],
+    ['all-1d', '一维码 ' + DATA.stats.n1d],
+    ['all-2d', '二维码 ' + DATA.stats.n2d],
+    ['undecoded', '未解码 ' + (DATA.codes.length - DATA.stats.decoded)],
+    ...DATA.groups.filter((g) => !['bctc', 'samples'].includes(g.id)).map((g) => [g.id, `${g.title} ${g.count}`]),
+  ];
+  let html = '<div class="filters">' + gchips.map(([g, label]) =>
+    `<button data-g="${g}" class="${filter.g === g ? 'on' : ''}">${label}</button>`).join('') + '</div>';
+  html += '<div class="filters">' + [['all', '全部码制'], ...fmts].map(([f, n]) =>
+    `<button data-fmt="${f}" class="${filter.fmt === f ? 'on' : ''}">${f}${f === 'all' ? '' : ' ' + n}</button>`).join('') + '</div>';
+  if (!list.length) {
+    view.innerHTML = html + '<div class="empty">没有匹配的码</div>';
+    return;
+  }
+  html += `<div class="grid">` + list.map((c) => `
+    <div class="tile" data-id="${c.id}">
+      <div class="imgbox"><img loading="lazy" src="${codeUrl(c)}" alt=""></div>
+      <div class="meta">
+        <div class="n" title="${c.name}">${c.caption || c.name}</div>
+        <div class="v${c.value == null ? ' miss' : ''}">${short(c.value, 40)}</div>
+      </div>
+    </div>`).join('') + '</div>';
+  html += `<div class="empty" style="padding:12px 0">共 ${list.length} 张</div>`;
+  view.innerHTML = html;
+}
+
+function renderStats() {
+  const s = DATA.stats;
+  $('#stats').innerHTML =
+    `<span>用例 <b>${s.cases}</b></span><span>测试码 <b>${s.codes}</b></span>` +
+    `<span>一维 <b>${s.n1d}</b></span><span>二维 <b>${s.n2d}</b></span>` +
+    `<span>已解码 <b>${s.decoded}</b></span>`;
+}
+
+function render() {
+  $('#tab-cases').classList.toggle('on', tab === 'cases');
+  $('#tab-lib').classList.toggle('on', tab === 'lib');
+  if (tab === 'cases') renderCases(); else renderLib();
+  updateResultBar();
+}
+
+/* ---------- 全屏扫码展示 ---------- */
+const ov = { list: [], idx: 0, zoom: 1, rot: 0, tx: 0, ty: 0, light: false, dragging: false };
+function ovApply() {
+  const img = $('#ov-img');
+  img.style.transform = `translate(${ov.tx}px, ${ov.ty}px) rotate(${ov.rot}deg) scale(${ov.zoom})`;
+}
+function ovShow(list, idx) {
+  ov.list = list; ov.idx = idx;
+  ov.zoom = 1; ov.rot = 0; ov.tx = 0; ov.ty = 0;
+  $('#overlay').classList.add('on');
+  ovRender();
+  // 让浏览器 / 手机返回键只关掉全屏，而不是离开本页
+  if (!(history.state && history.state.pkOv)) {
+    history.pushState({ pkOv: true }, '', location.pathname + location.search + '#code');
+  }
+}
+function ovRender() {
+  const c = codeById(ov.list[ov.idx]) || ov.list[ov.idx];
+  $('#ov-img').src = codeUrl(c);
+  $('#ov-title').textContent = c.caption || c.name;
+  $('#ov-sub').textContent = `${fmtShort(c.fmt)} · ${c.w}×${c.h}`;
+  const v = $('#ov-value');
+  if (c.value == null) {
+    v.innerHTML = '<span class="missing">未能自动解码（码制特殊 / 污损 / 尺寸过小）——请用扫码枪实测</span>';
+  } else {
+    v.textContent = esc(c.value);
+  }
+  $('#ov-pos').textContent = (ov.idx + 1) + ' / ' + ov.list.length;
+  ovApply();
+}
+function ovClose(fromPop) {
+  const el = $('#overlay');
+  if (!el.classList.contains('on')) return;
+  el.classList.remove('on');
+  if (!fromPop && history.state && history.state.pkOv) history.back();
+}
+window.addEventListener('popstate', () => {
+  if ($('#overlay').classList.contains('on')) ovClose(true);
+});
+function ovStep(d) {
+  if (!ov.list.length) return;
+  ov.idx = (ov.idx + d + ov.list.length) % ov.list.length;
+  ov.zoom = 1; ov.rot = 0; ov.tx = 0; ov.ty = 0;
+  ovRender();
+}
+
+/* ---------- 事件 ---------- */
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('.thumb, .tile');
+  if (t) {
+    const list = (tab === 'cases' ? currentCaseList() : libList()).map((c) => c.id || c);
+    const id = t.dataset.id;
+    const idx = list.indexOf(id);
+    ovShow(list.length ? list : [id], idx >= 0 ? idx : 0);
+    return;
+  }
+  const gb = e.target.closest('[data-goto]');
+  if (gb) {
+    tab = 'lib'; filter.g = gb.dataset.goto; filter.fmt = 'all';
+    render(); window.scrollTo({ top: 0 }); return;
+  }
+  const g = e.target.closest('[data-g]');
+  if (g) { filter.g = g.dataset.g; render(); return; }
+  const f = e.target.closest('[data-fmt]');
+  if (f) { filter.fmt = f.dataset.fmt; render(); return; }
+});
+function currentCaseList() {
+  const ids = [];
+  for (const c of DATA.cases) if (caseHit(c)) ids.push(...c.codes);
+  return ids;
+}
+$('#tab-cases').onclick = () => { tab = 'cases'; render(); };
+$('#tab-lib').onclick = () => { tab = 'lib'; render(); };
+$('#q').addEventListener('input', (e) => { q = e.target.value.trim(); render(); });
+
+/* ---------- 结果标记 / 导出 ---------- */
+view.addEventListener('click', (e) => {
+  const sb = e.target.closest('.res-btn');
+  if (!sb) return;
+  const id = sb.closest('.case')?.dataset.cid;
+  if (id) setStatus(id, sb.dataset.status);
+});
+view.addEventListener('input', (e) => {
+  const inp = e.target.closest('.note');
+  if (inp) setNote(inp.dataset.note, inp.value);
+});
+$('#export-results').onclick = exportResults;
+$('#clear-results').onclick = () => {
+  if (!Object.keys(RESULTS).length) return;
+  if (!confirm('确定清空本机保存的所有测试结果？该操作不可恢复。')) return;
+  RESULTS = {};
+  saveResults();
+  render();
+};
+$('#ov-back').onclick = () => ovClose();
+$('#ov-close').onclick = () => ovClose();
+$('#ov-prev').onclick = () => ovStep(-1);
+$('#ov-next').onclick = () => ovStep(1);
+$('#ov-zoomin').onclick = () => { ov.zoom = Math.min(6, ov.zoom * 1.25); ovApply(); };
+$('#ov-zoomout').onclick = () => { ov.zoom = Math.max(.4, ov.zoom / 1.25); ovApply(); };
+$('#ov-rot').onclick = () => { ov.rot = (ov.rot + 90) % 360; ovApply(); };
+$('#ov-fit').onclick = () => { ov.zoom = 1; ov.rot = 0; ov.tx = 0; ov.ty = 0; ovApply(); };
+$('#ov-bg').onclick = () => {
+  ov.light = !ov.light;
+  $('#overlay').classList.toggle('light', ov.light);
+};
+$('#ov-full').onclick = () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else $('#overlay').requestFullscreen?.();
+};
+$('#ov-copy').onclick = () => {
+  const c = codeById(ov.list[ov.idx]) || ov.list[ov.idx];
+  if (c.value == null) return;
+  navigator.clipboard?.writeText(c.value).then(() => {
+    const b = $('#ov-copy'); const old = b.textContent;
+    b.textContent = '已复制 ✓'; setTimeout(() => { b.textContent = old; }, 1200);
+  });
+};
+document.addEventListener('keydown', (e) => {
+  if (!$('#overlay').classList.contains('on')) return;
+  if (e.key === 'Escape') ovClose();
+  else if (e.key === 'ArrowLeft') ovStep(-1);
+  else if (e.key === 'ArrowRight') ovStep(1);
+  else if (e.key === '+' || e.key === '=') { ov.zoom = Math.min(6, ov.zoom * 1.25); ovApply(); }
+  else if (e.key === '-') { ov.zoom = Math.max(.4, ov.zoom / 1.25); ovApply(); }
+  else if (e.key === 'r' || e.key === 'R') { ov.rot = (ov.rot + 90) % 360; ovApply(); }
+  else if (e.key === 'f' || e.key === 'F') $('#ov-full').click();
+});
+(() => {
+  const stage = $('#stage');
+  let sx = 0, sy = 0, ox = 0, oy = 0, moved = false, onBlank = false;
+  stage.addEventListener('pointerdown', (e) => {
+    ov.dragging = true; sx = e.clientX; sy = e.clientY; ox = ov.tx; oy = ov.ty;
+    moved = false; onBlank = e.target === stage;
+    stage.classList.add('dragging');
+    try { stage.setPointerCapture(e.pointerId); } catch { /* 合成事件没有活动指针，忽略 */ }
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (!ov.dragging) return;
+    if (Math.abs(e.clientX - sx) > 6 || Math.abs(e.clientY - sy) > 6) moved = true;
+    ov.tx = ox + (e.clientX - sx); ov.ty = oy + (e.clientY - sy); ovApply();
+  });
+  stage.addEventListener('pointerup', () => {
+    ov.dragging = false; stage.classList.remove('dragging');
+    if (onBlank && !moved) ovClose();   // 点码图外的空白处直接退出
+  });
+  stage.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    ov.zoom = Math.max(.4, Math.min(6, ov.zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+    ovApply();
+  }, { passive: false });
+})();
+
+/* ---------- 启动 ---------- */
+fetch('data.json').then((r) => r.json()).then((d) => {
+  DATA = d;
+  renderStats();
+  render();
+}).catch((e) => {
+  view.innerHTML = '<div class="empty">数据加载失败：' + e.message + '</div>';
+});
+</script>
+</body>
+</html>

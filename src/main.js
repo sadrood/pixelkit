@@ -220,7 +220,8 @@ class App {
 
     const pages = ['compose', 'convert', 'document', 'agent', 'ppt', 'docx-editor', 'timer', 'fileshare', 'counter', 'qr', 'tasks', 'lifesim', 'book', 'nightmarket', 'radio', 'novel'];
     for (const p of pages) {
-      document.getElementById(`btn-back-${p}`).addEventListener('click', () => this.showPage('home'));
+      const backBtn = document.getElementById(`btn-back-${p}`);
+      if (backBtn) backBtn.addEventListener('click', () => this.showPage('home'));
     }
 
     // 夜市小游戏全屏切换（包一层 wrap，全屏时保留整个游戏区域）
@@ -291,9 +292,8 @@ class App {
   /** 懒加载世界电台页（独立模块，避免拖慢首屏） */
   async _initRadio() {
     try {
-      const { RadioPage } = await import('./pages/RadioPage.js');
-      this._radioPage = new RadioPage(this.toast);
-      this._radioPage.init();
+      const { mountRadio } = await import('./radio2/mount.jsx');
+      this._radioUnmount = mountRadio();
     } catch (e) {
       this._radioInited = false;
       this.toast?.show?.('电台工具加载失败：' + (e.message || e), 'error');

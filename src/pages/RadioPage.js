@@ -552,6 +552,22 @@ export class RadioPage {
   }
 
   /** 把列表/搜索/收藏里的电台解析成带真实坐标的数据集电台（用于聚焦与位置显示） */
+  /** 隐藏健康数据判定失效的电台（地图/星图只保留可用点） */
+  applyDeadFilter() {
+    if (this._deadFiltered) return;
+    if (!this._health && !this._probe) return;
+    const before = this.geoStations.length;
+    this.geoStations = this.geoStations.filter((st) => { const h = this.healthOf(st); return !h || h.ok; });
+    const removed = before - this.geoStations.length;
+    this._deadFiltered = true;
+    if (!removed) return;
+    if (this.index >= this.geoStations.length) this.index = 0;
+    try { this._globe?.setStations?.(this.geoStations); } catch { /* ignore */ }
+    try { this._neb3d?.setStations?.(this.geoStations); } catch { /* ignore */ }
+    try { this.setHint('已隐藏 ' + removed + ' 个判定失效的电台'); } catch { /* ignore */ }
+    console.log('[radio] 隐藏失效电台：' + removed + ' 个，剩余 ' + this.geoStations.length);
+  }
+
   /** 第二目录：Xiph/Icecast（无坐标，仅搜索/播放） */
   async loadExtras() {
     if (this._extra) return this._extra;
@@ -570,6 +586,7 @@ export class RadioPage {
       const j = await fetch('/data/station-health.json', { cache: 'no-cache' }).then((r) => r.json());
       this._health = j && j.deadIds ? { deadSet: new Set(j.deadIds.map(String)), builtAt: j.builtAt, alive: j.alive, total: j.total } : null;
       this._healthMeta = j ? { builtAt: j.builtAt, alive: j.alive, total: j.total } : null;
+      setTimeout(() => { try { this.applyDeadFilter(); } catch { /* ignore */ } }, 80);
       console.log('[radio] 社区探活：' + (j ? j.alive + '/' + j.total : '无') + ' 可用');
     } catch { this._health = null; }
     return this._health;
@@ -585,6 +602,7 @@ export class RadioPage {
         if (v && v[0] === 1) okSet.add(String(id)); else deadSet.add(String(id));
       }
       this._probe = { okSet, deadSet, builtAt: j.builtAt, sample: j.sample };
+      setTimeout(() => { try { this.applyDeadFilter(); } catch { /* ignore */ } }, 60);
       console.log('[radio] 实测探活：' + okSet.size + '/' + (okSet.size + deadSet.size) + ' 可连接');
     } catch { this._probe = null; }
     return this._probe;
@@ -1186,6 +1204,8 @@ export class RadioPage {
       if (!all || all.length <= this.geoStations.length) return;
       const curId = this.current ? this.current.id : null;
       this.geoStations = all.slice().sort((a, b) => (a.lon - b.lon) || (a.lat - b.lat));
+    // 全量数据替换后重新应用失效过滤
+    setTimeout(() => { try { this._deadFiltered = false; this.applyDeadFilter(); } catch { /* ignore */ } }, 100);
       this._globeStations = this.geoStations;
       if (this._globe && this._globe.setStations) this._globe.setStations(this.geoStations);
       try { this.applyLandSpread(); } catch { /* ignore */ }

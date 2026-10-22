@@ -1,0 +1,118 @@
+/* About / Privacy 文档页样式（移植自原站 about.html 内联样式） */
+:root {
+  --bg: #101f1d;
+  --ink: #f5f1e8;
+  --dim: #b3c1b7;
+  --faint: rgba(245, 241, 232, 0.16);
+  --signal: #f36b45;
+  --ink-dark: #172d2a;
+  --sans: "Inter", system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.65 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+main {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 40px 16px 72px;
+}
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 40px;
+}
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 18px;
+}
+.lang {
+  display: flex;
+  gap: 4px;
+}
+.lang button {
+  background: none;
+  border: 1px solid var(--faint);
+  color: var(--dim);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font: 12px var(--mono);
+  cursor: pointer;
+}
+.lang button.on {
+  background: var(--ink);
+  color: var(--ink-dark);
+  border-color: var(--ink);
+}
+.lede {
+  font-size: 19px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+h1 {
+  font-size: 32px;
+  line-height: 1.2;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+}
+h2 {
+  font-size: 17px;
+  margin: 32px 0 6px;
+}
+p,
+li {
+  color: var(--dim);
+}
+b {
+  color: var(--ink);
+  font-weight: 600;
+}
+ul {
+  padding-left: 20px;
+  margin: 6px 0;
+}
+a {
+  color: var(--ink);
+  text-underline-offset: 2px;
+}
+.meta {
+  font: 12px var(--mono);
+  color: var(--dim);
+}
+.q {
+  margin: 14px 0 26px;
+  font: 400 26px/1.25 "Instrument Serif", "Songti SC", serif;
+  color: var(--ink);
+}
+[data-l="en"] .q span {
+  font-style: italic;
+}
+.q cite {
+  display: block;
+  margin-top: 9px;
+  font: 11px/1 var(--mono);
+  font-style: normal;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+}
+[data-l] {
+  display: none;
+}
+html[lang="en"] [data-l="en"],
+html[lang="zh-CN"] [data-l="zh"] {
+  display: block;
+}
