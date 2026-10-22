@@ -161,18 +161,6 @@ export function Intro({
 
       <div className="credit mono dim">
         <span>{t(lang, "credits")}</span>
-        {" · "}
-        <a href="/about" data-zh="关于">
-          {lang === "zh" ? "关于" : "About"}
-        </a>
-        {" · "}
-        <a href="/privacy" data-zh="隐私">
-          {lang === "zh" ? "隐私" : "Privacy"}
-        </a>
-        {" · "}
-        <a href="https://x.com/RoamDial" target="_blank" rel="noopener">
-          X
-        </a>
       </div>
     </div>
   );

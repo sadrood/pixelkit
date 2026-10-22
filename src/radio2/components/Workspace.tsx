@@ -1773,19 +1773,8 @@ export default function Workspace() {
                 </button>
               </div>
             </div>
-            <a className="row sw go" href="/about">
-              <div className="tx">
-                <span>{T("aboutRow")}</span>
-                <span className="sub">{T("aboutRowSub")}</span>
-              </div>
-              <ChevronIcon />
-            </a>
-            <a className="row sw go" href="/privacy">
-              <div className="tx">
-                <span>{T("privacyFull")}</span>
-              </div>
-              <ChevronIcon />
-            </a>
+            
+            
           </div>
         )}
 
