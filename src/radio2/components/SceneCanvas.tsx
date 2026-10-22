@@ -1211,6 +1211,16 @@ export function SceneCanvas({
         } else if (morph > 0.98) {
           ann.style.opacity = "1";
           const colors = p.meta.genreColors;
+          // 标签避让：UI 安全区 + 已放置标签（const safeZones）
+          const safeZones = [
+            { x: 16, y: 16, w: 320, h: 120 },
+            { x: window.innerWidth - 520, y: 16, w: 504, h: 96 },
+            { x: 0, y: window.innerHeight - 96, w: window.innerWidth, h: 96 },
+            { x: 0, y: window.innerHeight - 330, w: 340, h: 330 },
+          ];
+          const placedZones: { x: number; y: number; w: number; h: number }[] = [];
+          const zoneHit = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) =>
+            a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
           const counts = new Array(11).fill(0);
           for (const s of p.stations) counts[s.genre] = (counts[s.genre] ?? 0) + 1;
           const rp = new THREE.Vector3();
@@ -1241,6 +1251,14 @@ export function SceneCanvas({
             el.g.setAttribute("text-anchor", "middle");
             el.n.setAttribute("text-anchor", "middle");
             el.g.setAttribute("fill", colors[g] ?? "#f5f1e8");
+            let gw = 90;
+            try { gw = el.g.getBBox().width || 90; } catch { /* ignore */ }
+            const lblBox = { x: sx - gw / 2 - 10, y: sy - 20, w: gw + 20, h: 48 };
+            if (safeZones.some((r) => zoneHit(lblBox, r)) || placedZones.some((r) => zoneHit(lblBox, r))) {
+              el.g.style.display = el.n.style.display = el.line.style.display = "none";
+              continue;
+            }
+            placedZones.push(lblBox);
             const dim = p.activeGenres.size > 0 && !p.activeGenres.has(g);
             (el.g as SVGTextElement).style.opacity = dim ? "0.45" : "1";
             (el.n as SVGTextElement).style.opacity = dim ? "0.35" : "1";
