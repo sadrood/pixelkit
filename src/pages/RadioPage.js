@@ -341,6 +341,7 @@ export class RadioPage {
           this.autoTuneFromCrosshair();
         });
       } catch { /* ignore */ }
+      this.loadStationHealth();
       this.loadFullStations();
       // 预热星云模块（用户切过去时不用等）
       import('./RadioNebula3D.js').catch(() => {});
@@ -404,7 +405,7 @@ export class RadioPage {
     if (typeof x === 'number') this._hoverX = x;
     if (typeof y === 'number') this._hoverY = y;
     if (!station) { tip.style.display = 'none'; return; }
-    tip.textContent = (station.name || '') + ' · ' + this.precLabel(station);
+    tip.textContent = (station.name || '') + ' · ' + this.precLabel(station) + (this.healthLabel(station) ? ' · ' + this.healthLabel(station) : '');
     tip.style.display = 'block';
     const stage = this.$('radio-globe-wrap');
     const rect = stage ? stage.getBoundingClientRect() : { left: 0, top: 0 };
@@ -494,11 +495,44 @@ export class RadioPage {
 
   step(delta) {
     if (!this.geoStations.length) return;
-    const i = this.index < 0 ? 0 : this.index + delta;
+    let i = this.index < 0 ? 0 : this.index + delta;
+    // 优先跳到社区验证可用的台（最多尝试 8 个）
+    for (let k = 0; k < 8; k++) {
+      const st = this.geoStations[((i % this.geoStations.length) + this.geoStations.length) % this.geoStations.length];
+      const h = this.healthOf(st);
+      if (!h || h.ok) break;
+      i += delta;
+    }
     this.setIndex(i, true);
   }
 
   /** 把列表/搜索/收藏里的电台解析成带真实坐标的数据集电台（用于聚焦与位置显示） */
+  /** 社区探活数据（Radio Browser lastcheckok） */
+  async loadStationHealth() {
+    if (this._health) return this._health;
+    try {
+      const j = await fetch('/data/station-health.json', { cache: 'no-cache' }).then((r) => r.json());
+      this._health = j && j.deadIds ? { deadSet: new Set(j.deadIds.map(String)), builtAt: j.builtAt, alive: j.alive, total: j.total } : null;
+      this._healthMeta = j ? { builtAt: j.builtAt, alive: j.alive, total: j.total } : null;
+      console.log('[radio] 社区探活：' + (j ? j.alive + '/' + j.total : '无') + ' 可用');
+    } catch { this._health = null; }
+    return this._health;
+  }
+
+  /** 返回 { ok, hours, clicks, votes } 或 null */
+  healthOf(st) {
+    if (!st || !this._health || !this._health.deadSet) return null;
+    const id = String(st.id || '').toLowerCase();
+    return { ok: !this._health.deadSet.has(id) };
+  }
+
+  healthLabel(st) {
+    const h = this.healthOf(st);
+    if (!h) return '';
+    if (!h.ok) return '社区验证：可能已失效';
+    return '社区验证：可用';
+  }
+
   resolveGeoStation(s) {
     if (!s) return s;
     const ok = (x) => x && isFinite(x.lat) && isFinite(x.lon) && !(Math.abs(x.lat) < 0.01 && Math.abs(x.lon) < 0.01);
@@ -527,7 +561,7 @@ export class RadioPage {
     if (sub) {
       const genre = this.genres && s.g != null ? (this.genres[s.g] || '') : '';
       const lang = this.langs && s.l != null ? (this.langs[s.l] || '') : '';
-      sub.textContent = [genre, lang, s.bitrate ? s.bitrate + ' KBPS' : '码率未知', this.precLabel(s)].filter(Boolean).join(' · ');
+      sub.textContent = [genre, lang, s.bitrate ? s.bitrate + ' KBPS' : '码率未知', this.precLabel(s), this.healthLabel(s)].filter(Boolean).join(' · ');
     }
     const tuneName = this.$('rd-tune-name');
     if (tuneName) tuneName.textContent = s.name || '';
