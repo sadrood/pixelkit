@@ -490,6 +490,17 @@ let level = 0;
 let histAcc = 0;
 
 /** 每帧调用：刷新频带、瀑布纹理行、bass 与 uLevel（公式照抄原站） */
+/** 没有可用的真实 FFT 时，用节拍合成一条频谱，让画面仍然“随音乐起伏” */
+function synthSpectrum(x: number, time: number, playing: boolean): number {
+  const amp = playing ? 1 : 0.25;
+  const beat = Math.pow(0.5 + 0.5 * Math.sin(time * Math.PI * 2 * 1.7), 3);
+  const beat2 = Math.pow(0.5 + 0.5 * Math.sin(time * Math.PI * 2 * 0.85 + 1.2), 2);
+  const low = Math.exp(-x * 5.5) * (0.28 + 0.55 * beat + 0.18 * beat2);
+  const mid = Math.exp(-Math.pow((x - 0.34) / 0.16, 2)) * (0.16 + 0.26 * beat2) * (0.7 + 0.3 * Math.sin(time * 6 + x * 12));
+  const high = Math.exp(-Math.pow((x - 0.62) / 0.3, 2)) * 0.1 * (0.5 + 0.5 * Math.sin(time * 9 + x * 40));
+  return Math.min(1, amp * (low + mid + high));
+}
+
 export function updateSpectrum(dt: number, time: number) {
   const real = isReal();
   if (real && analyser) {
@@ -507,6 +518,20 @@ export function updateSpectrum(dt: number, time: number) {
       if (o > peak) peak = o;
     }
     autoGain += (Math.max(peak, 0.25) - autoGain) * (peak > autoGain ? 0.08 : 0.01);
+    if (peak < 0.01) {
+      // 有分析器但音频静音/被静音：用合成频谱保持律动
+      let sb = 0;
+      for (let e = 0; e < FFT_W; e++) {
+        const v = synthSpectrum(e / FFT_W, time, live);
+        fftData[e] = v * 255;
+        if (e < 40) sb += v;
+      }
+      bass += (sb / 40 - bass) * 0.25;
+      histAcc += dt;
+      if (histAcc > 0.095) { histAcc = 0; fftData.copyWithin(FFT_W, 0, FFT_W * (FFT_H - 1)); }
+      level += ((live ? 0.75 : 0.2) - level) * 0.06;
+      return;
+    }
     let bs = 0;
     for (let e = 0; e < FFT_W; e++) {
       const v = Math.min(1, (tmpBands[e] * 0.8) / autoGain);
@@ -514,11 +539,26 @@ export function updateSpectrum(dt: number, time: number) {
       if (e < 40) bs += v;
     }
     bass += (bs / 40 - bass) * 0.3;
+    // blendSynth：真实频谱偏安静时，叠加一条合成节拍，保证唱片/山脉仍有起伏
+    if (live) {
+      const quiet = peak < 0.15 ? 1 : 0.32;
+      let sb2 = 0;
+      for (let e = 0; e < FFT_W; e++) {
+        const sv = synthSpectrum(e / FFT_W, time, true) * 0.9 * quiet;
+        const cur = fftData[e] as number;
+        if (sv * 255 > cur) fftData[e] = sv * 255;
+        if (e < 40) sb2 += (fftData[e] as number) / 255;
+      }
+      bass += (sb2 / 40 - bass) * 0.25;
+    }
   } else {
-    const base = (live ? 0.08 : 0.04) * (1 + 0.02 * Math.sin(time * 1.2));
-    const bv = Math.round(base * 255);
-    for (let e = 0; e < FFT_W; e++) fftData[e] = bv;
-    bass += (0 - bass) * 0.1;
+    let sb = 0;
+    for (let e = 0; e < FFT_W; e++) {
+      const v = synthSpectrum(e / FFT_W, time, live);
+      fftData[e] = v * 255;
+      if (e < 40) sb += v;
+    }
+    bass += (sb / 40 - bass) * 0.25;
   }
   histAcc += dt;
   if (histAcc > 0.095) {

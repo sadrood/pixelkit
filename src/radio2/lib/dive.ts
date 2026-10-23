@@ -29,10 +29,10 @@ export const DIVE_CFG: Record<
   point: { mode: 0, gain: 0, spin: 0, cam: [0, 0, 6.2], look: [0, 0, 0] },
   disc: { mode: 1, gain: 0.34, spin: 0.32, cam: [0, 3.4, 6], look: [0, -0.45, 0] },
   orb: { mode: 0, gain: 0.42, spin: 0.08, cam: [0, 0.3, 7.2], look: [0, 0, 0] },
-  field: { mode: 1, gain: 1.05, spin: 0, cam: [0, 2.3, 6.4], look: [0, 0.25, -0.5] },
+  field: { mode: 1, gain: 0.9, spin: 0, cam: [0, 2.6, 6.2], look: [0, 0.15, -0.3] },
   radar: { mode: 1, gain: 0.5, spin: 0.9, cam: [0, 4.6, 3.4], look: [0, -0.2, 0] },
   galaxy: { mode: 0, gain: 0.32, spin: 0.16, cam: [0, 3.2, 5.4], look: [0, -0.2, 0] },
-  waves: { mode: 0, gain: 0.3, spin: 0.05, cam: [0, 3, 6], look: [0, 0.2, 0] },
+  waves: { mode: 1, gain: 0.9, spin: 0.05, cam: [0, 3, 6], look: [0, 0.2, 0] },
   pulsar: { mode: 1, gain: 0.75, spin: 0, cam: [0, 2, 5.6], look: [0, 0.1, 0] },
   ring: { mode: 0, gain: 0.85, spin: 0.04, cam: [0, 0, 6.4], look: [0, 0, 0] },
 };
@@ -161,15 +161,25 @@ function field(N = DIVE_N): DiveGeo {
   const e = new Float32Array(N * 4);
   const t = new Float32Array(N * 2);
   const n = rng(51);
-  const r = N / 256;
+  const r = N / 320;
+  // mountain：起伏地形（多组正弦叠加山脊/山谷），配合 FFT 垂直律动
+  const hAt = (x: number, z: number) => {
+    const a = Math.sin(x * 1.55 + 0.7) * 0.42 + Math.sin(z * 1.9 - 0.4) * 0.3;
+    const b = Math.sin((x + z) * 2.7 + 1.9) * 0.16 + Math.sin((x - z) * 3.9 - 0.8) * 0.1;
+    const ridge = Math.pow(Math.abs(Math.sin(x * 1.05 + z * 0.55 + 0.9)), 1.6) * 0.28;
+    return a + b + ridge;
+  };
   for (let i = 0; i < N; i++) {
-    const a = i % 256;
-    const o = (i / 256) | 0;
-    const s = (a + n() * 0.6) / 256;
-    const c = (o + 0.5) / r;
-    e.set([(s - 0.5) * 6.4, 0, (c - 0.5) * 4.6, (o % 6 === 0 ? 1 : 0.3) * (0.4 + 0.6 * c)], i * 4);
-    t[i * 2] = Math.abs(s - 0.5) * 2 * 0.92 + 0.02;
-    t[i * 2 + 1] = 1 - c;
+    const a = i % 320;
+    const o = (i / 320) | 0;
+    const sx = (a + n() * 0.7) / 320;
+    const sz = (o + n() * 0.7) / r;
+    const x = (sx - 0.5) * 6.6;
+    const z = (sz - 0.5) * 4.8;
+    const h = hAt(x, z);
+    e.set([x, h, z, 0.42 + Math.max(0, h) * 0.9], i * 4);
+    t[i * 2] = sx * 0.95 + 0.02;
+    t[i * 2 + 1] = Math.max(0, Math.min(1, (h + 0.6) / 1.6));
   }
   return { pos: e, band: t };
 }
