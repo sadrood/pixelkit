@@ -705,7 +705,7 @@ export default function Workspace() {
   const baseTitle = useRef("");
   if (!baseTitle.current && typeof document !== "undefined") baseTitle.current = document.title;
   useEffect(() => {
-    document.title = station ? `${station.name || t("en", "unnamed")} · RoamDial` : baseTitle.current;
+    document.title = station ? `${station.name || t("en", "unnamed")} · 世界电台` : baseTitle.current;
   }, [station]);
 
   /* ---------- Media Session（原站 uP）：锁屏 / 系统媒体键 ---------- */
@@ -766,7 +766,7 @@ export default function Workspace() {
       ms.metadata = new MediaMetadata({
         title: name,
         artist,
-        album: "RoamDial",
+        album: "世界电台",
         artwork: [{ src: stationArtwork(name, color), sizes: "512x512", type: "image/png" }],
       });
       ms.playbackState =
@@ -884,12 +884,12 @@ export default function Workspace() {
       .map((id) => findById(data.stations, id))
       .filter(Boolean)
       .map((s) => ({ id: s!.id, name: s!.name, url: s!.url }));
-    const blob = new Blob([JSON.stringify({ app: "RoamDial", saved: items }, null, 2)], {
+    const blob = new Blob([JSON.stringify({ app: "世界电台", saved: items }, null, 2)], {
       type: "application/json",
     });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "roamdial-saved.json";
+    a.download = "world-radio-saved.json";
     a.click();
     URL.revokeObjectURL(a.href);
   }, [data, savedIds]);
@@ -928,13 +928,14 @@ export default function Workspace() {
     const s = stationRef.current;
     if (!s) return;
     const u = new URL(window.location.origin + window.location.pathname);
+      u.hash = "#/radio";
     u.searchParams.set("s", s.id);
     const url = u.toString();
     const place = placeLine(lang, s, data?.meta ?? null, "");
     const text = t(lang, "shareText", { name: s.name, place });
     try {
       if (navigator.share) {
-        await navigator.share({ title: "RoamDial", text, url });
+        await navigator.share({ title: "世界电台", text, url });
         return;
       }
     } catch {
@@ -1420,7 +1421,7 @@ export default function Workspace() {
             }}
           >
             <BrandMark />
-            <span>RoamDial</span>
+            <span>世界电台</span>
           </button>
           <div className="stats mono dim" style={{ marginTop: 8 }}>
             {data ? (

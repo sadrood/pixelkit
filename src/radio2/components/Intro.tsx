@@ -100,7 +100,7 @@ export function Intro({
       <div className="ibrand">
         <div className="logo">
           <BrandMark />
-          RoamDial
+          世界电台
         </div>
         <div className="islog">{t(lang, "slogan")}</div>
         <div className="isrc">— {t(lang, "sloganSrc")}</div>

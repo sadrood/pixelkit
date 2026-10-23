@@ -540,7 +540,7 @@ export function SceneCanvas({
       return;
     }
 
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth > 1200 ? 1.5 : 2);
     renderer.setPixelRatio(dpr);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(BG, 1);
@@ -565,6 +565,7 @@ export function SceneCanvas({
 
     /* 后处理：原站 three EffectComposer（HalfFloat）→ RenderPass → UnrealBloom(.45/.55/.2)
        → 颗粒 ShaderPass → OutputPass；软件渲染只关 bloom（原站 ce.enabled=!m） */
+    let softwareMode = false;
     let composer: EffectComposer | null = null;
     let bloom: UnrealBloomPass | null = null;
     let grain: ShaderPass | null = null;
@@ -573,12 +574,13 @@ export function SceneCanvas({
       const dbg = gl.getExtension("WEBGL_debug_renderer_info");
       const rendererName = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : "";
       const software = /swiftshader|software|basic render|llvmpipe/i.test(rendererName);
+      softwareMode = software;
       composer = new EffectComposer(renderer);
       composer.setPixelRatio(dpr);
       composer.setSize(window.innerWidth, window.innerHeight);
       composer.addPass(new RenderPass(scene, camera));
       bloom = new UnrealBloomPass(
-        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        new THREE.Vector2(window.innerWidth * 0.6, window.innerHeight * 0.6),
         0.45,
         0.55,
         0.2
@@ -1243,6 +1245,7 @@ export function SceneCanvas({
     /* 渲染循环 */
     let raf = 0;
     let tt = 0;
+    let frameNo = 0;
     const nearestRef = { idx: -1, dist: 1e9, locked: false, settled: false };
     let labels: [number, number, number][] = [];
     const stationCount = () => layout.globe.length / 3;
@@ -1264,16 +1267,26 @@ export function SceneCanvas({
       const dt = prevMs ? Math.min(0.05, Math.max(0.001, (ms - prevMs) / 1000)) : 1 / 60;
       prevMs = ms;
       const f60 = dt * 60;
+      frameNo += 1;
       if (!perfChecked) {
         perfAcc += dt;
         perfN++;
         if (perfAcc > 2) {
           perfChecked = true;
-          if (perfAcc / perfN > 0.024) {
+          const avg = perfAcc / perfN;
+          if (avg > 0.033) {
+            // 明显掉帧：降到 1.0 DPR 并关掉 Bloom
+            renderer.setPixelRatio(1);
+            composer?.setPixelRatio(1);
+            composer?.setSize(window.innerWidth, window.innerHeight);
+            if (bloom) bloom.enabled = false;
+            console.log("[radio2] 性能降级：DPR 1.0 + 关闭 Bloom");
+          } else if (avg > 0.024) {
             const pr = Math.min(dpr, 1.25);
             renderer.setPixelRatio(pr);
             composer?.setPixelRatio(pr);
             composer?.setSize(window.innerWidth, window.innerHeight);
+            console.log("[radio2] 性能降级：DPR " + pr);
           }
         }
       }
@@ -1309,12 +1322,15 @@ export function SceneCanvas({
         (reducedMotion() ? 1 : Math.min(1, dt * (p.diving ? 1.6 : 1.3)));
       (mat.uniforms.uBoost as { value: number }).value = 1 - diveAmt * 0.4;
 
-      /* 音频联动（原站 Bn → uFFT / uLevel / 泛光 / 颗粒 / .glow） */
-      updateSpectrum(dt, tt);
-      fftTex.needsUpdate = true;
-      mat.uniforms.uLevel.value = getLevel();
-      const bs = getBass();
-      if (bloom) bloom.strength = 0.45 + bs * 0.3;
+      /* 音频联动：省电模式下降频刷新并关闭 Bloom */
+      if (p.pro || (frameNo & 1) === 0) {
+        updateSpectrum(dt, tt);
+        fftTex.needsUpdate = true;
+        mat.uniforms.uLevel.value = getLevel();
+        const bs = getBass();
+        if (bloom) bloom.strength = 0.45 + bs * 0.3;
+      }
+      if (bloom) bloom.enabled = !softwareMode && !!p.pro;
       tickStatic(dt);
       const staticLv = setLevels();
       if (grain) grain.uniforms.uNoise.value = staticLv * 4;
@@ -1648,7 +1664,7 @@ export function SceneCanvas({
 
       /* 标签：20Hz，唱片态/过渡态不画（原站 Ir） */
       labelFor += dt;
-      if (ann && labelFor > 0.05) {
+      if (ann && labelFor > 0.08) {
         labelFor = 0;
         if (p.diving) {
           ann.style.opacity = "0";
@@ -1695,7 +1711,13 @@ export function SceneCanvas({
             el.n.setAttribute("text-anchor", "middle");
             el.g.setAttribute("fill", colors[g] ?? "#f5f1e8");
             let gw = 90;
-            try { gw = el.g.getBBox().width || 90; } catch { /* ignore */ }
+              {
+                // 用字符宽度估算替代 getBBox（避免每帧强制布局）
+                const txt = el.g.textContent || "";
+                let est = 0;
+                for (const ch of txt) est += /[\u3000-\u9fff\uff00-\uffef]/.test(ch) ? 14 : 8;
+                if (est > 0) gw = est + 8;
+              }
             const lblBox = { x: sx - gw / 2 - 10, y: sy - 20, w: gw + 20, h: 48 };
             if (safeZones.some((r) => zoneHit(lblBox, r)) || placedZones.some((r) => zoneHit(lblBox, r))) {
               el.g.style.display = el.n.style.display = el.line.style.display = "none";

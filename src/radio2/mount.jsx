@@ -40,8 +40,31 @@ export function mountRadio() {
   mountEl.style.cssText = 'position:absolute;inset:0;';
   shadow.appendChild(mountEl);
 
+  // 返回主站：派发 PixelKit 的页面跳转事件
+  if (!shadow.querySelector('.rd-back')) {
+    const back = document.createElement('button');
+    back.className = 'rd-back';
+    back.type = 'button';
+    back.textContent = '← 返回主站';
+    back.setAttribute('aria-label', '返回主站');
+    Object.assign(back.style, {
+      position: 'absolute', top: '14px', left: '50%', transform: 'translateX(-50%)',
+      zIndex: '20', padding: '7px 14px', borderRadius: '999px',
+      border: '1px solid rgba(245,241,232,0.18)', background: 'rgba(16,31,29,0.55)',
+      color: 'rgba(245,241,232,0.72)', font: '400 12px/1 Inter, "PingFang SC", sans-serif',
+      letterSpacing: '0.02em', cursor: 'pointer', backdropFilter: 'blur(6px)',
+      transition: 'color .2s, border-color .2s, background .2s',
+    });
+    back.addEventListener('mouseenter', () => { back.style.color = '#f5f1e8'; back.style.borderColor = 'rgba(245,241,232,0.45)'; });
+    back.addEventListener('mouseleave', () => { back.style.color = 'rgba(245,241,232,0.72)'; back.style.borderColor = 'rgba(245,241,232,0.18)'; });
+    back.addEventListener('click', () => {
+      window.dispatchEvent(new CustomEvent('pk-goto', { detail: 'home' }));
+    });
+    shadow.appendChild(back);
+  }
+
   const root = createRoot(mountEl);
   root.render(<Workspace />);
-  console.log('[radio2] RoamDial 复刻已挂载（Shadow DOM）');
+  console.log('[radio2] 世界电台已挂载（Shadow DOM）');
   return () => { try { root.unmount(); } catch { /* ignore */ } };
 }

@@ -37,11 +37,29 @@ class App {
     const roomParam = params.get('room');
     // const gameParam = params.get('game');
     // if (gameParam) { this.showPage('quoridor'); }
+    // 先看 hash 指定的页面（可分享链接），避免被 showPage('home') 清掉
+    const hashM = /^#\/([a-z0-9-]+)/i.exec(window.location.hash || '');
+    const hashPage = hashM && document.getElementById('page-' + hashM[1]) ? hashM[1] : '';
     if (roomParam) {
       this.showPage('docx-editor');
+    } else if (hashPage) {
+      this.showPage(hashPage);
     } else {
       this.showPage('home');
     }
+
+    /* page-hash：支持 /#/radio 这种可分享的单页链接 */
+    try {
+      const m = /^#\/([a-z0-9-]+)/i.exec(window.location.hash || '');
+      if (m && document.getElementById('page-' + m[1])) this.showPage(m[1]);
+    } catch { /* ignore */ }
+    window.addEventListener('hashchange', () => {
+      try {
+        const m = /^#\/([a-z0-9-]+)/i.exec(window.location.hash || '');
+        const target = m && document.getElementById('page-' + m[1]) ? m[1] : 'home';
+        if (target !== this.currentPage) this.showPage(target);
+      } catch { /* ignore */ }
+    });
   }
 
   // ==================== 主题 & 主色 管理 ====================
@@ -263,6 +281,13 @@ class App {
     const pageEl = document.getElementById(`page-${name}`);
     if (pageEl) pageEl.classList.add('active');
     this.currentPage = name;
+    /* page-hash:sync 让地址栏可分享当前页 */
+    try {
+      const want = name === 'home' ? '' : '#/' + name;
+      if ((window.location.hash || '') !== want) {
+        history.replaceState(null, '', window.location.pathname + window.location.search + want);
+      }
+    } catch { /* ignore */ }
     // 记录当前页面，供 CSS 做页面级调整（例如隐藏右下角主题吉祥物）
     document.body.dataset.page = name;
     // 世界电台：第一次进入时初始化（拉目录 + 绑定播放器）
