@@ -21,6 +21,7 @@ let hlsMod: HlsClass | null | undefined;
 let hls: HlsInstance | null = null;
 let tuneToken = 0;
 let failTimer = 0;
+let stallTimer = 0;
 
 let ctx: AudioContext | null = null;
 let analyser: AnalyserNode | null = null;
@@ -127,6 +128,7 @@ function mkEl(kind: "A" | "B"): HTMLAudioElement {
     live = true;
     paused = false;
     window.clearTimeout(failTimer);
+    window.clearTimeout(stallTimer);
     dropHold();
     emit("playing");
   });
@@ -141,6 +143,18 @@ function mkEl(kind: "A" | "B"): HTMLAudioElement {
     paused = true;
     emit("paused");
   });
+  /* 播放中途断流/卡顿：12 秒内进度不走就切换线路（A→B）或触发换台 */
+  const armStall = () => {
+    if (el !== cur() || paused) return;
+    window.clearTimeout(stallTimer);
+    const t0 = el.currentTime;
+    stallTimer = window.setTimeout(() => {
+      if (el !== cur() || paused) return;
+      if (el.currentTime - t0 < 0.5) failStream();
+    }, 12000);
+  };
+  el.addEventListener("waiting", armStall);
+  el.addEventListener("stalled", armStall);
   el.addEventListener("error", () => {
     if (el !== cur() || !el.getAttribute("src")) return;
     // HLS 的失败统一走 hls.js 的 ERROR 事件，避免同一次失败被处理两遍
@@ -521,6 +535,7 @@ export const getLevel = () => level;
 /** 原站 l.real：正在播放且走的是带分析器的 A 元素 */
 export const isReal = () => live && mode === "A";
 export const isLiveAudio = () => live;
+export const isStalled = () => stallTimer !== 0;
 
 if (typeof window !== "undefined") {
   (window as any).__rdAudio = { getBass, getLevel, isReal, isLiveAudio, currentState, loadAndPlay };

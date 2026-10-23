@@ -45,8 +45,20 @@ PixelKit 站点全局 CSS 有 `#app .btn` 等高优先级规则，会把复刻�
 - 代理白名单 `radioAllowedHosts` 已纳入 `public/roamdial/globe_rest.json` 的全部主机
 - 100 台抽样（服务器网络）：直连 81/100，代理 97/100，并集 **98/100**
 
+## 定位（听本地）
+- 顶部「📍 听本地」按钮：先尝试浏览器 GPS（仅 HTTPS/localhost 等安全上下文可用）
+- HTTP 站点或 GPS 被拒时，自动走 `/api/geo/locate`（服务器用 ip-api.com 按客户端 IP 做城市级定位）
+- 命中后按 haversine 找最近的可播电台并 `enterWorkspace` 播放，Toast 提示距离与定位方式
+- 实测（HTTP 生产）：IP 定位到「深圳/广东」，自动播放「深圳新闻广播（1 km）」
+
+## 音频 VPN 兜底
+- 服务器常驻 mihomo（systemd，配置在 `/etc/mihomo/config.yaml`，节点凭据不入库）
+- `/api/radio/stream` 先直连，失败（超时/拒绝/HTML/空流）时自动改用 `127.0.0.1:7890` 的 VPN 重试
+- 两者都失败返回 502，播放器据此自动换台；响应头 `X-Radio-Route: direct|vpn` 可排查
+- 实测 300 台抽样：直连 248，失败 52；其中 VPN 可救回 38（73%），等效可播率 82.7% → 95.3%
+
 ## 构建注意
-- 服务器 1.7GB 内存构建大包会被 OOM 杀死：已加 4GB swap，hook 构建使用 `BUILD_LIGHT=1`（关闭压缩）并限制 `--max-old-space-size=1536`
+- 服务器 1.7GB 内存构建大包会被 OOM 杀死：默认改为**本地构建 + 上传产物**（`scripts/deploy-prebuilt.ps1`），hook 检测到 `/tmp/pk-dist-<branch>.tgz` 即跳过构建，仅按 lockfile 变化运行 `npm install`
 
 ## 已知边界
 - 唱片视图「按流派」风格是波形/山脊画法，切到「圆盘」才是唱片盘（与源站一致）

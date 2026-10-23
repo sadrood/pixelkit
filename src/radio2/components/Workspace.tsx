@@ -1257,11 +1257,13 @@ export default function Workspace() {
       const lat = Number(d.lat), lon = Number(d.lon);
       const all = data?.stations ?? [];
       if (!isFinite(lat) || !isFinite(lon) || !all || !all.length) return;
-      const near = nearestByCoord(all, lat, lon, 1);
-      if (!near.length) return;
-      const st = near[0];
+      const list = nearestByCoord(all, lat, lon, 400);
+      if (!list.length) return;
+      const st = list[0];
+      const nearCount = list.filter((x) => x.distanceKm <= 100).length;
       const how = d.source === 'ip' ? '按 IP 定位' : '已定位';
-      const msg = `${how} · 最近的电台：${st.name}（${Math.round(st.distanceKm)} km）`;
+      const city = d.city ? `${d.city} · ` : '';
+      const msg = `${how} · ${city}附近 ${nearCount} 个台，正在播放最近的：${st.name}（${Math.round(st.distanceKm)} km）`;
       if (introMounted) { enterWorkspace({ station: st, autoplay: true }); setIntroMounted(false); }
       else tuneIn(st, true, { toGlobe: true, zoom: true });
       showToast(msg);
