@@ -6998,7 +6998,21 @@ const RADIO_API_BASES = (process.env.RADIO_API_BASE
   .map((u) => u.replace(/\/$/, ''));
 let radioApiBase = RADIO_API_BASES[0];
 const radioCache = new Map();
-const radioAllowedHosts = new Set();      // 音频中转白名单：只允许目录里真实出现过的电台主机（防 SSRF）
+const radioAllowedHosts = new Set();
+/* 电台音频 VPN 兜底：直连失败的流改走本地 mihomo HTTP 代理 */
+let radioVpnDispatcher = null;
+async function getRadioVpnDispatcher() {
+  if (radioVpnDispatcher) return radioVpnDispatcher;
+  const { ProxyAgent } = await import('undici');
+  radioVpnDispatcher = new ProxyAgent('http://127.0.0.1:7890');
+  return radioVpnDispatcher;
+}
+function radioBadUpstream(up) {
+  if (!up || !up.ok || !up.body) return true;
+  const type = String(up.headers.get('content-type') || '');
+  const len = String(up.headers.get('content-length') || '');
+  return !type || len === '0' || /text\/html/i.test(type);
+}      // 音频中转白名单：只允许目录里真实出现过的电台主机（防 SSRF）
 // RoamDial 复刻版（35,699 台）的主机也加入代理白名单，否则这些台的代理重试会被 403
 try {
   const rawRD = readFileSync(path.join(__dirname, 'public', 'roamdial', 'globe_rest.json'), 'utf-8').replace(/^﻿/, '');
@@ -7196,13 +7210,23 @@ app.get('/api/radio/stream', async (req, res) => {
        "open context failed"（实测 Chrome 报 NotSupportedError）。要纯音频。 */
     const headers = { 'User-Agent': 'Mozilla/5.0 (PixelKit-Radio)', 'Accept': 'audio/*,*/*;q=0.8' };
     if (req.headers.range) headers.Range = req.headers.range;
-    const up = await fetch(target.toString(), { headers, redirect: 'follow', signal: ac.signal });
-    if (!up.ok) return res.status(502).end();
+    let up = null;
+    try { up = await fetch(target.toString(), { headers, redirect: 'follow', signal: ac.signal }); } catch { up = null; }
+    let viaVpn = false;
+    if (radioBadUpstream(up)) {
+      try {
+        const { fetch: ufetch } = await import('undici');
+        const dispatcher = await getRadioVpnDispatcher();
+        const vpnUp = await ufetch(target.toString(), { headers, redirect: 'follow', signal: ac.signal, dispatcher });
+        if (!radioBadUpstream(vpnUp)) { up = vpnUp; viaVpn = true; }
+      } catch { /* VPN 不可用则保持直连结果 */ }
+    }
+    // 直连与 VPN 都不可用时返回 502，让播放器触发自动换台（而不是 200 空流）
+    if (radioBadUpstream(up)) return res.status(502).end();
+    res.setHeader('X-Radio-Route', viaVpn ? 'vpn' : 'direct');
     // 有些台在服务器网络下会被地区限制/重定向到错误页：返回空 200 或 text/html。
     // 直接把这种"假成功"变成 502，播放器才会触发 error → 自动换台。
-    const upType = String(up.headers.get('content-type') || '');
-    const upLen = String(up.headers.get('content-length') || '');
-    if (!up.body || !upType || upLen === '0' || /text\/html/i.test(upType)) return res.status(502).end();
+    if (radioBadUpstream(up)) return res.status(502).end();
     res.status(up.status === 206 ? 206 : 200);
     res.setHeader('Content-Type', up.headers.get('content-type') || 'audio/mpeg');
     const clen = up.headers.get('content-length'); if (clen) res.setHeader('Content-Length', clen);
