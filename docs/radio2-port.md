@@ -53,6 +53,20 @@ PixelKit 站点全局 CSS 有 `#app .btn` 等高优先级规则，会把复刻�
 - headless 无声卡，FFT 的真实低音值无法在自动化里验证（`__rdAudio.isReal()` 可确认真实频谱链路）
 - 旧电台渲染器（`src/pages/Radio*.js`，约 4,600 行）已删除；`main.css` 中历史 radio 覆盖样式尚未清理
 
+## 部署（本地构建 → 云端发布）
+
+服务器只有 1.7GB 内存，`vite build` 会在 `rendering chunks` 阶段被内核 OOM 杀死（hook 静默保留旧 dist，容易误判"部署成功"）。
+因此默认改为**本地构建、只上传产物**：
+
+```powershell
+pwsh scripts/deploy-prebuilt.ps1 -Target both -Message "改动说明"
+# 或 -Target test / -Target main
+```
+
+流程：本地 `npm run build` → 打 tar → scp 到 `/tmp/pk-dist-{test,main}.tgz` → push 触发 hook →
+hook 检测到预构建产物后**跳过 vite build**（仅按 package-lock 变化执行 `npm install`），直接发布。
+
 ## 回滚
-- 部署：`git push deploy test` / `test:main`，hook 构建失败会保留旧 dist
+- 部署失败/需要回退：服务器 `/opt/pixelkit-prod/releases/` 保留最近若干版本，可把 `live/index.html` 指回旧版；hook 构建失败也会保留旧 dist
+- 旧版 hook 行为：`git push deploy test` / `test:main`（无预构建产物时仍会尝试服务器构建，可能 OOM）
 - 如需回到旧电台页：恢复 `index.html` 的旧 `#page-radio` 标记与 `src/main.js` 的 `RadioPage` 引用（旧文件已删除，可从 GitHub 历史 `9a89244` 之前找回）

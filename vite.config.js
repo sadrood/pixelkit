@@ -30,7 +30,6 @@ function onnxWasmPlugin() {
 
 export default defineConfig({
   // 服务器内存紧张时用 BUILD_LIGHT=1 关掉压缩，降低构建内存峰值
-  build: { minify: process.env.BUILD_LIGHT ? false : 'esbuild', sourcemap: false, chunkSizeWarningLimit: 4096 },
   define: { __BUILD_TIME__: JSON.stringify(new Date().toISOString()) },
   plugins: [react(), onnxWasmPlugin()],
   root: '.',
@@ -71,6 +70,10 @@ export default defineConfig({
     }
   },
   build: {
+    // BUILD_LIGHT=1 时关闭压缩，降低服务器内存峰值（本地部署默认压缩）
+    minify: process.env.BUILD_LIGHT ? false : 'esbuild',
+    sourcemap: false,
+    chunkSizeWarningLimit: 4096,
     outDir: 'dist',
     assetsDir: 'assets',
     rollupOptions: {
