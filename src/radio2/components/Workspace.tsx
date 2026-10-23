@@ -215,6 +215,7 @@ export default function Workspace() {
   const [normOn, setNormOn] = useState(false);
   const [autoRecOn, setAutoRecOn] = useState(true);
   const [favOnly, setFavOnly] = useState(false);
+  const [myCity, setMyCity] = useState("");
   const [ecoOn, setEcoOn] = useState(false);
   const [diveForm, setDiveForm] = useState<DiveForm>("genre");
   const [isPhone, setIsPhone] = useState(false);
@@ -1261,9 +1262,10 @@ export default function Workspace() {
       if (!list.length) return;
       const st = list[0];
       const nearCount = list.filter((x) => x.distanceKm <= 100).length;
-      const how = d.source === 'ip' ? '按 IP 定位' : '已定位';
+      const how = d.source === 'cache' ? '上次位置' : d.source === 'ip' ? '按 IP 定位' : '已定位';
       const city = d.city ? `${d.city} · ` : '';
       const msg = `${how} · ${city}附近 ${nearCount} 个台，正在播放最近的：${st.name}（${Math.round(st.distanceKm)} km）`;
+      if (d.city) setMyCity(String(d.city));
       if (introMounted) { enterWorkspace({ station: st, autoplay: true }); setIntroMounted(false); }
       else tuneIn(st, true, { toGlobe: true, zoom: true });
       showToast(msg);
@@ -1462,6 +1464,7 @@ export default function Workspace() {
                   n: data.meta.n.toLocaleString(lang === "zh" ? "zh-CN" : "en"),
                   c: countryCount.toLocaleString(lang === "zh" ? "zh-CN" : "en"),
                 })}
+                {myCity ? ` · 📍 ${myCity}` : null}
                 {pool.length < data.meta.n && (
                   <>
                     <br />
