@@ -7197,6 +7197,33 @@ app.get('/api/radio/random', async (req, res) => {
 
 /* 音频中转：把电台流经本站转发（支持 Range；客户端断开就断开上游）。
    白名单只认目录里出现过的电台主机，避免被当成任意 URL 代理（SSRF）。 */
+/* 按客户端 IP 粗略定位（HTTP 站点无法用 GPS，浏览器要求安全上下文） */
+const geoLocateCache = new Map();
+app.get('/api/geo/locate', async (req, res) => {
+  try {
+    const xf = String(req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || '').split(',')[0].trim();
+    let ip = xf || req.socket.remoteAddress || '';
+    if (ip.startsWith('::ffff:')) ip = ip.slice(7);
+    if (!ip || ip === '127.0.0.1' || ip === '::1' || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip)) {
+      // 本机/内网访问：用服务器出口 IP 定位，至少给出城市级结果
+      ip = '';
+    }
+    const key = ip || 'self';
+    const hit = geoLocateCache.get(key);
+    if (hit && Date.now() - hit.t < 3600000) return res.json(hit.v);
+    const target = ip ? `http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,city,regionName,country,lat,lon&lang=zh-CN` : 'http://ip-api.com/json/?fields=status,city,regionName,country,lat,lon&lang=zh-CN';
+    const r = await fetch(target, { headers: { 'User-Agent': 'PixelKit/2.0' } });
+    const j = await r.json();
+    const out = j && j.status === 'success'
+      ? { success: true, lat: j.lat, lon: j.lon, city: j.city, region: j.regionName, country: j.country, source: 'ip', ip: ip || 'server' }
+      : { success: false, error: 'IP 定位失败' };
+    geoLocateCache.set(key, { t: Date.now(), v: out });
+    res.json(out);
+  } catch (e) {
+    res.status(500).json({ success: false, error: '定位服务不可用' });
+  }
+});
+
 app.get('/api/radio/stream', async (req, res) => {
   let target;
   try { target = new URL(String(req.query.u || '')); } catch { return res.status(400).json({ success: false, error: '音频地址无效' }); }

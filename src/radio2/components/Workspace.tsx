@@ -15,6 +15,8 @@ import {
   randomStations,
   searchStations,
   nearbyStations,
+  getStations,
+  nearestByCoord,
   diveList,
   genreCounts,
   type Station,
@@ -1247,6 +1249,34 @@ export default function Workspace() {
     },
     [tuneIn]
   );
+
+  /* 用户定位 → 打开工作区并播放最近的电台 */
+  useEffect(() => {
+    const onLocate = (e: Event) => {
+      const d = (e as CustomEvent).detail || {};
+      const lat = Number(d.lat), lon = Number(d.lon);
+      const all = data?.stations ?? [];
+      if (!isFinite(lat) || !isFinite(lon) || !all || !all.length) return;
+      const near = nearestByCoord(all, lat, lon, 1);
+      if (!near.length) return;
+      const st = near[0];
+      const how = d.source === 'ip' ? '按 IP 定位' : '已定位';
+      const msg = `${how} · 最近的电台：${st.name}（${Math.round(st.distanceKm)} km）`;
+      if (introMounted) { enterWorkspace({ station: st, autoplay: true }); setIntroMounted(false); }
+      else tuneIn(st, true, { toGlobe: true, zoom: true });
+      showToast(msg);
+    };
+    const onLocateErr = (e: Event) => {
+      const msg = (e as CustomEvent).detail?.message || '无法获取位置';
+      showToast(`定位失败：${msg}`);
+    };
+    window.addEventListener('rd-locate', onLocate as EventListener);
+    window.addEventListener('rd-locate-error', onLocateErr as EventListener);
+    return () => {
+      window.removeEventListener('rd-locate', onLocate as EventListener);
+      window.removeEventListener('rd-locate-error', onLocateErr as EventListener);
+    };
+  }, [data, tuneIn, showToast, enterWorkspace, introMounted]);
 
   const lastStation = useMemo(() => {
     if (!data || introDone) return null;

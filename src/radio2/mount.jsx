@@ -63,6 +63,56 @@ export function mountRadio() {
     shadow.appendChild(back);
   }
 
+  // 定位并播放最近的电台
+  if (!shadow.querySelector('.rd-locate-btn')) {
+    const loc = document.createElement('button');
+    loc.className = 'rd-locate-btn';
+    loc.type = 'button';
+    loc.textContent = '📍 听本地';
+    loc.setAttribute('aria-label', '定位并播放附近电台');
+    Object.assign(loc.style, {
+      position: 'absolute', top: '14px', left: 'calc(50% + 74px)',
+      zIndex: '20', padding: '7px 14px', borderRadius: '999px',
+      border: '1px solid rgba(245,241,232,0.18)', background: 'rgba(16,31,29,0.55)',
+      color: 'rgba(245,241,232,0.72)', font: '400 12px/1 Inter, "PingFang SC", sans-serif',
+      letterSpacing: '0.02em', cursor: 'pointer', backdropFilter: 'blur(6px)',
+      transition: 'color .2s, border-color .2s',
+    });
+    loc.addEventListener('mouseenter', () => { loc.style.color = '#f5f1e8'; loc.style.borderColor = 'rgba(245,241,232,0.45)'; });
+    loc.addEventListener('mouseleave', () => { loc.style.color = 'rgba(245,241,232,0.72)'; loc.style.borderColor = 'rgba(245,241,232,0.18)'; });
+    loc.addEventListener('click', () => {
+      const finish = (lat, lon, source) => {
+        loc.textContent = '📍 听本地';
+        window.dispatchEvent(new CustomEvent('rd-locate', { detail: { lat, lon, source } }));
+      };
+      const fail = (msg) => {
+        loc.textContent = '📍 听本地';
+        window.dispatchEvent(new CustomEvent('rd-locate-error', { detail: { message: msg } }));
+      };
+      const ipLocate = async () => {
+        try {
+          const r = await fetch('/api/geo/locate', { cache: 'no-store' });
+          const j = await r.json();
+          if (j && j.success && isFinite(j.lat) && isFinite(j.lon)) finish(j.lat, j.lon, 'ip');
+          else fail(j?.error || '定位失败');
+        } catch { fail('网络定位失败'); }
+      };
+      loc.textContent = '定位中…';
+      // 浏览器 GPS 只在 HTTPS/localhost 下可用；HTTP 站点直接走 IP 定位
+      const canGps = window.isSecureContext && !!navigator.geolocation;
+      if (canGps) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => finish(pos.coords.latitude, pos.coords.longitude, 'gps'),
+          () => { ipLocate(); },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 }
+        );
+      } else {
+        ipLocate();
+      }
+    });
+    shadow.appendChild(loc);
+  }
+
   const root = createRoot(mountEl);
   root.render(<Workspace />);
   console.log('[radio2] 世界电台已挂载（Shadow DOM）');

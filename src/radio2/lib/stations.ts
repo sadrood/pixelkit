@@ -199,6 +199,28 @@ export function nearbyStations(stations: Station[], s: Station, limit = 40): Sta
 
 /** 原站 it(e)：唱片视图的翻页列表。精度足够（>=3）就取同国家，否则取 ±2° 框内的低精度台；
  *  按热度降序、截到 300 个，当前台若挤不进前 300 就插到最前——列表里永远有当前台。 */
+/** 按用户坐标找最近的可播电台（haversine，单位 km） */
+export function nearestByCoord(
+  stations: Station[],
+  lat: number,
+  lon: number,
+  limit = 20
+): (Station & { distanceKm: number })[] {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const out: (Station & { distanceKm: number })[] = [];
+  for (const a of stations) {
+    if (!playable(a)) continue;
+    const dLat = toRad(a.lat - lat);
+    const dLon = toRad(a.lng - lon);
+    const h =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat)) * Math.cos(toRad(a.lat)) * Math.sin(dLon / 2) ** 2;
+    out.push({ ...a, distanceKm: 6371 * 2 * Math.asin(Math.min(1, Math.sqrt(h))) });
+  }
+  out.sort((x, y) => x.distanceKm - y.distanceKm);
+  return out.slice(0, limit);
+}
+
 export function diveList(stations: Station[], cur: Station, limit = 300): Station[] {
   const sameCountry = cur.prec >= 3;
   const out = stations.filter((a) =>
