@@ -262,7 +262,7 @@ attribute vec4 aFrom;
 attribute vec4 aTo;
 attribute vec4 aSeed;
 attribute vec4 aBand;
-uniform float uTime, uProg, uFromMode, uToMode, uFromGain, uToGain, uFromPt, uToPt, uSize, uPR, uFocus, uAspect, uMouseF;
+uniform float uTime, uProg, uFromMode, uToMode, uFromGain, uToGain, uFromPt, uToPt, uSize, uPR, uFocus, uAspect, uMouseF, uLevel;
 uniform vec2 uMouse;
 uniform sampler2D uFFT;
 varying float vA;
@@ -284,10 +284,17 @@ void main(){
   float aF = texture2D(uFFT, vec2(aBand.x, aBand.y*0.97+0.004)).r;
   float aT = texture2D(uFFT, vec2(aBand.z, aBand.w*0.97+0.004)).r;
   float amp = mix(aF*uFromGain, aT*uToGain, e);
+  float energy = clamp(uLevel, 0.0, 1.0);
   vec3 dir = normalize(mix(dirFor(uFromMode, pos), dirFor(uToMode, pos), e) + 1e-5);
   float rowShape = step(0.0005, mix(aBand.y, aBand.w, e));
-  pos += dir * amp * mix(0.35 + aSeed.w*0.65, 1.0, rowShape);
-  pos += vec3(sin(uTime*0.7+aSeed.y*40.0), cos(uTime*0.6+aSeed.z*40.0), sin(uTime*0.5+aSeed.x*40.0)) * 0.006;
+  // 音乐越大，跳得越高（山脉/雷达等垂直形态收益更明显）
+  pos += dir * amp * mix(0.35 + aSeed.w*0.65, 1.0, rowShape) * (0.65 + energy * 2.1);
+  // 垂直形态：整体高度随低音缩放（安静时压低，响时隆起）
+  float modeNow = mix(uFromMode, uToMode, e);
+  pos.y *= mix(1.0, 0.42 + energy * 1.75, step(0.5, modeNow) * uProg);
+  // 静止时不要抖动，只保留缓慢自转
+  float alive = smoothstep(0.004, 0.14, amp);
+  pos += vec3(sin(uTime*0.7+aSeed.y*40.0), cos(uTime*0.6+aSeed.z*40.0), sin(uTime*0.5+aSeed.x*40.0)) * 0.006 * alive;
   vec4 mv = modelViewMatrix * vec4(pos, 1.0);
   vec4 cl = projectionMatrix * mv;
   vec2 nd = cl.xy / cl.w;
@@ -719,6 +726,7 @@ export function SceneCanvas({
       uFromMode: { value: 0 },
       uToMode: { value: 0 },
       uFromGain: { value: 0 },
+    uLevel: { value: 0 },
       uToGain: { value: 0 },
       uFromPt: { value: 1 },
       uToPt: { value: 1 },
@@ -1417,6 +1425,7 @@ export function SceneCanvas({
         diveWasOn = p.diving;
       }
       diveFe = Math.min(1, diveFe + dt * diveRate);
+      diveUniforms.uLevel.value = getLevel();
       diveUniforms.uProg.value = diveFe;
       diveUniforms.uTime.value = tt;
       diveUniforms.uPR.value = renderer.getPixelRatio();

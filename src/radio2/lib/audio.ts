@@ -492,7 +492,8 @@ let histAcc = 0;
 /** 每帧调用：刷新频带、瀑布纹理行、bass 与 uLevel（公式照抄原站） */
 /** 没有可用的真实 FFT 时，用节拍合成一条频谱，让画面仍然“随音乐起伏” */
 function synthSpectrum(x: number, time: number, playing: boolean): number {
-  const amp = playing ? 1 : 0.25;
+  // 暂停/未播放时不要任何节拍，只保留静态
+  const amp = playing ? 1 : 0;
   const beat = Math.pow(0.5 + 0.5 * Math.sin(time * Math.PI * 2 * 1.7), 3);
   const beat2 = Math.pow(0.5 + 0.5 * Math.sin(time * Math.PI * 2 * 0.85 + 1.2), 2);
   const low = Math.exp(-x * 5.5) * (0.28 + 0.55 * beat + 0.18 * beat2);
@@ -502,6 +503,13 @@ function synthSpectrum(x: number, time: number, playing: boolean): number {
 }
 
 export function updateSpectrum(dt: number, time: number) {
+  // 暂停/未播放：清空频谱历史，避免残留的旧节拍继续驱动画面跳动
+  if (!live) {
+    fftData.fill(0);
+    bass += (0 - bass) * 0.5;
+    level += (0.08 - level) * 0.12;
+    return;
+  }
   const real = isReal();
   if (real && analyser) {
     if (!freqBuf) freqBuf = new Uint8Array(analyser.frequencyBinCount);
