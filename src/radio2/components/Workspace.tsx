@@ -273,10 +273,13 @@ export default function Workspace() {
     };
   }, []);
 
+  // 语言切换后，早期 useCallback 里捕获的 T 会拿到旧语言；用 ref 保证永远取最新
+  const langRef = useRef(lang);
+  langRef.current = lang;
   const T = useCallback(
     (key: Parameters<typeof t>[1], vars?: Record<string, string | number>) =>
-      t(lang, key, vars),
-    [lang]
+      t(langRef.current, key, vars),
+    []
   );
 
   const showToast = useCallback((text: string) => {
@@ -332,9 +335,9 @@ export default function Workspace() {
           if (st) {
             setStation(st);
             setView("globe");
-            showToast(t("en", "sharedStation"));
+            showToast(T("sharedStation"));
           } else {
-            showToast(t("en", "toastShareGone"));
+            showToast(T("toastShareGone"));
           }
         } else if (storage.getSeen()) {
           const last = storage.getLast();
@@ -642,7 +645,7 @@ export default function Workspace() {
           /* 原站：!Gn（唱片态不自动跳）、z<3（最多连跳三次）、跳台走 Ar() 的原地语义 */
           if (skipOnError.current && !recordViewRef.current && skipCount.current < 3) {
             const failedId = stationRef.current?.id;
-            showToast(t("en", "toastAutoSkip"));
+            showToast(T("toastAutoSkip"));
             setTimeout(() => {
               if (
                 recordViewRef.current ||
@@ -687,7 +690,7 @@ export default function Workspace() {
   const nextStation = useCallback(() => {
     const p = poolRef.current;
     if (!p.length) {
-      showToast(t("en", "toastNoPool"));
+      showToast(T("toastNoPool"));
       return;
     }
     const [n] = randomStations(p, 1);
@@ -708,7 +711,7 @@ export default function Workspace() {
   const baseTitle = useRef("");
   if (!baseTitle.current && typeof document !== "undefined") baseTitle.current = document.title;
   useEffect(() => {
-    document.title = station ? `${station.name || t("en", "unnamed")} · 世界电台` : baseTitle.current;
+    document.title = station ? `${station.name || T("unnamed")} · 世界电台` : baseTitle.current;
   }, [station]);
 
   /* ---------- Media Session（原站 uP）：锁屏 / 系统媒体键 ---------- */
@@ -764,7 +767,7 @@ export default function Workspace() {
     const c = data?.meta.countries[station.country];
     const artist = [station.state, lang === "zh" ? c?.[1] : c?.[2]].filter(Boolean).join(" · ");
     const color = data?.meta.genreColors[station.genre] ?? "#8FA39C";
-    const name = station.name || t("en", "unnamed");
+    const name = station.name || T("unnamed");
     try {
       ms.metadata = new MediaMetadata({
         title: name,
@@ -846,7 +849,7 @@ export default function Workspace() {
         const has = ids.includes(s.id);
         const next = has ? ids.filter((x) => x !== s.id) : [s.id, ...ids];
         storage.setSaved(next);
-        if (!has) showToast(t("en", "toastSaved"));
+        if (!has) showToast(T("toastSaved"));
         return next;
       });
     },
@@ -855,7 +858,7 @@ export default function Workspace() {
 
   const togglePin = useCallback(() => {
     setPinned((p) => {
-      showToast(t("en", p ? "toastUnpinned" : "toastPinned"));
+      showToast(T(p ? "toastUnpinned" : "toastPinned"));
       return !p;
     });
   }, [showToast]);
@@ -1378,7 +1381,7 @@ export default function Workspace() {
         onDive={() => setRecordView(true)}
         onError={() => {
           setWebglFailed(true);
-          showToast(t("en", "noWebGL"));
+          showToast(T("noWebGL"));
         }}
       />
 
