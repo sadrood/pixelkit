@@ -31,6 +31,9 @@ export function mountRadio() {
   const style = document.createElement('style');
   style.textContent = cssText + `
 /* mobile-hints: 手机上隐藏键盘快捷键提示，避免压住台名 */
+.flag-img { width: 1.15em; height: 0.82em; object-fit: cover; border-radius: 2px; vertical-align: -0.06em; display: inline-block; }
+.flag-fb { font-size: 0.95em; }
+.flag { display: inline-flex; align-items: center; gap: 0.28em; }
 @media (max-width:560px){
   .hints, .hint, .ann { display:none !important; }
   .rd-back { left:12px !important; top:56px !important; transform:none !important; width:34px !important; height:34px !important; padding:0 !important; font-size:0 !important; display:flex; align-items:center; justify-content:center; }

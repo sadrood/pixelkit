@@ -146,13 +146,23 @@ const EMPTY_META: StationMeta = {
   tzs: [],
 };
 
-function flagEmoji(cc?: string): string {
-  if (!cc || cc.length !== 2) return "🌐";
-  const codePoints = cc
-    .toUpperCase()
-    .split("")
-    .map((c) => 0x1f1e6 + c.charCodeAt(0));
-  return String.fromCodePoint(...codePoints);
+/** 国旗：用本地 SVG（public/roamdial/flags），避免 Windows 无旗帜 emoji 字体 */
+function FlagIcon({ cc }: { cc?: string }) {
+  const code = String(cc || "").toUpperCase();
+  if (!/^[A-Z]{2}$/.test(code)) return <span className="flag-fb">🌐</span>;
+  return (
+    <img
+      className="flag-img"
+      src={`/roamdial/flags/${code.toLowerCase()}.svg`}
+      alt={code}
+      loading="lazy"
+      onError={(e) => {
+        const el = e.currentTarget as HTMLImageElement;
+        el.style.display = "none";
+        el.insertAdjacentText("afterend", code);
+      }}
+    />
+  );
 }
 
 /** 大时间下方的地点行：MATURIN, MONAGAS. · 委内瑞拉 · 当地时间 */
@@ -1664,7 +1674,7 @@ export default function Workspace() {
                     <span className="sub">
                       {s ? (
                         <>
-                          {flagEmoji(data?.meta.countries[s.country]?.[0])}{" "}
+                          <FlagIcon cc={data?.meta.countries[s.country]?.[0]} />{" "}
                           {data?.meta.countries[s.country]?.[lang === "zh" ? 1 : 2]}
                           {s.br ? ` · ${s.br} kbps` : ""}
                         </>
@@ -1922,7 +1932,7 @@ export default function Workspace() {
           {station ? (
             <>
               <p className="place">
-                <span className="flag">{flagEmoji(data?.meta.countries[station.country]?.[0])}</span>
+                <span className="flag"><FlagIcon cc={data?.meta.countries[station.country]?.[0]} /></span>
                 {placeLine(lang, station, data?.meta ?? null, "")}
               </p>
               <div className="meta mono">{metaLine(lang, station, data?.meta ?? null)}</div>
